@@ -53,7 +53,21 @@ Java_com_example_cynarranger_MainActivity_nativeSetInstrument(
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_example_cynarranger_MainActivity_nativeSetMasterVolume(
+        JNIEnv* env, jobject, jfloat gain) {
+    engine.setMasterVolume(gain);
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_cynarranger_MainActivity_nativeMidiControlChange(
         JNIEnv* env, jobject, jint controller, jint value) {
     engine.sendMidiControlChange(controller, value);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_example_cynarranger_MainActivity_nativeLoadSoundFont(
+        JNIEnv* env, jobject, jstring sf2Path) {
+    const char *path = env->GetStringUTFChars(sf2Path, nullptr);
+    engine.loadSoundFont(path);
+    env->ReleaseStringUTFChars(sf2Path, path);
 }

@@ -21,6 +21,17 @@ android {
             cmake {
                 cppFlags += "-std=c++17"
                 arguments += "-DANDROID_STL=c++_shared"
+
+                // >>>>> 新增：强制 16KB 对齐 >>>>>
+                // -Wl 告诉编译器把后面的参数传给 Linker
+                // -z,max-page-size=16384 设置最大页大小为 16KB
+                cppFlags += "-Wl,-z,max-page-size=16384"
+
+                // 强制开启 O3 优化 (即使在 Debug 模式)  -O3: 最高级别优化
+                // -ffast-math: 允许编译器对浮点运算进行激进优化 (对音频处理很有用)
+                cppFlags += "-O3 -ffast-math"
+                // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
             }
         }
     }
@@ -62,5 +73,5 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     // 添加 Oboe
-    implementation("com.google.oboe:oboe:1.8.0")
+    implementation("com.google.oboe:oboe:1.9.3")
 }

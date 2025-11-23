@@ -12,7 +12,6 @@ import android.util.Log
 import android.view.MotionEvent
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 import java.io.FileOutputStream
@@ -20,6 +19,7 @@ import android.widget.ArrayAdapter
 import android.widget.Spinner
 import android.widget.AdapterView
 import android.view.View
+import android.widget.SeekBar
 
 class MainActivity : AppCompatActivity() {
 
@@ -27,22 +27,44 @@ class MainActivity : AppCompatActivity() {
     private var midiDevice: MidiDevice? = null
     private lateinit var statusText: TextView
 
+    // 定义你的音色库文件名列表
+    private val soundFontFiles = listOf(
+        "Crisis_GM_3.51.sf2",
+        "Yamaha_C7_Normalized.sf2",
+        "RoyalGrand3D.sf2",
+        "LiveHQNaturalGM.sf2"
+    )
+
+    // 为了显示好看的名字，可以搞个映射，或者直接用文件名
+    private val soundFontNames = listOf(
+        "Crisis_GM_3.51",
+        "Yamaha_C7_Normalized",
+        "RoyalGrand3D",
+        "LiveHQNaturalGM"
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         statusText = findViewById(R.id.sample_text) // 确保你在 XML 里有这个 ID
 
-        // 1. 初始化引擎 (保持不变)
-        val sf2File = File(cacheDir, "FluidR3_GM.sf2")
-        if (!sf2File.exists()) {
-            assets.open("FluidR3_GM.sf2").use { input ->
-                FileOutputStream(sf2File).use { output -> input.copyTo(output) }
-            }
-        }
-        nativeInit(sf2File.absolutePath)
+        // 1. 拷贝所有 SF2 文件到缓存
+        copyAssets()
+
+        // 2. 初始化引擎 (默认加载第一个)
+        val defaultSf2 = File(cacheDir, soundFontFiles[0])
+        nativeInit(defaultSf2.absolutePath)
+
+        // 3. 设置两个下拉菜单
+        setupSpinners()
+
+        // >>>>> 设置音量控制 >>>>>
+        setupVolumeControl()
         // 加载乐器列表到 UI
         setupInstrumentSpinner()
+
+
 
         // 2. 按钮测试 (保持不变)
         val btnTest = findViewById<Button>(R.id.btnTest)
@@ -79,6 +101,74 @@ class MainActivity : AppCompatActivity() {
             openMidiDevice(devices[0])
         } else {
             statusText.text = "请插入 USB MIDI 键盘..."
+        }
+    }
+
+
+
+    private fun copyAssets() {
+        for (fileName in soundFontFiles) {
+            val file = File(cacheDir, fileName)
+            if (!file.exists()) {
+                try {
+                    assets.open(fileName).use { input ->
+                        FileOutputStream(file).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+    }
+
+    private fun setupSpinners() {
+        // --- A. 设置音色库 (SoundFont) Spinner ---
+        val sfSpinner = findViewById<Spinner>(R.id.sfSpinner)
+        val sfAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, soundFontNames)
+        sfAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        sfSpinner.adapter = sfAdapter
+
+        sfSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                // 1. 获取选中的文件名
+                val fileName = soundFontFiles[position]
+                val file = File(cacheDir, fileName)
+
+                // 2. 调用 JNI 切换引擎里的 SoundFont
+                nativeLoadSoundFont(file.absolutePath)
+
+                // 3. 核心：切换完库后，必须刷新乐器列表！
+                refreshInstrumentSpinner()
+            }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+    }
+
+    private fun refreshInstrumentSpinner() {
+        val instSpinner = findViewById<Spinner>(R.id.instrumentSpinner)
+
+        // 1. 从 C++ 获取当前库的乐器总数
+        val count = nativeGetInstrumentCount()
+        val instrumentNames = ArrayList<String>()
+
+        // 2. 获取所有乐器名
+        for (i in 0 until count) {
+            instrumentNames.add(nativeGetInstrumentName(i))
+        }
+
+        // 3. 创建适配器并设置
+        val instAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, instrumentNames)
+        instAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        instSpinner.adapter = instAdapter
+
+        // 4. 重置选择监听
+        instSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                nativeSetInstrument(position)
+            }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
         }
     }
 
@@ -143,6 +233,32 @@ class MainActivity : AppCompatActivity() {
         }, Handler(Looper.getMainLooper()))
     }
 
+    private fun setupVolumeControl() {
+        val seekBar = findViewById<SeekBar>(R.id.volumeSeekBar)
+        val label = findViewById<TextView>(R.id.tvVolumeLabel)
+
+        // 默认 Gain = 1.0，对应 Progress = 20 (因为 20 * 0.05 = 1.0)
+        seekBar.progress = 20
+
+        seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                // 映射算法：每1格代表 0.05 的增益
+                // 0 -> 0.0
+                // 20 -> 1.0 (默认)
+                // 100 -> 5.0 (极大)
+                val gain = progress * 0.05f
+
+                label.text = String.format("Master Volume: %.2f", gain)
+
+                // 调用 JNI
+                nativeSetMasterVolume(gain)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+    }
+
     private fun closeMidiDevice() {
         midiDevice?.close()
         midiDevice = null
@@ -205,7 +321,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-
+    external fun nativeSetMasterVolume(gain: Float)
     external fun nativeMidiControlChange(controller: Int, value: Int)
     external fun nativeGetInstrumentCount(): Int
     external fun nativeGetInstrumentName(index: Int): String
@@ -213,6 +329,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeInit(sf2Path: String)
     external fun nativeNoteOn(note: Int, velocity: Int)
     external fun nativeNoteOff(note: Int)
+    external fun nativeLoadSoundFont(path: String)
 
     companion object {
         init {
