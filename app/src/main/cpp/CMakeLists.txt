@@ -73,3 +73,5 @@ target_link_libraries(
         android
         m
 )
+
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -mfpu=neon")

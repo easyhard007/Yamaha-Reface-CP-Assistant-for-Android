@@ -29,13 +29,11 @@ class MainActivity : AppCompatActivity() {
 
     // 定义你的音色库文件名列表
     private val soundFontFiles = listOf(
-        "LiveHQNaturalGM.sf2",
         "JJazzLab-SoundFont.sf2"
     )
 
     // 为了显示好看的名字，可以搞个映射，或者直接用文件名
     private val soundFontNames = listOf(
-        "LiveHQNaturalGM",
         "JJazzLab-SoundFont"
     )
 
