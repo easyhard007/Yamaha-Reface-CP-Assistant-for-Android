@@ -25,6 +25,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var midiManager: MidiManager
     private var midiDevice: MidiDevice? = null
+    private var midiDeviceInfoList: List<MidiDeviceInfo> = emptyList()
     private lateinit var statusText: TextView
 
     // 定义你的音色库文件名列表
@@ -71,31 +72,31 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ==========================================
-        // 3. MIDI 初始化
+        // 3. MIDI 初始化 — 手动选择设备
         // ==========================================
         midiManager = getSystemService(Context.MIDI_SERVICE) as MidiManager
 
-        // 注册插拔监听
+        setupMidiSpinner()
+
+        // 监听设备插拔，自动刷新列表
         midiManager.registerDeviceCallback(object : MidiManager.DeviceCallback() {
             override fun onDeviceAdded(deviceInfo: MidiDeviceInfo) {
-                statusText.text = "发现设备: ${deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME)}"
-                openMidiDevice(deviceInfo)
+                runOnUiThread { refreshMidiDevices() }
             }
-
             override fun onDeviceRemoved(deviceInfo: MidiDeviceInfo) {
-                statusText.text = "设备断开"
-                closeMidiDevice()
+                runOnUiThread {
+                    refreshMidiDevices()
+                    // 如果当前连接的设备被拔出，断开连接
+                    if (midiDevice != null && midiDevice?.info == deviceInfo) {
+                        closeMidiDevice()
+                        statusText.text = "设备已断开"
+                    }
+                }
             }
         }, Handler(Looper.getMainLooper()))
 
-        // 检查当前是否已经插着设备
-        val devices = midiManager.devices
-        if (devices.isNotEmpty()) {
-            statusText.text = "发现已连接设备: ${devices[0].properties.getString(MidiDeviceInfo.PROPERTY_NAME)}"
-            openMidiDevice(devices[0])
-        } else {
-            statusText.text = "请插入 USB MIDI 键盘..."
-        }
+        // 初次扫描
+        refreshMidiDevices()
     }
 
 
@@ -253,9 +254,57 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
+    // ==========================================
+    // MIDI 设备列表
+    // ==========================================
+    private fun setupMidiSpinner() {
+        val midiSpinner = findViewById<Spinner>(R.id.midiSpinner)
+        val btnRefresh = findViewById<Button>(R.id.btnRefreshMidi)
+
+        btnRefresh.setOnClickListener { refreshMidiDevices() }
+
+        midiSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>, view: View?, position: Int, id: Long) {
+                if (position >= 0 && position < midiDeviceInfoList.size) {
+                    // 切设备前先断开旧连接
+                    closeMidiDevice()
+                    openMidiDevice(midiDeviceInfoList[position])
+                }
+            }
+            override fun onNothingSelected(parent: AdapterView<*>) {}
+        }
+    }
+
+    private fun refreshMidiDevices() {
+        midiDeviceInfoList = midiManager.devices.toList()
+        val midiSpinner = findViewById<Spinner>(R.id.midiSpinner)
+
+        if (midiDeviceInfoList.isEmpty()) {
+            val emptyList = listOf("(没有找到 MIDI 设备)")
+            midiSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, emptyList)
+            return
+        }
+
+        val names = midiDeviceInfoList.map { info ->
+            val props = info.properties
+            val name = props.getString(MidiDeviceInfo.PROPERTY_NAME) ?: "Unknown"
+            val manufacturer = props.getString(MidiDeviceInfo.PROPERTY_MANUFACTURER)
+            if (manufacturer != null) "$name ($manufacturer)" else name
+        }
+
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, names)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        midiSpinner.adapter = adapter
+    }
+
     private fun closeMidiDevice() {
         midiDevice?.close()
         midiDevice = null
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        closeMidiDevice()
     }
 
     // ==========================================

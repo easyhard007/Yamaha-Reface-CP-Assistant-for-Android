@@ -196,6 +196,7 @@ fluid_voice_init(fluid_voice_t* voice, fluid_sample_t* sample,
 
   /* Increment the reference count of the sample to prevent the
      unloading of the soundfont while this voice is playing. */
+  if (voice->sample == NULL) return FLUID_FAILED;
   fluid_sample_incr_ref(voice->sample);
 
   return FLUID_OK;

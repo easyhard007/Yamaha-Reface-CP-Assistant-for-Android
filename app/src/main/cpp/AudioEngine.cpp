@@ -3,6 +3,7 @@
 #include <android/log.h>
 #include <cstring>
 #include <cstdio>
+#include <cmath>
 #include <arm_neon.h>
 
 #define TAG "AudioEngine"
@@ -42,10 +43,15 @@ void AudioEngine::scanPresets(fluid_synth_t* synth, std::vector<InstrumentInfo>&
 bool AudioEngine::init(const char* sf2Path) {
     std::lock_guard<std::mutex> lock(mLock);
 
+    // 如果已经初始化过，先清理旧的（Activity 重建场景）
+    if (mLeadSynth) { delete_fluid_synth(mLeadSynth); mLeadSynth = nullptr; }
+    if (mAccompSynth) { delete_fluid_synth(mAccompSynth); mAccompSynth = nullptr; }
+    if (mSettings) { delete_fluid_settings(mSettings); mSettings = nullptr; }
+    mLeadInstruments.clear();
+    mAccompInstruments.clear();
+
     mSettings = new_fluid_settings();
-    fluid_settings_setint(mSettings, "synth.polyphony", 32);
-    // 使用 linear 插值以提升移动端性能，防止超时导致的爆音
-    fluid_settings_setstr(mSettings, "synth.interpolation-method", "linear");
+    fluid_settings_setint(mSettings, "synth.polyphony", 48);
 
     mLeadSynth = new_fluid_synth(mSettings);
     mAccompSynth = new_fluid_synth(mSettings);
@@ -57,6 +63,7 @@ bool AudioEngine::init(const char* sf2Path) {
 
     // 降低增益，为双合成器混音预留余量
     fluid_synth_set_gain(mLeadSynth, 0.6f);
+    fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
     if (mLeadSoundFontId != -1) {
         scanPresets(mLeadSynth, mLeadInstruments);
@@ -66,6 +73,7 @@ bool AudioEngine::init(const char* sf2Path) {
     }
 
     fluid_synth_set_gain(mAccompSynth, 0.4f);
+    fluid_synth_set_interp_method(mAccompSynth, -1, FLUID_INTERP_LINEAR);
 //    fluid_synth_set_reverb_on(mAccompSynth, 1);
 //    fluid_synth_set_reverb(mAccompSynth, 0.5f, 0.5f, 50.0f, 0.2f);
 
@@ -73,6 +81,13 @@ bool AudioEngine::init(const char* sf2Path) {
 }
 
 void AudioEngine::start() {
+    // 如果已有正在运行的 stream，先停掉旧的，防止两个 stream 同时跑导致崩溃
+    if (stream) {
+        stream->stop();
+        stream->close();
+        stream.reset();
+    }
+
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)
             ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
@@ -80,9 +95,9 @@ void AudioEngine::start() {
             ->setFormat(oboe::AudioFormat::Float)
             ->setChannelCount(oboe::ChannelCount::Stereo)
             ->setUsage(oboe::Usage::Game)
+            ->setSampleRate(44100)  // 与 FluidLite 默认采样率保持一致，避免 resampling
             ->setCallback(this);
 
-    // 不强制 48000，使用系统原生采样率
     oboe::Result result = builder.openStream(stream);
     if (result != oboe::Result::OK) return;
 
@@ -92,13 +107,8 @@ void AudioEngine::start() {
     int32_t bufferSize = stream->getFramesPerBurst() * 4;
     stream->setBufferSizeInFrames(bufferSize);
 
-
-    int32_t sampleRate = stream->getSampleRate();
     {
         std::lock_guard<std::mutex> lock(mLock);
-        if (mLeadSynth) fluid_synth_set_sample_rate(mLeadSynth, (float)sampleRate);
-        if (mAccompSynth) fluid_synth_set_sample_rate(mAccompSynth, (float)sampleRate);
-
         // 预分配混音缓冲区，确保足够容纳调大后的 bufferSize
         mMixBuffer.assign(bufferSize * 2, 0.0f);
     }
@@ -222,16 +232,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     asm volatile("msr fpcr, %0" : : "r" (fpscr | (1U << 24)));
 #endif
 
-    // [关键改进 2] 绝不输出 memset(0)！
-    // 如果拿不到锁，我们直接跳过这一帧的“新 MIDI 消息处理”，但依然让 Synth 渲染上一时刻的状态。
-    // 这样听起来顶多是 MIDI 响应延迟了几毫秒，而绝对不会出现“咔哒”一声断音。
-    std::unique_lock<std::mutex> lock(mLock, std::try_to_lock);
+    // 使用普通锁而非 try_to_lock：FluidLite 不是线程安全的，
+    // write_float 与 noteon 并发会导致 SIGSEGV。
+    // MIDI 操作（playNote 等）都是微秒级，短暂阻塞 audio 线程不会产生爆音。
+    std::lock_guard<std::mutex> lock(mLock);
 
     if (mLeadSynth && mAccompSynth) {
-        // 即使没拿到锁（owns_lock 为 false），我们也继续渲染！
-        // 因为 FluidSynth 本身在渲染时（write_float）内部有自己的更细粒度的同步机制（如果开启了话）
-        // 或者至少它不会因为你没加外层锁而崩溃，顶多是 NoteOn 延迟执行。
-
         // 1. 渲染 Lead
         fluid_synth_write_float(mLeadSynth, numFrames, outBuffer, 0, 2, outBuffer, 1, 2);
 
@@ -240,13 +246,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         if (mMixBuffer.size() >= numFrames * 2) {
             fluid_synth_write_float(mAccompSynth, numFrames, mixPtr, 0, 2, mixPtr, 1, 2);
 
-            // 3. 混合并限幅 (使用简单的 Clamp)
+            // 3. 混合并使用 tanh 软削波 (取代硬削波，避免谐波失真)
             for (int i = 0; i < numFrames * 2; ++i) {
                 float sample = outBuffer[i] + mixPtr[i];
-                // 这里的限幅非常重要，防止两个 0.6 相加超过 1.0 导致的爆音
-                if (sample > 1.0f) sample = 1.0f;
-                else if (sample < -1.0f) sample = -1.0f;
-                outBuffer[i] = sample;
+                // tanh 软削波：在 ±1.0 附近平滑过渡，产生温暖的模拟式饱和而非刺耳的方波失真
+                // 同时保留瞬态细节，不会像硬削波那样把峰值直接"切平"
+                outBuffer[i] = tanhf(sample);
             }
         }
     } else {
