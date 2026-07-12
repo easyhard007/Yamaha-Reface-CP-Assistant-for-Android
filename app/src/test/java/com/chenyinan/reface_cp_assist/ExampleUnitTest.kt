@@ -1,4 +1,4 @@
-package com.example.cynarranger
+package com.chenyinan.reface_cp_assist
 
 import org.junit.Test
 

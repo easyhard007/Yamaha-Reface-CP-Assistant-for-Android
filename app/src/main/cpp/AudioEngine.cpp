@@ -136,13 +136,20 @@ void AudioEngine::stop() {
 void AudioEngine::playNote(int target, int note, int velocity) {
     std::lock_guard<std::mutex> lock(mLock);
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteon(synth, 0, note, velocity);
+    if (synth) {
+        fluid_synth_noteon(synth, 0, note, velocity);
+        mActiveNotes.insert(note);
+        mScaleDetector.feedNote(note);
+    }
 }
 
 void AudioEngine::stopNote(int target, int note) {
     std::lock_guard<std::mutex> lock(mLock);
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteoff(synth, 0, note);
+    if (synth) {
+        fluid_synth_noteoff(synth, 0, note);
+        mActiveNotes.erase(note);
+    }
 }
 
 void AudioEngine::sendMidiControlChange(int target, int controller, int value) {
@@ -210,6 +217,49 @@ void AudioEngine::setInstrument(int target, int index) {
     }
 }
 
+std::string AudioEngine::getChordInfo() {
+    std::lock_guard<std::mutex> lock(mLock);
+    return mCachedChordInfo;
+}
+
+// 根据和弦根音和调性根音，计算罗马数字级数
+static std::string toRomanNumeral(int chordRootPc, int scaleRootPc, bool isMinor,
+                                   const std::string& chordSuffix) {
+    if (chordRootPc < 0 || scaleRootPc < 0) return "--";
+
+    static const char* ROMAN_MAJOR[] = {"I", "#I", "ii", "#ii", "iii", "IV", "#IV", "V", "#V", "vi", "#vi", "viidim"};
+    static const char* ROMAN_MINOR[] = {"i", "#i", "iidim", "III", "#iii", "iv", "#iv", "v", "#v", "VI", "#vi", "viidim"};
+
+    int degree = (chordRootPc - scaleRootPc + 12) % 12;
+    const char* base = isMinor ? ROMAN_MINOR[degree] : ROMAN_MAJOR[degree];
+
+    // Append chord quality suffix (strip the root portion)
+    // e.g., chordSuffix = "m7" → roman = "ii7" or "iidim" etc.
+    if (chordSuffix.find("dim") != std::string::npos || chordSuffix.find("m7b5") != std::string::npos) {
+        // Already handled by viidim/iidim
+    }
+
+    std::string result = base;
+
+    // Add 7th indicators
+    if (chordSuffix.find("maj7") != std::string::npos) {
+        result += "maj7";
+    } else if (chordSuffix.find("m7") != std::string::npos) {
+        result += "7";
+    } else if (chordSuffix.find("7") != std::string::npos) {
+        result += "7";
+    } else if (chordSuffix.find("m") != std::string::npos) {
+        // minor chord: e.g., "ii" already has the minor look, but append "m" for clarity on major degrees
+        if (result == "I" || result == "IV" || result == "V") result += "m";
+    } else if (chordSuffix.find("dim") != std::string::npos) {
+        result += "dim";
+    } else if (chordSuffix.find("aug") != std::string::npos) {
+        result += "+";
+    }
+
+    return result;
+}
+
 void AudioEngine::setMasterVolume(int target, float gain) {
     std::lock_guard<std::mutex> lock(mLock);
     if (target == 0 && mLeadSynth) fluid_synth_set_gain(mLeadSynth, gain);
@@ -256,6 +306,35 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         }
     } else {
         memset(outBuffer, 0, numFrames * 2 * sizeof(float));
+    }
+
+    // 和弦分析：每帧更新缓存结果
+    {
+        float deltaSec = (float)numFrames / 44100.0f;
+        mScaleDetector.tick(deltaSec);
+
+        ChordResult cr = ChordDetector::detect(mActiveNotes);
+        int scaleRoot = mScaleDetector.getScaleRootPc();
+        bool isMinor = mScaleDetector.isMinor();
+
+        if (!cr.chordName.empty() && scaleRoot >= 0) {
+            // Extract chord suffix for roman numeral decoration
+            std::string suffix;
+            size_t pos = cr.chordName.find_first_of("mdi75sa");
+            if (pos != std::string::npos) {
+                suffix = cr.chordName.substr(pos);
+                // Remove bass note after slash for suffix
+                size_t slash = suffix.find('/');
+                if (slash != std::string::npos) suffix = suffix.substr(0, slash);
+            }
+
+            std::string roman = toRomanNumeral(cr.rootPc, scaleRoot, isMinor, suffix);
+            mCachedChordInfo = cr.chordName + "|" + roman + "|" + mScaleDetector.getKeyName();
+        } else if (!cr.chordName.empty()) {
+            mCachedChordInfo = cr.chordName + "|--|--";
+        } else {
+            mCachedChordInfo = "--|--|--";
+        }
     }
 
     return oboe::DataCallbackResult::Continue;

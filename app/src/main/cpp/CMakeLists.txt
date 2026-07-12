@@ -63,6 +63,8 @@ add_library(
         SHARED
         native-lib.cpp
         AudioEngine.cpp
+        ChordDetector.cpp
+        ScaleDetector.cpp
         ${FLUIDLITE_SOURCES}
 )
 

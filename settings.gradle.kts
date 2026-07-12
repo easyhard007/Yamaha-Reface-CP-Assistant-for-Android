@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "CynArranger"
+rootProject.name = "Yamaha Reface CP Assistant"
 include(":app")
  

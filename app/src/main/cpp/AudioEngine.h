@@ -5,7 +5,10 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <set>
 #include "fluidlite.h"
+#include "ChordDetector.h"
+#include "ScaleDetector.h"
 
 class AudioEngine : public oboe::AudioStreamCallback {
 public:
@@ -34,6 +37,9 @@ public:
 
     // 音量控制
     void setMasterVolume(int target, float gain);
+
+    // 和弦分析（供 JNI 轮询）
+    std::string getChordInfo();
 
     // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -71,5 +77,10 @@ private:
 
     // 混音缓冲区
     std::vector<float> mMixBuffer;
+
+    // 和弦检测
+    std::set<int> mActiveNotes;
+    ScaleDetector mScaleDetector;
+    std::string mCachedChordInfo;
     // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 };

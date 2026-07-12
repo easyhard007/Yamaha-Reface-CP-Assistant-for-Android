@@ -4,17 +4,17 @@ plugins {
 }
 
 android {
-    namespace = "com.example.cynarranger"
+    namespace = "com.chenyinan.reface_cp_assist"
     compileSdk {
         version = release(36)
     }
 
     defaultConfig {
-        applicationId = "com.example.cynarranger"
+        applicationId = "com.chenyinan.reface_cp_assist"
         minSdk = 27
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {
