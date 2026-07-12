@@ -36,9 +36,30 @@ android {
         }
     }
 
+    // >>>>> 1. 配置签名信息 (新增) >>>>>
+    signingConfigs {
+        create("release") {
+            // 这里的路径取决于你刚才把 jks 文件存在哪了
+            // 如果放在项目根目录，用 rootProject.file("my_keystore.jks")
+            // 如果放在 app 目录下，用 file("my_keystore.jks")
+            storeFile = file("C:\\Users\\easyh\\AndroidStudioProjects\\CynKeyApk\\cyn_keystore.jks")
+            storePassword = "8931007" // 刚才设置的密码，例如 "123456"
+            keyAlias = "key0"       // 刚才设置的别名
+            keyPassword = "8931007" // 刚才设置的密码
+        }
+    }
+
     buildTypes {
         release {
+            // >>>>> 2. 引用上面的签名配置 (新增) >>>>>
+            signingConfig = signingConfigs.getByName("release")
+            // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+            // 代码混淆 (通常 Release 默认开启)
+            // 注意：如果开启混淆导致 JNI 找不到 Java 方法，可能需要关掉它
+            // 为了测试性能，暂时建议先设为 false，排除混淆带来的干扰
             isMinifyEnabled = false
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

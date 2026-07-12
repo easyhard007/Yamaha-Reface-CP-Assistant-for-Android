@@ -3,10 +3,8 @@
 #include <oboe/Oboe.h>
 #include <mutex>
 #include <memory>
-#include <vector> // 引入 vector
-#include <string> // 引入 string
-// 引入 FluidLite 主头文件
-// 因为我们在 CMake 中使用了 add_subdirectory，路径会自动处理，直接引用即可
+#include <vector>
+#include <string>
 #include "fluidlite.h"
 
 class AudioEngine : public oboe::AudioStreamCallback {
@@ -14,53 +12,64 @@ public:
     AudioEngine() = default;
     ~AudioEngine();
 
-    // 初始化：加载 SoundFont，设置参数
+    // 初始化：同时创建 Lead 和 Accomp 两个合成器
+    // sf2Path: 默认加载给 Lead 的音色路径
     bool init(const char* sf2Path);
 
-    // 启动/停止 Oboe 音频流
     void start();
     void stop();
 
-    // MIDI 核心功能
-    void playNote(int note, int velocity);
-    void stopNote(int note);
-    void sendMidiControlChange(int controller, int value);
+    // >>>>> 核心修改：增加 target 参数 (0=Lead, 1=Accomp) >>>>>
 
+    // MIDI 控制
+    void playNote(int target, int note, int velocity);
+    void stopNote(int target, int note);
+    void sendMidiControlChange(int target, int controller, int value);
 
     // 乐器管理
-    bool loadSoundFont(const char* path);
-    int getInstrumentCount();
-    const char* getInstrumentName(int index);
-    void setInstrument(int index);
+    bool loadSoundFont(int target, const char* path);
+    int getInstrumentCount(int target);
+    const char* getInstrumentName(int target, int index);
+    void setInstrument(int target, int index);
 
-    void setMasterVolume(float gain); // gain: 0.0 - 5.0 (推荐范围)
+    // 音量控制
+    void setMasterVolume(int target, float gain);
 
+    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-    // Oboe 音频回调函数
+    // Oboe 回调
     oboe::DataCallbackResult onAudioReady(
             oboe::AudioStream *audioStream,
             void *audioData,
             int32_t numFrames) override;
 
 private:
-    // 辅助函数：扫描当前 SF2 的所有乐器
-    void scanPresets();
-
-    std::shared_ptr<oboe::AudioStream> stream;
-    std::mutex mLock; // 线程锁，防止 UI 线程和音频线程冲突
-
-    // FluidLite 核心指针
-    fluid_settings_t* mSettings = nullptr;
-    fluid_synth_t* mSynth = nullptr;
-    int mSoundFontId = -1;
-
-    // 定义乐器映射结构
     struct InstrumentInfo {
-        std::string name; // 显示给 UI 的名字
-        int bank;         // 真实的 Bank 号
-        int program;      // 真实的 Program 号
+        std::string name;
+        int bank;
+        int program;
     };
 
-    // 乐器列表缓存
-    std::vector<InstrumentInfo> mInstruments;
+    // 辅助函数：扫描指定 Synth 的乐器到指定列表
+    void scanPresets(fluid_synth_t* synth, std::vector<InstrumentInfo>& list);
+
+    std::shared_ptr<oboe::AudioStream> stream;
+    std::mutex mLock;
+
+    fluid_settings_t* mSettings = nullptr; // 配置可以共用一个
+
+    // >>>>> 明确的两个变量，不搞数组 >>>>>
+    fluid_synth_t* mLeadSynth = nullptr;   // 主旋律 (键盘)
+    fluid_synth_t* mAccompSynth = nullptr; // 伴奏 (自动)
+
+    int mLeadSoundFontId = -1;
+    int mAccompSoundFontId = -1;
+
+    // 两个乐器列表缓存
+    std::vector<InstrumentInfo> mLeadInstruments;
+    std::vector<InstrumentInfo> mAccompInstruments;
+
+    // 混音缓冲区
+    std::vector<float> mMixBuffer;
+    // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 };

@@ -29,18 +29,14 @@ class MainActivity : AppCompatActivity() {
 
     // 定义你的音色库文件名列表
     private val soundFontFiles = listOf(
-        "Crisis_GM_3.51.sf2",
-        "Yamaha_C7_Normalized.sf2",
-        "RoyalGrand3D.sf2",
-        "LiveHQNaturalGM.sf2"
+        "LiveHQNaturalGM.sf2",
+        "JJazzLab-SoundFont.sf2"
     )
 
     // 为了显示好看的名字，可以搞个映射，或者直接用文件名
     private val soundFontNames = listOf(
-        "Crisis_GM_3.51",
-        "Yamaha_C7_Normalized",
-        "RoyalGrand3D",
-        "LiveHQNaturalGM"
+        "LiveHQNaturalGM",
+        "JJazzLab-SoundFont"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
