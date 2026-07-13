@@ -67,6 +67,7 @@ add_library(
         chord_detect.cpp
         ScaleDetector.cpp
         AutoSustainManager.cpp
+        BassEnhancer.cpp
         ${FLUIDLITE_SOURCES}
 )
 

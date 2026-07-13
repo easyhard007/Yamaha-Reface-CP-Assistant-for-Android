@@ -2,6 +2,8 @@ package com.chenyinan.reface_cp_assist
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.media.AudioDeviceInfo
+import android.media.AudioManager
 import android.media.midi.MidiDevice
 import android.media.midi.MidiDeviceInfo
 import android.media.midi.MidiManager
@@ -73,7 +75,8 @@ class MainActivity : AppCompatActivity() {
             { idx -> startDevice(idx) }, { stopDevice() },
             { idx -> selectSf2(idx) }, { idx -> nativeSetInstrument(idx) },
             { delta -> nativeChangeSplitPoint(delta) },
-            { enabled -> nativeSetAutoSustain(enabled) }
+            { enabled -> nativeSetAutoSustain(enabled) },
+            { enabled -> nativeSetBassEnhance(enabled) }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -142,14 +145,43 @@ class MainActivity : AppCompatActivity() {
         js("if(typeof onNativeDeviceState==='function')onNativeDeviceState($connected,'$name',$idx);")
     }
 
-    private fun sendSustainCC(cc: Int) {
-        if (cc == 127) midiUtil.sendSustainOn()
-        else if (cc == 0) midiUtil.sendSustainOff()
+    private fun handleProcessResult(result: Int) {
+        val sustainCC = result and 0xFF
+        if (sustainCC == 127) midiUtil.sendSustainOn()
+        else if (sustainCC == 0) midiUtil.sendSustainOff()
+        val bassNote = ((result shr 8) and 0xFF) - 1
+        if (bassNote >= 0) {
+            val bassVel = (result shr 16) and 0xFF
+            if (bassVel > 0) midiUtil.sendNoteOn(bassNote, bassVel)
+            else midiUtil.sendNoteOff(bassNote)
+        }
     }
 
     private fun midiLogRx(text: String) {
         val prefix = if (connectedDeviceName.isNotEmpty()) "[$connectedDeviceName] " else ""
         jsLog("$prefix$text", true)
+    }
+
+    private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
+
+    private fun pushAudioDevices() {
+        val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+        val sb = StringBuilder()
+        for (d in devices) {
+            val typeName = when (d.type) {
+                AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Speaker"
+                AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Headphones"
+                AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Headset"
+                AudioDeviceInfo.TYPE_BLUETOOTH_A2DP -> "BT"
+                AudioDeviceInfo.TYPE_USB_HEADSET -> "USB"
+                else -> "?${d.type}"
+            }
+            val active = if (d.isSink) "*" else ""
+            val name = d.productName?.toString() ?: ""
+            sb.append("$active$typeName ${name}, ")
+        }
+        val info = if (sb.isEmpty()) "-" else sb.toString().trimEnd(',', ' ')
+        js("var el=document.getElementById('dbg-audio');if(el)el.textContent='$info';")
     }
 
     private fun midiNoteName(note: Int) = "${noteNames[note % 12]}${note / 12 - 1}"
@@ -246,6 +278,7 @@ class MainActivity : AppCompatActivity() {
                 // 自动踏板 CC64 发送
                 val cc = nativeGetPendingSustainCC()
                 if (cc == 127) midiUtil.sendSustainOn() else if (cc == 0) midiUtil.sendSustainOff()
+                pushAudioDevices()
                 chordHandler.postDelayed(this, 150)
             }
         }
@@ -268,13 +301,13 @@ class MainActivity : AppCompatActivity() {
                         val velocity = msg[i + 2].toInt()
                         if (velocity > 0) {
                             nativeNoteOn(note, velocity)
-                                sendSustainCC(nativeProcessNoteOn(note, velocity))
+                                handleProcessResult(nativeProcessNoteOn(note, velocity))
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteon',$note,$velocity,$ch);")
                         } else {
                             nativeNoteOff(note)
-                                sendSustainCC(nativeProcessNoteOff(note))
+                                handleProcessResult(nativeProcessNoteOff(note))
                             val log = "↓ NoteOff ${midiNoteName(note)}  v0  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
@@ -283,7 +316,7 @@ class MainActivity : AppCompatActivity() {
                     } else if (status in 0x80..0x8F && i + 2 < offset + count) {
                         val note = msg[i + 1].toInt()
                         nativeNoteOff(note)
-                                sendSustainCC(nativeProcessNoteOff(note))
+                                handleProcessResult(nativeProcessNoteOff(note))
                         val log = "↓ NoteOff ${midiNoteName(note)}  ch$ch"
                         midiLogRx(log)
                         js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
@@ -292,7 +325,7 @@ class MainActivity : AppCompatActivity() {
                         val ctrl = msg[i + 1].toInt()
                         val value = msg[i + 2].toInt()
                         nativeSendCC(ctrl, value)
-                        sendSustainCC(nativeProcessCC(ctrl, value))
+                        handleProcessResult(nativeProcessCC(ctrl, value))
                         val ccName = if (ctrl == 64) "Sustain" else "CC$ctrl"
                         midiLogRx("↓ $ccName=$value  ch$ch")
                         js("if(typeof onNativeMidi==='function')onNativeMidi('cc',$ctrl,$value,$ch);")
@@ -335,6 +368,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetNoteState(): String
     external fun nativeChangeSplitPoint(delta: Int): Int
     external fun nativeSetAutoSustain(enabled: Boolean)
+    external fun nativeSetBassEnhance(enabled: Boolean)
     external fun nativeGetPendingSustainCC(): Int
     external fun nativeLoadSoundFont(path: String)
     external fun nativeGetInstrumentCount(): Int

@@ -4,19 +4,22 @@
 #include <mutex>
 #include <vector>
 #include "chord_detect.h"
+#include "BassEnhancer.h"
 #include "ScaleDetector.h"
 #include "AutoSustainManager.h"
 
 /// Returned by processNoteOn — tells the caller what to do
 struct NoteOnResult {
-    bool shouldPlay = true;       // send to FluidLite?
-    bool shouldSendToDevice = false; // forward to external MIDI?
+    bool shouldPlay = true;
     int sustainCCToSend = -1;     // -1=none, 0=off, 127=on
+    int bassNote = -1;            // bass note to send (-12 octave), -1 = none
+    int bassVelocity = 0;
 };
 
 struct NoteOffResult {
-    bool shouldStop = true;       // send note-off to FluidLite?
+    bool shouldStop = true;
     int sustainCCToSend = -1;
+    int bassNote = -1;            // bass note-off (-12 octave), -1 = none
 };
 
 struct CCResult {
@@ -38,6 +41,11 @@ public:
     int  setAutoSustainEnabled(bool enabled); // returns CC64 to send (-1/0/127)
     int  getPendingSustainCC();               // clears after read
     bool isAutoSustainEnabled() const;
+
+    // ---- Bass enhance ----
+    void setBassEnhanceEnabled(bool enabled);
+    bool isBassEnhanceEnabled() const { return mBassEnhanceEnabled; }
+    float getBassWeight(int note) const;  // weight for a given MIDI note
 
     // ---- State accessors (for polling/JNI) ----
     std::string getNoteStateJson();
@@ -61,6 +69,16 @@ private:
     // Auto-sustain
     AutoSustainManager mAutoSustain;
     int mPendingSustainCC = -1;
+
+    // Bass enhance
+    BassEnhancer mBassEnhancer;
+    bool mBassEnhanceEnabled = false;
+    float mBassEnhanceRatio = 0.5f;
+    int mBassEnhanceCenter = 43;
+    int mBassEnhanceSpread = 12;
+    float mBassWeights[128] = {};
+    bool mBassWeightsDirty = true;
+    void recomputeBassWeights();
 
     // Analysis
     ScaleDetector mScaleDetector;

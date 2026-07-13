@@ -48,7 +48,7 @@ bool AudioEngine::init(const char* sf2Path) {
         return false;
     }
 
-    fluid_synth_set_gain(mLeadSynth, 0.6f);
+    fluid_synth_set_gain(mLeadSynth, 1.0f);
     fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
     if (mLeadSoundFontId != -1) {
@@ -65,7 +65,7 @@ void AudioEngine::start() {
     oboe::AudioStreamBuilder builder;
     builder.setDirection(oboe::Direction::Output)
         ->setPerformanceMode(oboe::PerformanceMode::LowLatency)
-        ->setSharingMode(oboe::SharingMode::Exclusive)
+        ->setSharingMode(oboe::SharingMode::Shared)
         ->setFormat(oboe::AudioFormat::Float)
         ->setChannelCount(oboe::ChannelCount::Stereo)
         ->setUsage(oboe::Usage::Game)

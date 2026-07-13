@@ -1,8 +1,32 @@
 #include "MidiProcessor.h"
 #include <android/log.h>
 #include <sstream>
+#include <cmath>
 
 #define TAG "MidiProcessor"
+
+void MidiProcessor::setBassEnhanceEnabled(bool enabled) {
+    std::lock_guard<std::mutex> lock(mLock);
+    mBassEnhanceEnabled = enabled;
+    mBassEnhancer.setEnabled(enabled);
+}
+
+float MidiProcessor::getBassWeight(int note) const {
+    if (!mBassEnhanceEnabled || note < 0 || note > 127) return 0;
+    if (mBassWeightsDirty) const_cast<MidiProcessor*>(this)->recomputeBassWeights();
+    return mBassWeights[note];
+}
+
+void MidiProcessor::recomputeBassWeights() {
+    float variance2 = (mBassEnhanceSpread * mBassEnhanceSpread) / logf(10.0f);
+    if (variance2 < 0.001f) variance2 = 0.001f;
+    for (int i = 0; i < 128; i++) {
+        float x = (float)(i - mBassEnhanceCenter);
+        float w = expf(-(x * x) / variance2) * mBassEnhanceRatio;
+        mBassWeights[i] = (w >= 0.1f * mBassEnhanceRatio) ? w : 0.0f;
+    }
+    mBassWeightsDirty = false;
+}
 
 static const char* pitchNames[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
@@ -44,6 +68,11 @@ NoteOnResult MidiProcessor::processNoteOn(int note, int velocity) {
         __android_log_print(ANDROID_LOG_INFO, TAG, "[AutoSustain] BREAK → CC64=0");
     }
 
+    // Bass enhance
+    if (mBassWeightsDirty) recomputeBassWeights();
+    BassNote bn = mBassEnhancer.processNoteOn(note, velocity, mBassWeights);
+    if (bn.noteOn) { r.bassNote = bn.note; r.bassVelocity = bn.velocity; }
+
     return r;
 }
 
@@ -63,6 +92,10 @@ NoteOffResult MidiProcessor::processNoteOff(int note) {
 
     mActiveNotes.erase(note);
 
+    // Bass enhance note-off
+    BassNote bnOff = mBassEnhancer.processNoteOff(note);
+    if (mBassEnhancer.isEnabled()) { r.bassNote = bnOff.note; }
+
     return r;
 }
 
@@ -71,7 +104,6 @@ CCResult MidiProcessor::processCC(int controller, int value) {
     CCResult r;
 
     if (controller == 64 && !mAutoSustain.isEnabled()) {
-        // Physical pedal only when auto-sustain is OFF
         if (value >= 64) {
             mIsPedalDown = true;
             for (int n : mActiveNotes) mPedalHeldNotes.insert(n);
@@ -79,6 +111,18 @@ CCResult MidiProcessor::processCC(int controller, int value) {
             mIsPedalDown = false;
             mPedalHeldNotes.clear();
         }
+    }
+
+    // Bass enhance CCs (Reface CP knobs)
+    if (controller == 81) { // Drive knob → ratio
+        mBassEnhanceRatio = value / 127.0f;
+        mBassWeightsDirty = true;
+    } else if (controller == 18) { // Tremolo Depth → center
+        mBassEnhanceCenter = 36 + (int)(value / 127.0f * 24);
+        mBassWeightsDirty = true;
+    } else if (controller == 19) { // Tremolo Rate → spread
+        mBassEnhanceSpread = 5 + (int)(value / 127.0f * 43);
+        mBassWeightsDirty = true;
     }
 
     return r;
@@ -141,14 +185,29 @@ std::string MidiProcessor::getNoteStateJson() {
         return j;
     };
 
-    return "{\"active\":[" + toJson(mActiveNotes) +
+    std::string json = "{\"active\":[" + toJson(mActiveNotes) +
            "],\"pedal\":[" + toJson(mPedalHeldNotes) +
            "],\"low\":[" + toJson(lowNotes) +
            "],\"all\":[" + toJson(allNotes) +
            "],\"pedalDown\":" + std::string(mIsPedalDown ? "true" : "false") +
            ",\"split\":" + std::to_string(mSplitPoint) +
            ",\"autoSustain\":" + std::string(mAutoSustain.isEnabled() ? "true" : "false") +
-           ",\"isBreaking\":" + std::string(mAutoSustain.isBreaking() ? "true" : "false") + "}";
+           ",\"isBreaking\":" + std::string(mAutoSustain.isBreaking() ? "true" : "false") +
+           ",\"bassEnhance\":" + std::string(mBassEnhanceEnabled ? "true" : "false") +
+           ",\"bassRatio\":" + std::to_string(mBassEnhanceRatio).substr(0, 4) +
+           ",\"bassCenter\":" + std::to_string(mBassEnhanceCenter) +
+           ",\"bassSpread\":" + std::to_string(mBassEnhanceSpread) +
+           ",\"bassWeights\":[";
+    if (mBassWeightsDirty) const_cast<MidiProcessor*>(this)->recomputeBassWeights();
+    bool firstW = true;
+    for (int i = 0; i < 128; i++) {
+        if (!firstW) json += ","; firstW = false;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%.3f", mBassWeights[i]);
+        json += buf;
+    }
+    json += "]}";
+    return json;
 }
 
 std::string MidiProcessor::getChordInfo() {

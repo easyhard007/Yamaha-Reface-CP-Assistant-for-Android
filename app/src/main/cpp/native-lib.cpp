@@ -61,18 +61,23 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetMasterVolume(
         JNIEnv*, jobject, jfloat gain) { audio.setMasterVolume(0, gain); }
 
 // ===== MIDI Processor (note state, auto-sustain, chord analysis) =====
+// Encode sustainCC + bassNote + bassVelocity into one int for Kotlin
+static jint encodeResult(int sustainCC, int bassNote, int bassVel) {
+    return (sustainCC & 0xFF) | ((bassNote + 1) << 8) | ((bassVel & 0xFF) << 16);
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         JNIEnv*, jobject, jint note, jint velocity) {
     auto r = midi.processNoteOn(note, velocity);
-    return r.sustainCCToSend;
+    return encodeResult(r.sustainCCToSend, r.bassNote, r.bassVelocity);
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOff(
         JNIEnv*, jobject, jint note) {
     auto r = midi.processNoteOff(note);
-    return r.sustainCCToSend;
+    return encodeResult(r.sustainCCToSend, r.bassNote, 0);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -103,6 +108,10 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordInfo(
         JNIEnv* env, jobject) {
     return env->NewStringUTF(midi.getChordInfo().c_str());
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassEnhance(
+        JNIEnv*, jobject, jboolean enabled) { midi.setBassEnhanceEnabled(enabled); }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeSplitPoint(
