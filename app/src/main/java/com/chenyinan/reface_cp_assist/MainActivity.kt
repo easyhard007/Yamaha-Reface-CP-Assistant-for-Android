@@ -76,7 +76,8 @@ class MainActivity : AppCompatActivity() {
             { idx -> selectSf2(idx) }, { idx -> nativeSetInstrument(idx) },
             { delta -> nativeChangeSplitPoint(delta) },
             { enabled -> nativeSetAutoSustain(enabled) },
-            { enabled -> nativeSetBassEnhance(enabled) }
+            { enabled -> nativeSetBassEnhance(enabled) },
+            { delta -> sendTransposeSysEx(nativeChangeTranspose(delta)) }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -155,6 +156,16 @@ class MainActivity : AppCompatActivity() {
             if (bassVel > 0) midiUtil.sendNoteOn(bassNote, bassVel)
             else midiUtil.sendNoteOff(bassNote)
         }
+    }
+
+    private fun sendTransposeSysEx(transpose: Int): Int {
+        val valByte = (transpose + 64).coerceIn(0, 127)
+        val msg = byteArrayOf(
+            0xF0.toByte(), 0x43, 0x10, 0x7F, 0x1C, 0x04, 0x00, 0x00, 0x07, valByte.toByte(), 0xF7.toByte()
+        )
+        midiUtil.sendRaw(msg)
+        jsLog("↑ Transpose SysEx → ${transpose}", false)
+        return transpose
     }
 
     private fun midiLogRx(text: String) {
@@ -325,7 +336,9 @@ class MainActivity : AppCompatActivity() {
                         val ctrl = msg[i + 1].toInt()
                         val value = msg[i + 2].toInt()
                         nativeSendCC(ctrl, value)
-                        handleProcessResult(nativeProcessCC(ctrl, value))
+                        val scc = nativeProcessCC(ctrl, value)
+                        if (scc == 127) midiUtil.sendSustainOn()
+                        else if (scc == 0) midiUtil.sendSustainOff()
                         val ccName = if (ctrl == 64) "Sustain" else "CC$ctrl"
                         midiLogRx("↓ $ccName=$value  ch$ch")
                         js("if(typeof onNativeMidi==='function')onNativeMidi('cc',$ctrl,$value,$ch);")
@@ -367,6 +380,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetChordInfo(): String
     external fun nativeGetNoteState(): String
     external fun nativeChangeSplitPoint(delta: Int): Int
+    external fun nativeChangeTranspose(delta: Int): Int
     external fun nativeSetAutoSustain(enabled: Boolean)
     external fun nativeSetBassEnhance(enabled: Boolean)
     external fun nativeGetPendingSustainCC(): Int

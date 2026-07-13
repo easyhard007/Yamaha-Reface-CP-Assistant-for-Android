@@ -170,6 +170,14 @@ int MidiProcessor::changeSplitPoint(int delta) {
     return mSplitPoint;
 }
 
+int MidiProcessor::changeTranspose(int delta) {
+    std::lock_guard<std::mutex> lock(mLock);
+    mTranspose += delta;
+    if (mTranspose < -12) mTranspose = -12;
+    if (mTranspose > 12) mTranspose = 12;
+    return mTranspose;
+}
+
 std::string MidiProcessor::getNoteStateJson() {
     std::lock_guard<std::mutex> lock(mLock);
     auto lowNotes = getLowNotes();
@@ -195,6 +203,7 @@ std::string MidiProcessor::getNoteStateJson() {
            ",\"isBreaking\":" + std::string(mAutoSustain.isBreaking() ? "true" : "false") +
            ",\"bassEnhance\":" + std::string(mBassEnhanceEnabled ? "true" : "false") +
            ",\"bassRatio\":" + std::to_string(mBassEnhanceRatio).substr(0, 4) +
+           ",\"transpose\":" + std::to_string(mTranspose) +
            ",\"bassCenter\":" + std::to_string(mBassEnhanceCenter) +
            ",\"bassSpread\":" + std::to_string(mBassEnhanceSpread) +
            ",\"bassWeights\":[";

@@ -50,6 +50,13 @@ class MidiUtil {
         }
     }
 
+    /** 发送原始字节（SysEx 等） */
+    fun sendRaw(bytes: ByteArray) {
+        val port = midiInputPort ?: return
+        try { port.send(bytes, 0, bytes.size) }
+        catch (e: Exception) { Log.e(TAG, "发送失败: ${e.message}") }
+    }
+
     fun disconnect() {
         try { midiInputPort?.close() } catch (_: IOException) {}
         midiInputPort = null

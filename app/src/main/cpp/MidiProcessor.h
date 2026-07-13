@@ -52,6 +52,8 @@ public:
     std::string getChordInfo();
     int  changeSplitPoint(int delta);
     int  getSplitPoint() const { return mSplitPoint; }
+    int  changeTranspose(int delta);  // returns new value
+    int  getTranspose() const { return mTranspose; }
 
 private:
     mutable std::mutex mLock;
@@ -65,6 +67,7 @@ private:
 
     // Split point
     int mSplitPoint = 52; // E3
+    int mTranspose = 0;        // 升降调 (-12 ~ +12)
 
     // Auto-sustain
     AutoSustainManager mAutoSustain;

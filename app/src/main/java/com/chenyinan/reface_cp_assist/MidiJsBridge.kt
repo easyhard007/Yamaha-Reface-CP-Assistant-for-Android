@@ -14,7 +14,8 @@ class MidiJsBridge(
     private val onSelectInstrument: (Int) -> Unit,
     private val onChangeSplitPoint: (Int) -> Int,
     private val onToggleAutoSustain: (Boolean) -> Unit,
-    private val onToggleBassEnhance: (Boolean) -> Unit
+    private val onToggleBassEnhance: (Boolean) -> Unit,
+    private val onChangeTranspose: (Int) -> Int
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -44,6 +45,9 @@ class MidiJsBridge(
 
     @JavascriptInterface
     fun changeSplitPoint(delta: Int): Int { return onChangeSplitPoint(delta) }
+
+    @JavascriptInterface
+    fun changeTranspose(delta: Int): Int { return onChangeTranspose(delta) }
 
     @JavascriptInterface
     fun toggleBassEnhance(enabled: Boolean) { onToggleBassEnhance(enabled) }

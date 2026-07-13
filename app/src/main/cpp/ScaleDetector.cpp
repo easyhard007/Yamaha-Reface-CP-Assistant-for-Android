@@ -114,7 +114,12 @@ std::string ScaleDetector::getKeyName() const {
     int root = getScaleRootPc();
     if (root < 0) return "--";
 
-    std::string name = PITCH_NAMES[root];
-    name += mCachedIsMinor ? "m小调" : "大调";
-    return name;
+    // Show both major and relative minor ("C大调 / Am小调")
+    if (mCachedIsMinor) {
+        int relMajor = (root + 3) % 12;
+        return std::string(PITCH_NAMES[relMajor]) + "大调 / " + PITCH_NAMES[root] + "小调";
+    } else {
+        int relMinor = (root + 9) % 12;
+        return std::string(PITCH_NAMES[root]) + "大调 / " + PITCH_NAMES[relMinor] + "小调";
+    }
 }

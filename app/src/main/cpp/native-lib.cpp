@@ -114,5 +114,9 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassEnhance(
         JNIEnv*, jobject, jboolean enabled) { midi.setBassEnhanceEnabled(enabled); }
 
 extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeTranspose(
+        JNIEnv*, jobject, jint delta) { return midi.changeTranspose(delta); }
+
+extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeSplitPoint(
         JNIEnv*, jobject, jint delta) { return midi.changeSplitPoint(delta); }
