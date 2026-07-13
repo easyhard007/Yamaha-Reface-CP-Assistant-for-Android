@@ -73,16 +73,12 @@ class MidiUtil {
 
     /** 发送延音踏板 On */
     fun sendSustainOn() {
-        onSendLog?.invoke("↑ Sustain=127")
         sendCC(CC_SUSTAIN, 127)
-        Log.d(TAG, "Sustain ON → MIDI OUT")
     }
 
     /** 发送延音踏板 Off */
     fun sendSustainOff() {
-        onSendLog?.invoke("↑ Sustain=0")
         sendCC(CC_SUSTAIN, 0)
-        Log.d(TAG, "Sustain OFF → MIDI OUT")
     }
 
     /**
