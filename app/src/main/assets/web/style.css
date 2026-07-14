@@ -1,0 +1,375 @@
+:root { 
+    --wk-width: 40px; 
+    --bk-width: 26px; 
+    --bk-margin: -13px; 
+    --pad-gap: 5px; 
+}
+
+/* === 基础与全面屏安全区设定 === */
+html, body { 
+    background-color: #050505; 
+    margin: 0; padding: 0; width: 100vw; max-width: 100vw; 
+    height: 100dvh; max-height: 100dvh; 
+    color: #fff; text-align: center; overflow: hidden; 
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+body { 
+    padding-top: max(10px, env(safe-area-inset-top)); 
+    padding-bottom: max(10px, env(safe-area-inset-bottom)); 
+    padding-left: max(10px, env(safe-area-inset-left)); 
+    padding-right: max(10px, env(safe-area-inset-right)); 
+    box-sizing: border-box; display: flex; flex-direction: column; 
+}
+
+#main-page {
+    flex: 1; display: flex; flex-direction: column; width: 100%; 
+    padding-bottom: 60px; 
+    overflow-y: auto; overflow-x: hidden; scrollbar-width: none; 
+}
+#main-page::-webkit-scrollbar { display: none; }
+
+h2 {
+    font-size: clamp(1.3rem, 5vw, 2.2rem); 
+    font-weight: 700; line-height: 1.2; flex-shrink: 0;
+    display: flex; flex-wrap: nowrap; justify-content: center; align-items: center;
+    gap: clamp(6px, 2vw, 14px); color: #D4D7DF;
+    margin-top: 10px; margin-bottom: 5px; white-space: nowrap; z-index: 2; position: relative;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+
+/* ==========================================
+   【核心卡片容器】
+   ========================================== */
+.card { 
+    margin: 8px auto; 
+    width: calc(100% - 20px); max-width: 900px; 
+    padding: 2vmin; 
+    /* 将圆角改为 CSS 变量，默认 20px，方便 JS 动态修改 */
+    border-radius: var(--card-radius, 20px); 
+    box-sizing: border-box; position: relative; z-index: 2;
+    background: rgba(230, 230, 240, 0.06); 
+    backdrop-filter: blur(20px) brightness(95%) saturate(95%); 
+    -webkit-backdrop-filter: blur(20px) brightness(95%) saturate(95%);
+    border: 1px solid rgba(255, 255, 255, 0.1); border-top: 1px solid rgba(255, 255, 255, 0.15); border-left: 1px solid rgba(255, 255, 255, 0.12); 
+    box-shadow: 0 20px 60px 10px rgba(0, 0, 0, 0.5), 0 10px 20px 0px rgba(0, 0, 0, 0.05), inset 0 0 20px rgba(0, 0, 0, 0.15);   
+}
+
+/* ==========================================
+   【核心修复】：为多层嵌套的 Flex 容器注入钢筋骨架
+   ========================================== */
+
+#piano-card {
+    /* 不仅要占 4 份，还要给一个最小高度保底，防止内部压缩 */
+    flex: 4;
+    min-height: 35vh; /* 强制钢琴卡片至少占据屏幕的 35% 高度 */
+    display: flex; flex-direction: column; 
+}
+
+
+/* === 2. 钢琴与和弦的 1:1 等分包裹器 === */
+#piano-lower-half {
+    display: flex; flex-direction: column; 
+    flex: 1; 
+    min-height: 150px; /* 核心修复：必须给包裹器一个最小绝对高度 */
+}
+
+#pressed-notes { 
+    background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 2vmin; 
+    flex: 1; /* 占据包裹器 50% */
+    min-height: 60px; /* 核心修复：防止和弦框被压没 */
+    width: 100%; box-sizing: border-box; display: flex; flex-direction: column; overflow: hidden; 
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.05); 
+}
+.chord-primary-text { font-size: clamp(24px, 6vh, 48px); font-weight: bold; color: #fff; }
+.chord-secondary-text { font-size: clamp(12px, 3vh, 20px); color: #ccc; font-weight: bold; }
+
+/* === 3. 钢琴键盘区 === */
+#keyboard-wrapper { 
+    flex: 1; /* 占据包裹器另外 50% */
+    min-height: 80px; /* 核心修复：防止键盘被压没 */
+    width: 100%; overflow-x: auto; scrollbar-width: none; 
+    display: flex; align-items: flex-end; 
+}
+#keyboard-wrapper::-webkit-scrollbar { display: none; } 
+#keyboard { display: flex; width: max-content; user-select: none; height: 100%; }
+.key { position: relative; box-sizing: border-box; }
+
+.white-key { width: var(--wk-width); min-width: var(--wk-width); height: 100%; background: rgba(240, 240, 240, 0.9); border: 1px solid rgba(0,0,0,0.2); border-radius: 0 0 6px 6px; z-index: 1; backdrop-filter: blur(5px); }
+.black-key { width: var(--bk-width); min-width: var(--bk-width); height: 60%; background: rgba(20, 20, 20, 0.95); border-radius: 0 0 4px 4px; margin-left: var(--bk-margin); margin-right: var(--bk-margin); z-index: 2; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+
+/* ==========================================
+   【核心修复】：钢琴监控点 (红点与粉点)
+   强制响应式大小，强制定位，确保 100% 浮现
+   ========================================== */
+.active-red.white-key { background: #d0d0d0; border-bottom: 4px solid #888; }
+.active-red.black-key { background: #000; }
+
+.white-key .enhance-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%; /* 加深颜色：使用更浓郁的蓝色，不透明度设为 0.7 */
+    background: rgba(50, 110, 200, 0.3);
+    pointer-events: none;
+    z-index: 1;
+    transition: height 0.15s ease;
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* 基础点：必须使用响应式大小和相对底部的百分比定位，防止琴键高度变化时点跑偏 */
+.dot { 
+    position: absolute; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    width: clamp(8px, 1.5vh, 14px); 
+    height: clamp(8px, 1.5vh, 14px); 
+    border-radius: 50%; 
+    display: none; /* 默认隐藏 */
+    bottom: 12%;   /* 相对高度，永远贴近琴键底部 */
+    z-index: 4; 
+}
+.black-key .dot { 
+    bottom: 15%; /* 黑键稍微靠上一点点 */
+}
+
+/* 红色：物理按下 (优先级最高) */
+.active-red .dot {
+display: block !important;
+background: #ff2a2a !important;
+}
+
+/* 粉色：物理松开但被踏板保持 */
+.key.active-pink .dot {
+display: block !important;
+background: #ff80ab !important;
+}
+
+.key.is-split::after {
+content: '';
+position: absolute;
+left: 50%;
+transform: translateX(-50%);
+/* 尺寸与形状 */
+width: clamp(6px, 1vh, 10px);
+height: clamp(6px, 1vh, 10px);
+background: #2196f3;
+clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+
+/* 位置：贴近底部 */
+bottom: 5px;
+z-index: 3; /* 层级低于 .dot (z-index 4)，这样圆点会覆盖在三角上方 */
+
+filter: drop-shadow(0 0 3px rgba(33, 150, 243, 0.8));
+pointer-events: none;
+}
+
+
+
+/* === 4. 全局灯光控制面板 === */
+#color-card {
+    flex: 3;
+    min-height: 20vh; /* 核心修复：强制调色盘卡片至少占 25% 屏幕高度 */
+    display: flex; flex-direction: column; justify-content: space-around;
+}
+#color-card h3 { font-size: clamp(14px, 3vmin, 18px); margin: 0; flex-shrink: 0; }
+
+#light-panel-wrapper { display: flex; width: 100%; align-items: center; flex: 1; min-height: 120px; /* 给包裹器骨架 */ }
+#color-picker-section { width: 60%; display: flex; justify-content: center; align-items: center; border-right: 1px solid rgba(255,255,255,0.1); height: 100%; box-sizing: border-box; padding: 2vmin; overflow: hidden;}
+#color-picker-container { display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; }
+
+/* 核心修复 4：取消高度 100% 的死板限制，让 iro.js 自由计算 */
+.IroWheel { max-height: 200px !important; max-width: 100% !important; aspect-ratio: 1/1; }
+
+#light-info-section { width: 40%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 2vmin; box-sizing: border-box; }
+#light-roman-display { font-size: clamp(12px, 2.5vh, 20px); color: rgba(255,255,255,0.7); margin-bottom: 2px; font-weight: bold; font-family: serif;}
+#light-function-display { font-size: clamp(24px, 8vh, 64px); font-weight: bold; color: #fff; margin-bottom: 4px; font-family: serif; letter-spacing: 2px; will-change: text-shadow, color; line-height: 1; }
+#light-key-display { font-size: clamp(10px, 2vh, 16px); color: rgba(255,255,255,0.5); font-weight: bold; }
+
+#fab-btn { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: max(20px, env(safe-area-inset-left)); width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.5); color: #fff; font-size: 20px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 900; transition: all 0.3s; }
+#fab-btn.success { color: #00e676; border-color: rgba(0, 230, 118, 0.4); }
+
+#settings-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(5,5,5,0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); z-index: 1000; display: none; flex-direction: column; align-items: center; padding-top: max(60px, env(safe-area-inset-top)); box-sizing: border-box; }
+#settings-page.show { display: flex; }
+#back-btn { position: absolute; top: max(20px, env(safe-area-inset-top)); left: max(20px, env(safe-area-inset-left)); background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; padding: 10px 15px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; backdrop-filter: blur(10px); }
+select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margin-bottom: 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 16px; outline: none; }
+.action-btn { padding: 15px 20px; font-size: 16px; font-weight: bold; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 140px; transition: all 0.3s ease; }
+.action-btn.success { background: rgba(170, 0, 255, 0.6); border-color: rgba(170, 0, 255, 0.8); text-shadow: 0 0 10px rgba(255,255,255,0.5); } 
+.stop-btn { background: rgba(0,0,0,0.5); }
+#status { margin-top: 15px; color: #aaa; font-size: 14px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+.IroHandle { display: none !important; }
+
+/* --- 新增：功能控制面板 --- */
+/* --- 功能面板核心布局 --- */
+#function-card {
+    flex: 2.5;
+    min-height: 20vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly; /* 关键：垂直方向均匀分布，解决底部发空问题 */
+    padding: 15px 20px;
+    box-sizing: border-box;
+}
+
+.function-upper-area {
+    display: flex;
+    flex-direction: row; /* 默认：横向排列 */
+    justify-content: space-around; /* 两个单元左右拉开 */
+    align-items: center;
+    width: 100%;
+}
+
+.control-unit {
+    display: flex;
+    align-items: center;
+    gap: clamp(6px, 1.5vw, 15px); /* 内部元素（按钮和文字）的间距 */
+}
+
+.function-lower-area {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+}
+
+.transpose-value {
+    font-size: 20px;
+    font-weight: bold;
+    min-width: 40px;
+    color: #fff;
+    transition: transform 0.1s;
+}
+
+/* 玻璃按钮样式 */
+.glass-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.glass-btn:active {
+    transform: scale(0.92);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 20px;
+    padding-bottom: 3px;
+    box-sizing: border-box; /* 确保 padding 不会撑大圆圈 */
+}
+
+.btn-rect {
+    padding: 8px 18px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+/* 激活状态：浅白色填充 */
+.btn-active {
+    background: rgba(255, 255, 255, 0.9) !important;
+    color: #121212 !important;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+/* ==========================================
+   【核心修复 3】：响应式布局 (高度极小/横屏防重叠保护)
+   当屏幕高度极其扁平 (< 800px) 时，压缩卡片宽度和间距，防止纵向溢出
+   ========================================== */
+@media (max-height: 880px) {
+    .card {
+        padding: 10px;
+        margin: 5px auto;
+        /* 在极扁屏幕下，卡片变窄，腾出更多呼吸空间 */
+        /* width: 80%; */
+        max-width: 700px;
+    }
+
+    #pressed-notes { margin-bottom: 10px; }
+    h2 { margin-top: 5px; font-size: clamp(1rem, 4vw, 1.8rem); }
+}
+
+@media (max-height: 600px) {
+    /* 极端扁平 (横屏手机)：进一步压缩键盘最低限度，防止和色环打架 */
+    .white-key { height: 60px; }
+    .black-key { height: 35px; }
+    .card { 
+        /* width: 70%;  */
+        padding: 5px; 
+    }
+
+    .function-row {
+        gap: 10px;
+    }
+}
+
+/* ==========================================
+   【核心修复】：极窄屏幕 (宽高比小于 3:4) 字体微调
+   ========================================== */
+@media (max-aspect-ratio: 3/4) {
+    /* 1. TSD 功能级数罗马数字 (调小 2 号，比如从 8vh 降到 6vh) */
+    #light-function-display {
+        font-size: clamp(24px, 6vh, 48px) !important;
+    }
+    
+    /* 2. 键盘上方的首选和弦 (调小 1 号) */
+    .chord-primary-text {
+        font-size: clamp(20px, 5vh, 40px) !important;
+    }
+    
+    /* 3. 键盘上方的备选和弦及 OR (调小 1 号) */
+    .chord-secondary-text {
+        font-size: clamp(10px, 2.5vh, 16px) !important;
+    }
+
+    /* 4. 功能面板专属微调 */
+    #function-card {
+        padding: 10px;
+    }
+
+    .function-upper-area {
+        flex-direction: column; /* 竖屏：转调和分割点变成上下堆叠 */
+        gap: 15px; /* 增加两行之间的间距 */
+    }
+
+    .control-unit {
+        width: 100%;
+        justify-content: center; /* 居中对齐 */
+    }
+
+    .function-label {
+        min-width: 80px; /* 固定标签宽度，使加减按钮视觉对齐 */
+        text-align: left;
+    }
+
+    .transpose-value {
+        font-size: 18px; /* 缩小数字 */
+        min-width: 30px; /* 缩小占位 */
+    }
+
+    .btn-circle {
+        width: 32px;  /* 减小圆形按钮尺寸 */
+        height: 32px;
+        font-size: 18px;
+    }
+
+    .btn-rect {
+        padding: 8px 18px; /* 减小 Auto-Sustain 按钮尺寸 */
+        font-size: 13px;
+    }
+
+    #color-picker-section {
+            border-right: none !important; /* 竖屏下移除右侧分割线 */
+    }
+}

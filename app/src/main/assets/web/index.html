@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="dark">
+    <title>Yamaha Reface CP Assistant</title>
+    
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#121212">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- 1. 引入 CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- 2. 引入第三方库 -->
+    <script src="vendor/three.min.js"></script>
+    <script src="vendor/tonal.min.js"></script>
+    <script src="vendor/iro.min.js"></script>
+    <!-- 引入 NoSleep.js 解决屏幕常亮 -->
+    <script src="vendor/NoSleep.min.js"></script>
+    
+    <!-- 3. 引入业务解耦模块 -->
+	<script src="scale_chord_engine.js"></script> 
+	<script src="modulation_engine.js"></script>
+	<script src="color_mapping.js"></script>
+	<script src="virtual_piano_engine.js"></script>
+    <script src="background_animation.js"></script>
+    <script src="light_control.js"></script>
+    <script src="keyboard.js"></script>
+    <script src="midi_util.js"></script>
+    <script src="auto_sustain.js"></script>
+    <script src="midi_enhance.js"></script>
+
+
+</head>
+<body>
+
+    <div id="glcanvas" style="position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 0; pointer-events: none;"></div>
+
+    <div id="main-page">
+        <h2>Yamaha Reface CP Assistant
+        </h2>
+        
+        <div class="card" id="piano-card">
+            <!-- 用来等分下半部分高度的包裹器 -->
+            <div id="piano-lower-half">
+                <!-- 模块2：和弦监控 -->
+                <div id="pressed-notes">
+                    <div style="height:100%; display:flex; justify-content:center; align-items:center; color:#666; font-size:16px;">等待弹奏...</div>
+                </div>
+                
+                <!-- 模块3：钢琴键盘 -->
+                <div id="keyboard-wrapper">
+                    <div id="keyboard"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="color-card">
+            <div id="light-panel-wrapper">
+                <!-- 左侧调色盘 -->
+                <div id="color-picker-section">
+                    <div id="color-picker-container"></div>
+				</div>
+				<!-- 右侧 40%：灯光和弦与调性监控 (三行结构) -->
+                <div id="light-info-section">
+                    <div id="light-roman-display">-</div>
+                    <div id="light-function-display">VI</div> <!-- 占位符 -->
+                    <div id="light-key-display">正在识别调性</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="function-card">
+        <!-- 上部区域：包含转调和分割点 -->
+            <div class="function-upper-area">
+                <div class="control-unit">
+                    <span class="function-label">Transpose</span>
+                    <div class="glass-btn btn-circle" onclick="changeTranspose(-1)">−</div>
+                    <span id="transpose-display" class="transpose-value">0</span>
+                    <div class="glass-btn btn-circle" onclick="changeTranspose(1)">+</div>
+                </div>
+
+                <div class="control-unit">
+                    <span class="function-label">Split</span>
+                    <div class="glass-btn btn-circle" onclick="changeSplitPoint(-1)">−</div>
+                    <span id="split-display" class="transpose-value">E3</span>
+                    <div class="glass-btn btn-circle" onclick="changeSplitPoint(1)">+</div>
+                </div>
+            </div>
+
+            <!-- 下部区域：自动踏板按钮与低音增强按钮 -->
+            <div class="function-lower-area" style="gap: 15px;">
+                <div id="sustain-btn" class="glass-btn btn-rect" onclick="toggleAutoSustain()">AUTO-SUSTAIN</div>
+                <!-- 新增增强按钮，移除 BREAK TEST -->
+                <div id="enhance-btn" class="glass-btn btn-rect" onclick="toggleBassEnhance()">ENHANCE: 50%</div>
+            </div>
+        </div>
+
+		<div class="card" id="debug-panel-chord" style="display:none;">
+            <h3>🛠️ 算法 Debug 面板 (Tonal.js Filter)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tonal 原始和弦</th>
+                        <th>置信度</th>
+                        <th>长度</th>
+                        <th>得分</th>
+                        <th>降维归类</th>
+                    </tr>
+                </thead>
+                <tbody id="debug-tbody">
+                    <tr><td colspan="5" style="color:#666;"></td></tr>
+                </tbody>
+            </table>
+        </div>
+		<!-- 新增：调性追踪数据调试面板 -->
+        <div class="card" id="debug-panel-scale" style="display:none;">
+            <h3>📊 调性追踪向量表 (Chroma Vector)</h3>
+            <!-- 横向排列 12 个音名的实时权重 -->
+            <div id="pitch-weights-row" style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:15px; background:#111; padding:10px; border-radius:8px;">
+                <!-- JS 动态生成 -->
+            </div>
+            <table>
+                <thead>
+                    <tr><th>排名</th><th>分析调性</th><th>置信度得分</th></tr>
+                </thead>
+                <tbody id="scale-debug-tbody">
+                    <tr><td colspan="3" style="color:#666;"></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="fab-btn" onclick="openSettings()">?</div>
+    </div>
+
+    <!-- 设置页面 -->
+   <div id="settings-page">
+        <button id="back-btn" onclick="closeSettings()">⬅ 返回</button>
+        <h2 style="color: #d500f9;">⚙️ 设置</h2>
+        <div class="card" id="settings-card" style="margin-top: 30px;">
+            <p style="color:#aaa; font-size:11px; margin:0 0 2px 0;">SoundFont</p>
+            <select id="sf2Select" onchange="onSf2Change()" style="width:100%; margin-bottom:10px;"></select>
+            <p style="color:#aaa; font-size:11px; margin:0 0 2px 0;">Instrument</p>
+            <select id="instSelect" onchange="onInstChange()" style="width:100%; margin-bottom:10px;"></select>
+            <p id="midi-label" style="color:white; font-size:14px; margin:0 0 10px 0;">请选择MIDI 端口</p>
+            <select id="midiPorts" onchange="selectPort()">
+                <option value="">扫描设备中...</option>
+            </select>
+            <div style="display:flex; gap:8px; margin-top:10px;">
+                <button id="start-btn" class="action-btn" style="flex:1; font-size:14px; padding:8px;" onclick="startControl()">🟢 启动</button>
+                <button class="action-btn stop-btn" style="flex:1; font-size:14px; padding:8px;" onclick="stopControl()">⏹ 停止</button>
+            </div>
+        </div>
+        <!-- MIDI 日志 -->
+        <div class="card" style="margin-top:12px; background:#1a1a1a; padding:10px;">
+            <p style="color:#aaa; font-size:12px; margin:0 0 4px 0;">MIDI Monitor</p>
+            <div id="midi-log" style="font-family:monospace; font-size:10px; line-height:1.5; max-height:100px; overflow-y:auto; margin-bottom:6px;"></div>
+            <div style="display:flex; gap:8px; font-family:monospace; font-size:10px;">
+                <div style="flex:1; background:#222; padding:4px 6px; border-radius:4px;">
+                    <span style="color:#ff6060;">● Active:</span>
+                    <span id="dbg-active" style="color:#ccc;">-</span>
+                </div>
+                <div style="flex:1; background:#222; padding:4px 6px; border-radius:4px;">
+                    <span style="color:#ff8cb4;">● Pedal:</span>
+                    <span id="dbg-pedal" style="color:#ccc;">-</span>
+                </div>
+                <div style="flex:1; background:#222; padding:4px 6px; border-radius:4px;">
+                    <span style="color:#88aaff;">▼ Low:</span>
+                    <span id="dbg-low" style="color:#ccc;">-</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; font-family:monospace; font-size:10px; margin-top:4px;">
+                <div style="flex:1; background:#222; padding:4px 6px; border-radius:4px;">
+                    <span style="color:#FFEB3B;">Pedal:</span>
+                    <span id="dbg-pedaldown" style="color:#ccc;">-</span>
+                </div>
+                <div style="flex:1; background:#222; padding:4px 6px; border-radius:4px;">
+                    <span style="color:#FF9800;">Break:</span>
+                    <span id="dbg-breaking" style="color:#ccc;">-</span>
+                </div>
+            </div>
+            <div style="font-family:monospace; font-size:10px; margin-top:4px; background:#222; padding:4px 6px; border-radius:4px;">
+                <span style="color:#aaa;">Audio Out:</span>
+                <span id="dbg-audio" style="color:#ccc;">-</span>
+            </div>
+            <div style="font-family:monospace; font-size:10px; margin-top:4px; background:#222; padding:4px 6px; border-radius:4px;">
+                <span style="color:#29B6F6;">Bass Enhance:</span>
+                <span id="dbg-bass" style="color:#ccc;">-</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================= 全局状态与常量 =================
+        window.midiAccess = null; 
+        window.midiOutput = null; 
+        window.isRunning = false;
+        let autoConnectTimer = null;
+
+        window.transposeValue = 0;
+        window.split_point = 52; // 高低音区分割点
+        window.autoSustainEnabled = false;
+        window.currentDeviceID = 0; // 默认设备编号 0 (Reface CP)
+        window.bassEnhanceEnabled = false;
+        window.bassEnhanceRatio = 0.5; // 默认 50%
+
+        const noSleep = new NoSleep();
+
+        // ================= 全局颜色状态 (用于驱动背景与 UI) =================
+        window.visualState = {
+            h: 260, // 初始色相 (蓝紫)
+            s: 100,
+            l: 100,
+            envelope: 0 // 能量包络 (0-1)
+        };
+
+        // 【新增】：幽灵音频上下文与保活振荡器
+        let wakelockAudioCtx = null;
+        let wakelockOscillator = null;
+
+
+        window.physicalPedalDown = false; // 物理踏板状态
+        window.autoPedalDown = false;     // 自动踏板状态
+        window.isPedalDown = false;       // 逻辑合并状态 (两者之一为 true 则为 true)
+
+
+        window.activeNotes = new Set();      
+        window.pedalHeldNotes = new Set();   
+        window.allActiveNotes = new Set();
+        window.lowNotes = new Set();
+
+        const noteStartTimes = new Map(); // debug：用于记录每个 MIDI note 的按下起始时间
+
+        // MIDI 编号转音名工具 (用于 UI 显示)
+        function midiToNoteName(midi) {
+            const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const octave = Math.floor(midi / 12) - 1; // MIDI 60 是 C4
+            const name = names[midi % 12];
+            return name + octave;
+        }
+
+        // 踏板态同步函数
+        function syncPedalState() {
+            const newState = window.physicalPedalDown || window.autoPedalDown;
+
+            // 如果踏板从“踩下”状态变为“完全释放”状态，清理延音缓存
+            if (window.isPedalDown && !newState) {
+                window.pedalHeldNotes.clear();
+                updateCombinedNotes();
+                refreshKeyboardUI();
+            }
+
+            window.isPedalDown = newState;
+        }
+
+        function changeSplitPoint(delta) {
+            window.split_point += delta;
+            // 限制在合理范围 (如 A0 到 C8)
+            if (window.split_point < 21) window.split_point = 21;
+            if (window.split_point > 108) window.split_point = 108;
+
+            document.getElementById('split-display').innerText = midiToNoteName(window.split_point);
+
+            // 【新增】：立即刷新 UI，让蓝色小点跟随移动
+            if (typeof refreshKeyboardUI === 'function') {
+                refreshKeyboardUI();
+            }
+        }
+        // 修改增强比例并同步 UI
+        function setEnhanceRatio(ratio) {
+            window.bass_enhance_ratio = ratio;
+            const btn = document.getElementById('enhance-btn');
+            if (btn) {
+                btn.innerText = `ENHANCE: ${Math.round(ratio * 100)}%`;
+            }
+            // 重新计算权重字典，否则高度和音量都不会变
+            if (typeof updateBassWeightMap === 'function') {
+                updateBassWeightMap();
+            }
+        }
+
+        // 打开低音增强
+        function toggleBassEnhance() {
+            window.bassEnhanceEnabled = !window.bassEnhanceEnabled;
+            const btn = document.getElementById('enhance-btn');
+            if (window.bassEnhanceEnabled) {
+                btn.classList.add('btn-active');
+            } else {
+                btn.classList.remove('btn-active');
+            }
+            // 【新增】：切换时立即刷新键盘
+            if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+            if (typeof updateBassWeightMap === 'function')  updateBassWeightMap();
+        }
+
+        function updateCombinedNotes() {
+            window.allActiveNotes = new Set([...window.activeNotes, ...window.pedalHeldNotes]);
+        }
+
+        function autoConnectRefaceCP() {
+            // 如果已经启动且已有设备，停止计时器并退出
+            if (window.isRunning && window.midiOutput) {
+                if (autoConnectTimer) {
+                    console.log("已连接设备，停止自动扫描。");
+                    clearInterval(autoConnectTimer);
+                    autoConnectTimer = null;
+                }
+                return;
+            }
+
+            if (!window.midiAccess) return;
+
+            // 遍历所有 MIDI 输出端口
+            for (let output of window.midiAccess.outputs.values()) {
+                const name = output.name.toLowerCase();
+                if (name.includes("reface cp")) {
+                    console.log("探测到 Yamaha Reface CP: " + output.name + "，正在尝试自动激活...");
+
+                    // 1. 设置全局输出对象
+                    window.midiOutput = output;
+
+                    // 2. 同步更新设置界面的下拉菜单 (可选，方便用户查看)
+                    const select = document.getElementById('midiPorts');
+                    if (select) {
+                        select.value = output.id;
+                    }
+
+                    // 3. 自动执行启动流程
+                    startControl();
+
+                    // 4. 成功后清除计时器
+                    if (autoConnectTimer) {
+                        clearInterval(autoConnectTimer);
+                        autoConnectTimer = null;
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ================= MIDI 核心监听逻辑 =================
+        function handleMIDIInput(event) {
+            const [status, data1, data2] = event.data;
+            const cmd = status >> 4;
+            const channel = status & 0x0F;
+            if (channel === 15) return;
+
+            // 监听踏板信号和 CC 信号 (Control Change)
+            if (cmd === 11) {
+                if (data1 === 64) { // 物理踏板
+                    window.physicalPedalDown = (data2 >= 64); // 修正：写入 physical 变量
+                    syncPedalState();
+                    return;
+                }
+                // CC#81: drive旋钮，控制低音增强的音量
+                if (data1 === 81) {
+                    setEnhanceRatio(data2 / 127);
+                }
+                // CC#18: tremolo的depth旋钮，控制低音增强中心点 (映射到 36-60, 即 C2-C4)
+                else if (data1 === 18) {
+                    window.bass_enhance_center = Math.round(36 + (data2 / 127) * 24);
+                    if (typeof updateBassWeightMap === 'function') updateBassWeightMap();
+                }
+                // CC#19: tremolo的rate旋钮，控制低音增强的衰减范围 (映射到 5-48 半音)
+                else if (data1 === 19) {
+                    window.bass_enhance_spread = Math.round(5 + (data2 / 127) * 43);
+                    if (typeof updateBassWeightMap === 'function') updateBassWeightMap();
+                }
+
+                return;
+            }
+
+
+            //音符
+            if (cmd === 9 && data2 > 0) {
+                window.activeNotes.add(data1);
+
+                noteStartTimes.set(data1, performance.now());
+
+                // 【核心新增】：如果开启了自动踏板且弹奏了低音区音符
+                if (window.autoSustainEnabled && data1 < window.split_point) {
+                    console.log("lowNotes",lowNotes);
+                    // 立即触发 sustainer 进行冲突检测
+                    if (typeof sustainer === 'function') sustainer("check_collision", data1);
+                    window.lowNotes.add(data1);
+                }
+
+                if (window.isPedalDown) window.pedalHeldNotes.add(data1); 
+                else window.pedalHeldNotes.delete(data1); 
+                
+                if (typeof registerNoteForScale === 'function') registerNoteForScale(data1);
+                
+                // 【新增：将 MIDI 信号投喂给虚拟钢琴引擎计算能量！】
+                if (typeof triggerVirtualNoteOn === 'function') {
+                    triggerVirtualNoteOn(data1, data2);
+                }
+
+                // 低音增强 (不再只检查 data1 >= 36 && data1 <= 62，由字典内部的权重决定是否发声）
+                if (window.bassEnhanceEnabled) {
+                    if (typeof bass_enhance === 'function') bass_enhance(data1, data2, true);
+                }
+
+                updateCombinedNotes();
+                if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+            } 
+            else if (cmd === 8 || (cmd === 9 && data2 === 0)) { 
+                window.activeNotes.delete(data1);
+
+                // 【新增测试】：计算并输出持续时间
+                if (noteStartTimes.has(data1)) {
+                    const duration = performance.now() - noteStartTimes.get(data1);
+                    console.log(`%c[MIDI Timer] Note: ${data1} | Duration: ${duration.toFixed(2)}ms`, "color: #00e676; font-weight: bold;");
+                    noteStartTimes.delete(data1);
+                }
+
+                if (window.autoSustainEnabled) {
+                    if (typeof sustainer === 'function') sustainer("try_repress");
+                }
+
+                if (window.isPedalDown) window.pedalHeldNotes.add(data1);
+
+                // 【新增】：停止低音增强信号
+                if (window.bassEnhanceEnabled) {
+                    if (typeof bass_enhance === 'function') bass_enhance(data1, 0, false);
+                }
+
+                updateCombinedNotes();
+                if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+            }
+        }
+
+
+
+        // ================= 设置与连接 =================
+        function openSettings() { document.getElementById('settings-page').classList.add('show'); }
+        function closeSettings() { document.getElementById('settings-page').classList.remove('show'); }
+        function updateFabState() {
+            const fab = document.getElementById('fab-btn');
+            if (window.midiOutput && window.isRunning) { fab.innerText = "✓"; fab.classList.add('success'); } 
+            else { fab.innerText = "?"; fab.classList.remove('success'); }
+        }
+
+        window.onload = () => {
+            // 强制锁定手机竖屏 (Portrait)
+            if (screen.orientation && screen.orientation.lock) {
+                // 捕获 Promise 错误，因为在非全屏/非 HTTPS/部分桌面端可能会被拒绝，忽略即可
+                screen.orientation.lock("portrait").catch(function(error) {
+                    console.log("屏幕方向锁定被系统拒绝或不支持: ", error);
+                });
+            }
+            // 初始化其他文件的组件
+            if (typeof initKeyboardDOM === 'function') initKeyboardDOM(); 
+            if (typeof initColorPicker === 'function') initColorPicker();
+            if (typeof initBackground === 'function') initBackground();
+            
+            navigator.requestMIDIAccess({ sysex: true }).then(onMIDISuccess).catch(err => {
+                document.getElementById('status').innerText = "获取权限失败，请使用 HTTPS 环境";
+            });
+        };
+
+        function onMIDISuccess(access) {
+            window.midiAccess = access;
+            populateMIDIOutputs();
+
+            // --- 【新增】 ---
+            // 1. 立即尝试一次自动连接
+            autoConnectRefaceCP();
+
+            // 2. 开启 5 秒一次的“雷达”扫描
+            if (!window.isRunning) {
+                autoConnectTimer = setInterval(autoConnectRefaceCP, 5000);
+            }
+
+            for (let input of window.midiAccess.inputs.values()) input.onmidimessage = handleMIDIInput;
+            window.midiAccess.onstatechange = (e) => {
+                populateMIDIOutputs();
+                if(e.port.type === "input") {
+                    for (let input of window.midiAccess.inputs.values()) input.onmidimessage = handleMIDIInput;
+                }
+                // 如果设备是新插拔的，也触发一次检测
+                if (e.port.state === 'connected') autoConnectRefaceCP();
+            };
+        }
+
+
+        function populateMIDIOutputs() {
+            const select = document.getElementById('midiPorts');
+            const currentSelectedId = window.midiOutput ? window.midiOutput.id : select.value;
+            select.innerHTML = '<option value="">-- 请选择 DAW / Port 2 --</option>';
+            for (let output of window.midiAccess.outputs.values()) {
+                let option = document.createElement('option'); option.value = output.id; option.text = output.name; 
+                if (output.id === currentSelectedId) option.selected = true; select.appendChild(option);
+            }
+        }
+
+        function selectPort() { window.midiOutput = window.midiAccess.outputs.get(document.getElementById('midiPorts').value); }
+        // 请求屏幕常亮
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('屏幕唤醒锁已激活 (Screen Wake Lock Active)');
+
+                    // 监听系统强制释放锁的事件（比如用户手动锁屏后再解锁，需要重新申请）
+                    wakeLock.addEventListener('release', () => {
+                        console.log('屏幕唤醒锁被系统释放');
+                    });
+                } else {
+                    console.warn('当前浏览器不支持 Wake Lock API');
+                }
+            } catch (err) {
+                console.error(`唤醒锁请求失败: ${err.name}, ${err.message}`);
+            }
+        }
+
+        // 释放屏幕常亮
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release()
+                    .then(() => {
+                        wakeLock = null;
+                        console.log('屏幕唤醒锁已手动释放');
+                    });
+            }
+        }
+
+        // 应对页面可见性变化（切到后台再切回来时，自动重新申请）
+        document.addEventListener('visibilitychange', async () => {
+            if (wakeLock !== null && document.visibilityState === 'visible' && window.isRunning) {
+                await requestWakeLock();
+            }
+        });
+
+		function startControl() {
+            const startBtn = document.getElementById('start-btn');
+            const statusEl = document.getElementById('status');
+
+            if (!window.midiOutput) {
+                statusEl.innerText = "❌ 启动失败：请先在上方选择 MIDI 端口！";
+                statusEl.style.color = "#ff5252";
+                return;
+            }
+            
+            try {
+                window.isRunning = true;
+                // 启动成功，关掉轮询
+                if (autoConnectTimer) {
+                    clearInterval(autoConnectTimer);
+                    autoConnectTimer = null;
+                }
+
+                updateFabState();
+                startBtn.classList.add('success');
+                statusEl.innerText = "✅ 启动成功！已建立连接";
+                // 启动成功后，申请屏幕常亮！
+                requestWakeLock();
+                noSleep.enable();
+                console.log("NoSleep 强力保活已开启！");
+
+                // 在发音之前，先让硬件的转调值回归到软件当前显示的值（通常是 0）
+                if (typeof sendTransposeSysEx === 'function') {
+                    sendTransposeSysEx(window.currentDeviceID, window.transposeValue);
+                }
+
+                // --- Yamaha Reface CP 专属：交错启动音效 (E6, G6, C7) ---
+                const notes = [88, 91, 96]; // E6, G6, C7的 MIDI 编号
+                notes.forEach((note, index) => {
+                    setTimeout(() => {
+                        if (window.midiOutput && window.isRunning) {
+                            window.midiOutput.send([0x90, note, 80]); // Note On (力度80)
+
+                            // 每个音符在发出 600ms 后自动关闭，确保每个音符长度一致
+                            setTimeout(() => {
+                                if (window.midiOutput) window.midiOutput.send([0x80, note, 0]); // Note Off
+                            }, 600);
+                        }
+                    }, index * 150); // 每个音符间隔 150ms
+                });
+
+                if (typeof forceSendCurrentColorToMidi === 'function') {
+                    forceSendCurrentColorToMidi();
+                }
+
+                // ==========================================
+                // 【核心新增】：开启幽灵音频保活 (Audio Wakelock)
+                // ==========================================
+                try {
+                    if (!wakelockAudioCtx) {
+                        wakelockAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    // 如果处于挂起状态（某些浏览器对非手势触发的限制），唤醒它
+                    if (wakelockAudioCtx.state === 'suspended') {
+                        wakelockAudioCtx.resume();
+                    }
+                    
+                    // 创建一个振荡器
+                    wakelockOscillator = wakelockAudioCtx.createOscillator();
+                    const gainNode = wakelockAudioCtx.createGain();
+                    
+                    // 必须将音量设置为极其微弱的浮点数，或者直接为 0 (某些严格的系统设为0会失效，所以用 0.0001)
+                    gainNode.gain.value = 0.0001; 
+                    
+                    wakelockOscillator.connect(gainNode);
+                    gainNode.connect(wakelockAudioCtx.destination);
+                    
+                    // 开始在后台无限循环播放这极其微弱的蜂鸣音，从而欺骗系统保持线程活跃
+                    wakelockOscillator.start();
+                    console.log("幽灵音频保活已开启！");
+                } catch(e) {
+                    console.warn("音频保活开启失败", e);
+                }
+                
+            } catch (err) {
+                statusEl.innerText = "❌ 启动失败：MIDI 端口拒绝访问";
+                statusEl.style.color = "#ff5252";
+            }
+            refreshKeyboardUI()
+        }
+
+        function stopControl() {
+            const startBtn = document.getElementById('start-btn');
+            const statusEl = document.getElementById('status');
+
+            window.isRunning = false; 
+            updateFabState();
+            
+            if(window.midiOutput) {
+                if (typeof sendSustainOff === 'function') {
+                    sendSustainOff(window.currentDeviceID);
+                }
+                window.midiOutput.send([0x9F, 0x0C, 0x00]);
+            }
+
+            // ==========================================
+            // 【核心新增】：关闭幽灵音频
+            // ==========================================
+            if (wakelockOscillator) {
+                try {
+                    wakelockOscillator.stop();
+                    wakelockOscillator.disconnect();
+                    wakelockOscillator = null;
+                } catch(e) {}
+            }
+            if (wakelockAudioCtx && wakelockAudioCtx.state !== 'closed') {
+                wakelockAudioCtx.suspend();
+            }
+            
+            startBtn.classList.remove('success'); 
+            statusEl.innerText = "已退回普通模式";
+            statusEl.style.color = "#aaa";
+            // 【新增】：停止工作站后，释放屏幕常亮特权，允许手机息屏省电
+            releaseWakeLock();
+            // 【终极方案】：关闭 NoSleep，允许息屏
+            noSleep.disable();
+            console.log("NoSleep 已关闭。");
+        }
+
+        function changeTranspose(delta) {
+            window.transposeValue += delta;
+            // 限制范围在 -12 到 +12
+            if (window.transposeValue > 12) window.transposeValue = 12;
+            if (window.transposeValue < -12) window.transposeValue = -12;
+
+            const display = document.getElementById('transpose-display');
+            display.innerText = (window.transposeValue > 0 ? "+" : "") + window.transposeValue;
+
+            // 缩放反馈
+            display.style.transform = "scale(1.2)";
+            setTimeout(() => display.style.transform = "scale(1)", 100);
+
+            // 【新增】：向硬件发送转调指令
+            if (typeof sendTransposeSysEx === 'function') {
+                sendTransposeSysEx(window.currentDeviceID, window.transposeValue);
+            }
+            // --- 【新增】：同步调性识别引擎的权重位移 ---
+            if (typeof shiftScaleAndWeights === 'function') {
+                shiftScaleAndWeights(delta); // 注意这里传入的是 delta (+1 或 -1)
+            }
+
+        }
+
+        function toggleAutoSustain() {
+            window.autoSustainEnabled = !window.autoSustainEnabled;
+            const btn = document.getElementById('sustain-btn');
+            if (window.autoSustainEnabled) {
+                btn.classList.add('btn-active');
+                if (typeof sendSustainOn === 'function') {
+                    sendSustainOn(window.currentDeviceID);
+                }
+            } else {
+                btn.classList.remove('btn-active');
+                if (typeof sendSustainOff === 'function') {
+                    sendSustainOff(window.currentDeviceID);
+                }
+                window.pedalHeldNotes.clear();
+                window.autoPedalDown = false;
+                if (typeof syncPedalState === 'function') syncPedalState();
+
+                window.lowNotes.clear(); // 同时清理低音池
+                if (typeof updateCombinedNotes === 'function') updateCombinedNotes();
+                if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+            }
+        }
+
+    </script>
+    <!-- ===== Native Bridge (Android WebView) ===== -->
+    <script>
+    let _deviceList = [];
+    function onNativeMidiDeviceList(json) {
+        try {
+            _deviceList = JSON.parse(json);
+            const sel = document.getElementById('midiPorts');
+            sel.innerHTML = '';
+            if (_deviceList.length === 0) {
+                sel.innerHTML = '<option value="">(没有找到设备)</option>';
+            } else {
+                _deviceList.forEach((d, i) => {
+                    const opt = document.createElement('option'); opt.value = i;
+                    opt.text = d.name + (d.manufacturer ? ' (' + d.manufacturer + ')' : '');
+                    sel.appendChild(opt);
+                });
+            }
+            document.getElementById('status').innerText = `找到 ${_deviceList.length} 个设备`;
+        } catch(e) {}
+    }
+    function onNativeDeviceState(connected, name, deviceIndex) {
+        window.isRunning = connected;
+        window.midiOutput = connected ? { send: function(bytes) {} } : null;
+        updateFabState();
+        const label = document.getElementById('midi-label');
+        const sel = document.getElementById('midiPorts');
+        if (connected) {
+            label.innerHTML = '✅ MIDI 端口: ' + name;
+            label.style.color = '#00E676';
+            if (deviceIndex >= 0 && deviceIndex < _deviceList.length) sel.value = deviceIndex;
+        } else {
+            label.innerHTML = '请选择MIDI 端口';
+            label.style.color = '#FFFFFF';
+        }
+        const startBtn = document.getElementById('start-btn');
+        if (connected) { startBtn.classList.add('success'); }
+        else { startBtn.classList.remove('success'); }
+    }
+    function onNativeSf2List(names) {
+        const sel = document.getElementById('sf2Select');
+        sel.innerHTML = '';
+        try {
+            JSON.parse(names).forEach((n, i) => {
+                const opt = document.createElement('option'); opt.value = i; opt.text = n;
+                sel.appendChild(opt);
+            });
+        } catch(e) {}
+    }
+    function onNativeInstList(names) {
+        const sel = document.getElementById('instSelect');
+        sel.innerHTML = '';
+        try {
+            JSON.parse(names).forEach((n, i) => {
+                const opt = document.createElement('option'); opt.value = i; opt.text = n;
+                sel.appendChild(opt);
+            });
+        } catch(e) {}
+    }
+    function onSf2Change() {
+        const idx = document.getElementById('sf2Select').value;
+        if (typeof Android !== 'undefined') Android.selectSf2(parseInt(idx));
+    }
+    function onInstChange() {
+        const idx = document.getElementById('instSelect').value;
+        if (typeof Android !== 'undefined') Android.selectInstrument(parseInt(idx));
+    }
+    function onNativeMidi(type, note, velocity, channel) {
+        if (!window.isRunning) { window.isRunning = true; updateFabState(); }
+        // Feed virtual piano engine (drives background animation brightness)
+        if (type === 'noteon' && typeof triggerVirtualNoteOn === 'function') {
+            triggerVirtualNoteOn(note, velocity);
+        }
+        // Update virtual piano energy every call
+        if (typeof updateVirtualPianoEngine === 'function') {
+            updateVirtualPianoEngine(performance.now());
+        }
+    }
+    function onNativeChordInfo(chord, roman, key, tsd, secondary) {
+        _lastChordInfo = { chord, roman, key, tsd };
+        // Chord display (primary + secondary like keyboard.js)
+        const pressedDiv = document.getElementById('pressed-notes');
+        if (pressedDiv && chord !== '--') {
+            var secHtml = '';
+            if (secondary && secondary !== '' && secondary !== chord) {
+                // Check if secondary has a different root
+                var secRoot = (secondary.match(/^[A-G][#b]?/) || [''])[0];
+                var priRoot = (chord.match(/^[A-G][#b]?/) || [''])[0];
+                if (secRoot !== priRoot) {
+                    secHtml = '<span style="font-size:0.6em;color:rgba(255,255,255,0.3);margin-right:8px;font-weight:normal;">OR</span>' +
+                              '<span class="chord-secondary-text">' + secondary + '</span>';
+                }
+            }
+            pressedDiv.innerHTML = '<div style="height:60%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;">' +
+                '<span class="chord-primary-text">' + chord + '</span></div>' +
+                '<div style="height:40%;display:flex;align-items:baseline;justify-content:center;padding-top:2px;">' + secHtml + '</div>';
+        } else if (pressedDiv && window.allActiveNotes && window.allActiveNotes.size === 0) {
+            pressedDiv.innerHTML = '<div style="height:60%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;"><span style="color:rgba(255,255,255,0.4);font-size:clamp(14px,3vh,18px);">等待和弦...</span></div><div style="height:40%;"></div>';
+        }
+        // Roman numeral
+        var rd = document.getElementById('light-roman-display');
+        if (rd) rd.innerText = (roman !== '--') ? roman : '-';
+        // Key
+        var kd = document.getElementById('light-key-display');
+        if (kd) kd.innerText = (key !== '--') ? key : '正在识别调性';
+        // TSD color (skip if tsd is "--" — scale not yet detected)
+        if (typeof applyChordColorByNumeral === 'function' && tsd !== '--' && tsd !== '-') {
+            var fg = applyChordColorByNumeral(tsd);
+            var fd = document.getElementById('light-function-display');
+            if (fd) fd.innerText = fg;
+        }
+    }
+    function onNativeNoteState(json) {
+        try {
+            const state = JSON.parse(json);
+            window.activeNotes = new Set(state.active || []);
+            window.pedalHeldNotes = new Set(state.pedal || []);
+            window.lowNotes = new Set(state.low || []);
+            window.allActiveNotes = new Set(state.all || []);
+            window.isPedalDown = state.pedalDown || false;
+            if (state.split != null) window.split_point = state.split;
+            // Bass enhance sync
+            if (state.bassEnhance != null) window.bassEnhanceEnabled = (state.bassEnhance === true || state.bassEnhance === 'true');
+            if (state.bassRatio != null) window.bass_enhance_ratio = parseFloat(state.bassRatio) || 0;
+            if (state.bassCenter != null) window.bass_enhance_center = parseInt(state.bassCenter) || 43;
+            if (state.bassSpread != null) window.bass_enhance_spread = parseInt(state.bassSpread) || 12;
+            // Sync bass weight map from C++ (replaces JS updateBassWeightMap)
+            if (state.bassWeights) {
+                window.BASS_WEIGHT_MAP = {};
+                for (var wi = 0; wi < state.bassWeights.length; wi++) {
+                    var w = state.bassWeights[wi];
+                    if (w > 0) window.BASS_WEIGHT_MAP[wi] = w;
+                }
+            }
+            if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+            // Restore key/roman after refreshKeyboardUI overwrites (JS scale detection is disabled)
+            if (_lastChordInfo && _lastChordInfo.key !== '--') {
+                var rk = document.getElementById('light-key-display');
+                var rr = document.getElementById('light-roman-display');
+                var rf = document.getElementById('light-function-display');
+                if (rk) rk.innerText = _lastChordInfo.key;
+                if (rr) rr.innerText = _lastChordInfo.roman;
+                if (rf && _lastChordInfo.tsd) {
+                    rf.innerText = _lastChordInfo.tsd;
+                    // Re-apply TSD colors
+                    if (typeof applyChordColorByNumeral === 'function') {
+                        applyChordColorByNumeral(_lastChordInfo.tsd);
+                    }
+                }
+            }
+            // Update virtual piano engine (drives background brightness)
+            if (typeof updateVirtualPianoEngine === 'function') {
+                updateVirtualPianoEngine(performance.now());
+            }
+            // Update ENHANCE button text
+            var eb = document.getElementById('enhance-btn');
+            if (eb) eb.innerText = 'ENHANCE: ' + Math.round(window.bass_enhance_ratio * 100) + '%';
+            const fmt = (s) => s.size ? [...s].sort((a,b)=>a-b).join(',') : '-';
+            const da = document.getElementById('dbg-active');
+            const dp = document.getElementById('dbg-pedal');
+            const dl = document.getElementById('dbg-low');
+            if (da) da.textContent = fmt(window.activeNotes);
+            if (dp) dp.textContent = fmt(window.pedalHeldNotes);
+            if (dl) dl.textContent = fmt(window.lowNotes);
+            const pd = document.getElementById('dbg-pedaldown');
+            if (pd) { pd.textContent = window.isPedalDown ? 'TRUE' : 'false'; pd.style.color = window.isPedalDown ? '#00E676' : '#ff5252'; }
+            const br = document.getElementById('dbg-breaking');
+            if (br) { br.textContent = (state.isBreaking) ? 'TRUE' : 'false'; br.style.color = (state.isBreaking) ? '#FF9800' : '#ff5252'; }
+            const db = document.getElementById('dbg-bass');
+            if (db) { db.textContent = 'ratio=' + (state.bassRatio != null ? state.bassRatio : '?') + ' center=' + (state.bassCenter != null ? state.bassCenter : '?') + ' spread=' + (state.bassSpread != null ? state.bassSpread : '?') + ' enabled=' + (state.bassEnhance || false); }
+        } catch(e) {}
+    }
+    // Disable JS MIDI handling — C++ handles everything
+    handleMIDIInput = function() {};
+    sustainer = function() {};
+    // Prevent keyboard.js from flickering the function display's CSS class
+    // Disable JS scale detection — C++ ScaleDetector handles this
+    getScaleDebugData = function() { return { bestText: "-", weights: [], scales: [] }; };
+    registerNoteForScale = function() {};
+    // Patch updateBassWeightMap: remove auto-scroll (red dots drive scrolling)
+    if (typeof updateBassWeightMap === 'function') {
+        var _origUpdateBassWeightMap = updateBassWeightMap;
+        updateBassWeightMap = function() { _origUpdateBassWeightMap(); };
+    }
+    // Override toggleAutoSustain → use C++ backend
+    toggleAutoSustain = function() {
+        window.autoSustainEnabled = !window.autoSustainEnabled;
+        const btn = document.getElementById('sustain-btn');
+        if (window.autoSustainEnabled) {
+            btn.classList.add('btn-active');
+            if (typeof Android !== 'undefined') Android.toggleAutoSustain(true);
+        } else {
+            btn.classList.remove('btn-active');
+            if (typeof Android !== 'undefined') Android.toggleAutoSustain(false);
+        }
+    };
+    // Override toggleBassEnhance → C++ backend
+    toggleBassEnhance = function() {
+        window.bassEnhanceEnabled = !window.bassEnhanceEnabled;
+        var btn = document.getElementById('enhance-btn');
+        if (window.bassEnhanceEnabled) btn.classList.add('btn-active');
+        else btn.classList.remove('btn-active');
+        if (typeof Android !== 'undefined') Android.toggleBassEnhance(window.bassEnhanceEnabled);
+    };
+    // Override changeTranspose → use C++ backend + SysEx
+    changeTranspose = function(delta) {
+        if (typeof Android !== 'undefined') {
+            var newVal = Android.changeTranspose(delta);
+            document.getElementById('transpose-display').innerText = (newVal > 0 ? '+' : '') + newVal;
+        }
+    };
+    // Override changeSplitPoint → use C++ backend
+    changeSplitPoint = function(delta) {
+        if (typeof Android !== 'undefined') {
+            const newVal = Android.changeSplitPoint(delta);
+            window.split_point = newVal;
+            document.getElementById('split-display').innerText = midiToNoteName(newVal);
+            if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
+        }
+    };
+    function onNativeMidiLogEntry(text, isRx) {
+        const div = document.getElementById('midi-log');
+        if (!div) return;
+        const span = document.createElement('span');
+        span.style.color = isRx ? '#00E676' : '#FF9800';
+        span.textContent = text;
+        div.appendChild(span); div.appendChild(document.createElement('br'));
+        while (div.children.length > 400) { div.removeChild(div.firstChild); div.removeChild(div.firstChild); }
+        const card = document.getElementById('midi-log-card');
+        if (card) card.scrollTop = card.scrollHeight;
+    }
+    // Override: use native device list
+    const _origSelectPort = selectPort;
+    selectPort = function() {};
+    const _origStartControl = startControl;
+    startControl = function() {
+        const idx = parseInt(document.getElementById('midiPorts').value);
+        if (isNaN(idx) || idx < 0 || idx >= _deviceList.length) {
+            document.getElementById('status').innerText = '❌ 请先选择设备'; return;
+        }
+        if (typeof Android !== 'undefined') Android.startDevice(idx);
+        document.getElementById('status').innerText = '正在连接...';
+    };
+    const _origStopControl = stopControl;
+    stopControl = function() {
+        if (typeof Android !== 'undefined') Android.stopDevice();
+    };
+    // Override onload: skip Web MIDI, init DOM via bridge
+    window.onload = () => {
+        if (typeof initKeyboardDOM === 'function') initKeyboardDOM();
+        if (typeof initColorPicker === 'function') initColorPicker();
+        if (typeof initBackground === 'function') initBackground();
+        window.isRunning = true;
+    };
+    </script>
+
+    <!-- PWA 注册与强制刷新监听 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => {
+                        console.log('Service Worker 注册成功!', reg);
+                        
+                        // 监听新版本的到来
+                        reg.addEventListener('updatefound', () => {
+                            const newWorker = reg.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                // 当新版本准备好且旧版本已被干掉时
+                                if (newWorker.state === 'activated') {
+                                    console.log('新版本已激活！正在强制刷新页面...');
+                                    // 直接硬刷新页面，加载最新代码
+                                    window.location.reload();
+                                }
+                            });
+                        });
+                    })
+                    .catch(err => console.log('Service Worker 注册失败', err));
+            });
+        }
+    </script>
+</body>
+</html>

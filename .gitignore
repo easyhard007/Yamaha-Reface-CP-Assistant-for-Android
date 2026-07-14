@@ -1,16 +1,37 @@
-*.iml
+### Android ###
 .gradle
-/local.properties
+*.iml
+*.log
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+### Android Studio / IDEA ###
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
-/app/src/main/assets
+
+### SoundFont files (too large for GitHub, 100MB+ each) ###
+*.sf2
+*.SF2
+*.sf3
+*.SF3
+
+### Backup soundfonts ###
+/soundfont_bak/
+
+### OS files ###
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+Thumbs.db
+
+### App build output ###
+/app/build/
+/app/release/
+
+### References (original HTML project, not part of our app) ###
+/references/
