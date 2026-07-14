@@ -3,58 +3,66 @@ package com.chenyinan.reface_cp_assist
 import android.util.Log
 import android.webkit.JavascriptInterface
 
-/**
- * JS Bridge: WebView 中的 JavaScript 通过此类调用 Android 原生功能
- */
 class MidiJsBridge(
     private val midiUtil: MidiUtil,
     private val onStartDevice: (Int) -> Unit,
     private val onStopDevice: () -> Unit,
     private val onSelectSf2: (Int) -> Unit,
     private val onSelectInstrument: (Int) -> Unit,
+    private val onGetInstrumentBank: (Int) -> Int,
     private val onChangeSplitPoint: (Int) -> Int,
     private val onToggleAutoSustain: (Boolean) -> Unit,
     private val onToggleBassEnhance: (Boolean) -> Unit,
-    private val onChangeTranspose: (Int) -> Int
+    private val onChangeTranspose: (Int) -> Int,
+    // Style
+    private val onGetStyleFileList: () -> String,
+    private val onLoadStyle: (Int) -> String,
+    private val onSelectStyleScene: (Int) -> Unit,
+    private val onStartStyle: () -> Unit,
+    private val onStopStyle: () -> Unit,
+    private val onIsStylePlaying: () -> Boolean,
+    private val onGetCurrentStyleScene: () -> Int,
+    private val onGetPendingStyleScene: () -> Int,
+    private val onGetStyleChannels: () -> String,
+    private val onSetStyleChannelInst: (Int, Int, Int) -> Unit,
+    private val onDumpStyleDebug: () -> String,
+    private val onToggleMute: (Int) -> Unit,
+    private val onGetActiveChannels: () -> Int,
+    private val onIsChannelMuted: (Int) -> Boolean
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
-    @JavascriptInterface
-    fun sendMidiNote(note: Int, velocity: Int, isOn: Boolean) {
-        if (isOn) midiUtil.sendNoteOn(note, velocity)
-        else midiUtil.sendNoteOff(note)
+    @JavascriptInterface fun sendMidiNote(note: Int, velocity: Int, isOn: Boolean) {
+        if (isOn) midiUtil.sendNoteOn(note, velocity) else midiUtil.sendNoteOff(note)
     }
+    @JavascriptInterface fun sendMidiCC(controller: Int, value: Int) { midiUtil.sendCC(controller, value) }
+    @JavascriptInterface fun sendTestTones() { midiUtil.sendTestTones() }
+    @JavascriptInterface fun startDevice(index: Int) { onStartDevice(index) }
+    @JavascriptInterface fun stopDevice() { onStopDevice() }
+    @JavascriptInterface fun selectSf2(index: Int) { onSelectSf2(index) }
+    @JavascriptInterface fun selectInstrument(index: Int) { onSelectInstrument(index) }
+    @JavascriptInterface fun getInstrumentBank(index: Int): Int = onGetInstrumentBank(index)
+    @JavascriptInterface fun changeSplitPoint(delta: Int): Int = onChangeSplitPoint(delta)
+    @JavascriptInterface fun changeTranspose(delta: Int): Int = onChangeTranspose(delta)
+    @JavascriptInterface fun toggleBassEnhance(enabled: Boolean) { onToggleBassEnhance(enabled) }
+    @JavascriptInterface fun toggleAutoSustain(enabled: Boolean) { onToggleAutoSustain(enabled) }
+    @JavascriptInterface fun log(msg: String) { Log.d(TAG, "JS: $msg") }
 
-    @JavascriptInterface
-    fun sendMidiCC(controller: Int, value: Int) { midiUtil.sendCC(controller, value) }
-
-    @JavascriptInterface
-    fun sendTestTones() { midiUtil.sendTestTones() }
-
-    @JavascriptInterface
-    fun startDevice(index: Int) { onStartDevice(index) }
-
-    @JavascriptInterface
-    fun stopDevice() { onStopDevice() }
-
-    @JavascriptInterface
-    fun selectSf2(index: Int) { onSelectSf2(index) }
-
-    @JavascriptInterface
-    fun selectInstrument(index: Int) { onSelectInstrument(index) }
-
-    @JavascriptInterface
-    fun changeSplitPoint(delta: Int): Int { return onChangeSplitPoint(delta) }
-
-    @JavascriptInterface
-    fun changeTranspose(delta: Int): Int { return onChangeTranspose(delta) }
-
-    @JavascriptInterface
-    fun toggleBassEnhance(enabled: Boolean) { onToggleBassEnhance(enabled) }
-
-    @JavascriptInterface
-    fun toggleAutoSustain(enabled: Boolean) { onToggleAutoSustain(enabled) }
-
-    @JavascriptInterface
-    fun log(msg: String) { Log.d(TAG, "JS: $msg") }
+    // Style
+    @JavascriptInterface fun getStyleFileList(): String = onGetStyleFileList()
+    @JavascriptInterface fun loadStyleFile(fileIdx: Int): String = onLoadStyle(fileIdx)
+    @JavascriptInterface fun selectStyleScene(index: Int) { onSelectStyleScene(index) }
+    @JavascriptInterface fun startStyle() { onStartStyle() }
+    @JavascriptInterface fun stopStyle() { onStopStyle() }
+    @JavascriptInterface fun isStylePlaying(): Boolean = onIsStylePlaying()
+    @JavascriptInterface fun getCurrentStyleScene(): Int = onGetCurrentStyleScene()
+    @JavascriptInterface fun getPendingStyleScene(): Int = onGetPendingStyleScene()
+    @JavascriptInterface fun getStyleChannels(): String = onGetStyleChannels()
+    @JavascriptInterface fun setStyleChannelInst(channel: Int, bank: Int, program: Int) {
+        onSetStyleChannelInst(channel, bank, program)
+    }
+    @JavascriptInterface fun dumpStyleDebug(): String = onDumpStyleDebug()
+    @JavascriptInterface fun toggleMute(channel: Int) { onToggleMute(channel) }
+    @JavascriptInterface fun getActiveChannels(): Int = onGetActiveChannels()
+    @JavascriptInterface fun isChannelMuted(channel: Int): Boolean = onIsChannelMuted(channel)
 }

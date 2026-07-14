@@ -101,6 +101,25 @@
             </div>
         </div>
 
+        <!-- 节奏测试卡片 -->
+        <div class="card" id="style-card">
+            <h3>🎵 节奏测试 (Style Test)</h3>
+            <div style="display:flex; gap:8px; margin-bottom:4px; flex-wrap:wrap; align-items:center;">
+                <div class="glass-btn btn-rect" onclick="loadTestStyle()" id="load-style-btn">📂 Load Style</div>
+                <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="display:none; background:#2e7d32;">▶ Start</div>
+                <select id="style-file-select" style="display:none; background:#222; color:#fff; border:1px solid #555; border-radius:6px; padding:6px; font-size:13px; max-width:200px;"></select>
+                <div id="style-confirm-btn" class="glass-btn btn-rect" onclick="confirmLoadStyle()" style="display:none; font-size:12px; padding:6px 12px;">✅ 确认</div>
+                <div class="glass-btn btn-rect" onclick="dumpStyleDebug()" id="style-dump-btn" style="display:none; font-size:11px;">🛠 Dump</div>
+            </div>
+            <div id="style-info" style="color:#aaa; font-size:11px; margin-bottom:4px;">点击按钮选择节奏文件并加载</div>
+            <div id="scene-list" style="display:none;">
+                <p style="color:#ccc; font-size:12px; margin:4px 0;">场景:</p>
+                <div id="scene-buttons" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;"></div>
+                <p style="color:#ccc; font-size:12px; margin:4px 0;">音轨:</p>
+                <div id="track-rows" style="font-size:10px;"></div>
+            </div>
+        </div>
+
 		<div class="card" id="debug-panel-chord" style="display:none;">
             <h3>🛠️ 算法 Debug 面板 (Tonal.js Filter)</h3>
             <table>
@@ -296,6 +315,166 @@
             // 【新增】：切换时立即刷新键盘
             if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
             if (typeof updateBassWeightMap === 'function')  updateBassWeightMap();
+        }
+
+        // ===== Style / Rhythm Test =====
+        window.styleScenes = [];
+        window.styleFileNames = [];
+        window.styleSelectedScene = 0;
+        window.styleTimer = null;
+
+        function loadTestStyle() {
+            if (typeof Android === 'undefined') { document.getElementById('style-info').innerText = 'Android only'; return; }
+            clearStyleTimer();
+            try {
+                var listJson = Android.getStyleFileList();
+                window.styleFileNames = JSON.parse(listJson);
+                if (window.styleFileNames.length === 0) { document.getElementById('style-info').innerText = 'No style files'; return; }
+                if (window.styleFileNames.length === 1) { doLoadStyle(0); return; }
+                var sel = document.getElementById('style-file-select');
+                sel.innerHTML = '';
+                for (var i = 0; i < window.styleFileNames.length; i++) {
+                    var opt = document.createElement('option'); opt.value = i; opt.textContent = window.styleFileNames[i];
+                    sel.appendChild(opt);
+                }
+                sel.style.display = 'inline-block';
+                document.getElementById('style-confirm-btn').style.display = 'inline-block';
+                document.getElementById('style-info').innerText = 'Select a style file (' + window.styleFileNames.length + ' available)';
+            } catch(e) { document.getElementById('style-info').innerText = 'Error: ' + e.message; }
+        }
+        function confirmLoadStyle() {
+            var idx = parseInt(document.getElementById('style-file-select').value);
+            document.getElementById('style-file-select').style.display = 'none';
+            document.getElementById('style-confirm-btn').style.display = 'none';
+            doLoadStyle(idx);
+        }
+        function doLoadStyle(fileIdx) {
+            document.getElementById('style-info').innerText = 'Loading ' + window.styleFileNames[fileIdx] + ' ...';
+            try {
+                var json = Android.loadStyleFile(fileIdx);
+                var scenes = JSON.parse(json);
+                if (scenes.error) { document.getElementById('style-info').innerText = 'Error: ' + scenes.error; return; }
+                window.styleScenes = scenes;
+                window.styleSelectedScene = 0;
+                Android.selectStyleScene(0);
+                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleFileNames[fileIdx] + ' (' + scenes.length + ' scenes)';
+                refreshSceneButtons(scenes, 0);
+                refreshTrackRows();
+                document.getElementById('scene-list').style.display = 'block';
+                document.getElementById('style-play-btn').style.display = 'inline-block';
+                document.getElementById('style-dump-btn').style.display = 'inline-block';
+            } catch(e) { document.getElementById('style-info').innerText = 'Parse error: ' + e.message; }
+        }
+        function refreshSceneButtons(scenes, selectedIdx) {
+            var html = '';
+            for (var i = 0; i < scenes.length; i++) {
+                var s = 'font-size:11px; padding:4px 8px;';
+                if (i === selectedIdx) s += 'border:2px solid #fff; box-shadow:0 0 8px rgba(255,255,255,0.5);';
+                html += '<div id="scene-btn-' + i + '" class="glass-btn btn-rect" onclick="selectScene(' + i + ')" style="' + s + '">' + scenes[i].name + '</div>';
+            }
+            document.getElementById('scene-buttons').innerHTML = html;
+        }
+        function selectScene(idx) {
+            if (typeof Android === 'undefined') return;
+            window.styleSelectedScene = idx;
+            Android.selectStyleScene(idx);
+            if (!Android.isStylePlaying()) refreshSceneButtons(window.styleScenes, idx);
+        }
+        function toggleTestStyle() {
+            if (typeof Android === 'undefined') return;
+            if (Android.isStylePlaying()) {
+                Android.stopStyle();
+                clearStyleTimer();
+                var btn = document.getElementById('style-play-btn');
+                btn.style.background = '#2e7d32'; btn.innerText = '▶ Start';
+                document.getElementById('style-info').innerText = 'Stopped';
+                refreshSceneButtons(window.styleScenes, window.styleSelectedScene);
+                refreshTrackRows();
+            } else {
+                Android.selectStyleScene(window.styleSelectedScene);
+                Android.startStyle();
+                var btn = document.getElementById('style-play-btn');
+                btn.style.background = '#c62828'; btn.innerText = '⏹ Stop';
+                document.getElementById('style-info').innerText = 'Playing: ' + window.styleScenes[window.styleSelectedScene].name + ' (C chord)';
+                startStyleTimer();
+            }
+        }
+        // Timer
+        function startStyleTimer() { clearStyleTimer(); window.styleTimer = setInterval(pollStyleState, 150); }
+        function clearStyleTimer() { if (window.styleTimer) { clearInterval(window.styleTimer); window.styleTimer = null; } }
+        function pollStyleState() {
+            if (typeof Android === 'undefined' || !Android.isStylePlaying()) {
+                var btn = document.getElementById('style-play-btn');
+                if (btn) { btn.style.background = '#2e7d32'; btn.innerText = '▶ Start'; }
+                clearStyleTimer(); refreshTrackRows(); return;
+            }
+            var cur = Android.getCurrentStyleScene(), pend = Android.getPendingStyleScene();
+            for (var i = 0; i < window.styleScenes.length; i++) {
+                var b = document.getElementById('scene-btn-' + i);
+                if (!b) continue;
+                b.style.boxShadow = ''; b.style.border = ''; b.style.animation = '';
+                if (i === cur) { b.style.border = '2px solid #fff'; b.style.boxShadow = '0 0 12px rgba(255,255,255,0.7)'; }
+                else if (i === pend && pend >= 0) { b.style.border = '2px solid #fff'; b.style.animation = 'style-blink 0.5s ease-in-out infinite alternate'; }
+            }
+            updateTrackLEDs();
+        }
+        // Track list
+        function refreshTrackRows() {
+            var insts = window.instrumentNames || [];
+            try {
+                var json = Android.getStyleChannels();
+                var channels = JSON.parse(json);
+                if (!channels || !channels.length) { document.getElementById('track-rows').innerHTML = ''; return; }
+                var html = '';
+                for (var i = 0; i < channels.length; i++) {
+                    var ch = channels[i];
+                    // 鼓组 (bank=128) 在 insts 中的偏移: bank 0 在索引 0-127, bank 128 在 128+
+                    var progIdx = (ch.bank === 128) ? (128 + ch.program) : ch.program;
+                    var instName = (insts[progIdx] || ('Prog ' + ch.program));
+                    var extra = ' MSB=' + ch.msb + ' LSB=' + ch.lsb;
+                    if (ch.bank === 128) extra += ' [DRUM]';
+                    else if (ch.msb > 0) extra += ' [→GM b0]';
+                    var volPan = ' <span style="color:#555;">vol:' + ch.vol + ' pan:' + ch.pan + (ch.rev > 0 ? ' rev:' + ch.rev : '') + (ch.cho > 0 ? ' cho:' + ch.cho : '') + '</span>';
+                    html += '<div id="tr-' + ch.channel + '" style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px solid #222;">' +
+                        '<div class="glass-btn" onclick="toggleMute(' + ch.channel + ')" id="mute-' + ch.channel +
+                        '" style="font-size:9px; padding:2px 5px; min-width:24px; text-align:center;">M</div>' +
+                        '<span style="color:#ccc; flex:1;">Ch.' + ch.channel + ' ' + instName + extra +
+                        ' (b' + ch.bank + ' p' + ch.program + ')' + volPan + '</span>' +
+                        '<span id="led-' + ch.channel + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#333;"></span>' +
+                        '</div>';
+                }
+                document.getElementById('track-rows').innerHTML = html;
+                refreshMuteButtons();
+            } catch(e) {}
+        }
+        function toggleMute(ch) { if (typeof Android !== 'undefined') { Android.toggleMute(ch); refreshMuteButtons(); } }
+        function refreshMuteButtons() {
+            if (typeof Android === 'undefined') return;
+            try {
+                var channels = JSON.parse(Android.getStyleChannels());
+                for (var i = 0; i < channels.length; i++) {
+                    var ch = channels[i].channel;
+                    var btn = document.getElementById('mute-' + ch);
+                    if (!btn) continue;
+                    btn.style.background = Android.isChannelMuted(ch) ? '#c62828' : '';
+                }
+            } catch(e) {}
+        }
+        function updateTrackLEDs() {
+            if (typeof Android === 'undefined') return;
+            var active = Android.getActiveChannels();
+            for (var ch = 0; ch < 16; ch++) {
+                var led = document.getElementById('led-' + ch);
+                if (!led) continue;
+                var on = (active & (1 << ch));
+                led.style.background = on ? '#fff' : '#333';
+                led.style.boxShadow = on ? '0 0 4px #fff' : '';
+            }
+        }
+        function dumpStyleDebug() {
+            if (typeof Android === 'undefined') return;
+            var path = Android.dumpStyleDebug();
+            document.getElementById('style-info').innerText = 'Dump -> ' + path;
         }
 
         function updateCombinedNotes() {
@@ -760,7 +939,9 @@
         const sel = document.getElementById('instSelect');
         sel.innerHTML = '';
         try {
-            JSON.parse(names).forEach((n, i) => {
+            var arr = JSON.parse(names);
+            window.instrumentNames = arr;
+            arr.forEach(function(n, i) {
                 const opt = document.createElement('option'); opt.value = i; opt.text = n;
                 sel.appendChild(opt);
             });

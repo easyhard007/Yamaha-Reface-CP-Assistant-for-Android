@@ -68,6 +68,8 @@ add_library(
         ScaleDetector.cpp
         AutoSustainManager.cpp
         BassEnhancer.cpp
+        StyleParser.cpp
+        StylePlayer.cpp
         ${FLUIDLITE_SOURCES}
 )
 

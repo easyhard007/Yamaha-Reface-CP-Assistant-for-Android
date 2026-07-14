@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private val soundFontNames = listOf("JJazzLab-SoundFont")
     private val soundFontFiles = listOf("JJazzLab-SoundFont.sf2")
+    private val styleFiles = mutableListOf<String>()
     private var currentSf2Index = 0
     private val noteNames = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
@@ -74,10 +75,25 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(MidiJsBridge(midiUtil,
             { idx -> startDevice(idx) }, { stopDevice() },
             { idx -> selectSf2(idx) }, { idx -> nativeSetInstrument(idx) },
+            { idx -> nativeGetInstrumentBank(idx) },
             { delta -> nativeChangeSplitPoint(delta) },
             { enabled -> nativeSetAutoSustain(enabled) },
             { enabled -> nativeSetBassEnhance(enabled) },
-            { delta -> sendTransposeSysEx(nativeChangeTranspose(delta)) }
+            { delta -> sendTransposeSysEx(nativeChangeTranspose(delta)) },
+            { getStyleFileListJson() },
+            { idx -> loadStyle(idx) },
+            { idx -> selectStyleScene(idx) },
+            { startStyle() },
+            { stopStyle() },
+            { isStylePlaying() },
+            { getCurrentStyleScene() },
+            { getPendingStyleScene() },
+            { nativeGetStyleChannels() },
+            { channel, bank, prog -> nativeSetStyleChannelInst(channel, bank, prog) },
+            { dumpStyleDebug() },
+            { ch -> toggleMute(ch) },
+            { getActiveChannels() },
+            { ch -> isChannelMuted(ch) }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -360,7 +376,63 @@ class MainActivity : AppCompatActivity() {
                 catch (_: Exception) {}
             }
         }
+        // also copy style files from assets/styles/ to cacheDir
+        try {
+            val styList = assets.list("styles") ?: emptyArray()
+            styleFiles.clear()
+            for (name in styList) {
+                styleFiles.add(name)
+                val f = File(cacheDir, name)
+                if (!f.exists()) {
+                    try { assets.open("styles/$name").use { i -> FileOutputStream(f).use { o -> i.copyTo(o) } } }
+                    catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
     }
+
+    // 供 JS 调用: 返回可用的 style 文件列表 JSON
+    private fun getStyleFileListJson(): String {
+        val arr = JSONArray()
+        for (name in styleFiles) arr.put(name)
+        return arr.toString()
+    }
+
+    private var styleSf2Loaded = false
+
+    // ===== Style / Rhythm callbacks =====
+    private fun loadStyle(index: Int): String {
+        if (index < 0 || index >= styleFiles.size) return """{"error":"bad index"}"""
+        val file = File(cacheDir, styleFiles[index])
+        val result = nativeLoadStyle(file.absolutePath)
+        // Load sf2 onto accompaniment synth once
+        if (!styleSf2Loaded) {
+            val sf2File = File(cacheDir, soundFontFiles[currentSf2Index])
+            if (sf2File.exists()) {
+                nativeLoadStyleSoundFont(sf2File.absolutePath)
+                styleSf2Loaded = true
+            }
+        }
+        jsLog("Style loaded: ${styleFiles[index]}", false)
+        return result
+    }
+    private fun selectStyleScene(index: Int) { nativeStyleSelectScene(index) }
+    private fun startStyle() { nativeStyleStart(); jsLog("Style started", false) }
+    private fun stopStyle() { nativeStopStyle(); jsLog("Style stopped", false) }
+    private fun isStylePlaying(): Boolean = nativeIsStylePlaying()
+    private fun dumpStyleDebug(): String {
+        if (styleFiles.isEmpty()) return "No style loaded"
+        val sty = File(cacheDir, styleFiles[0])
+        val dir = getExternalFilesDir(null) ?: cacheDir
+        val out = File(dir, "style_debug.txt")
+        val ok = nativeDumpStyleDebug(sty.absolutePath, out.absolutePath)
+        return if (ok) out.absolutePath else "Dump failed"
+    }
+    private fun toggleMute(channel: Int) { nativeToggleMute(channel) }
+    private fun getActiveChannels(): Int = nativeGetActiveChannels()
+    private fun isChannelMuted(channel: Int): Boolean = nativeIsChannelMuted(channel)
+    private fun getCurrentStyleScene(): Int = nativeGetCurrentScene()
+    private fun getPendingStyleScene(): Int = nativeGetPendingScene()
 
     override fun onDestroy() {
         super.onDestroy()
@@ -388,6 +460,23 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetInstrumentCount(): Int
     external fun nativeGetInstrumentName(index: Int): String
     external fun nativeSetInstrument(index: Int)
+    external fun nativeGetInstrumentBank(index: Int): Int
+
+    // Style / Rhythm
+    external fun nativeLoadStyle(styPath: String): String
+    external fun nativeStyleSelectScene(sceneIndex: Int)
+    external fun nativeStyleStart()
+    external fun nativeStopStyle()
+    external fun nativeIsStylePlaying(): Boolean
+    external fun nativeGetCurrentScene(): Int
+    external fun nativeGetPendingScene(): Int
+    external fun nativeDumpStyleDebug(styPath: String, outputPath: String): Boolean
+    external fun nativeLoadStyleSoundFont(sf2Path: String)
+    external fun nativeGetStyleChannels(): String
+    external fun nativeSetStyleChannelInst(channel: Int, bank: Int, program: Int)
+    external fun nativeToggleMute(channel: Int)
+    external fun nativeGetActiveChannels(): Int
+    external fun nativeIsChannelMuted(channel: Int): Boolean
 
     companion object {
         init { System.loadLibrary("cynarranger") }

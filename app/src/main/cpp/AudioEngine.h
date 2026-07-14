@@ -18,16 +18,25 @@ public:
     void start();
     void stop();
 
-    // Playback
+    // Playback (channel 0 calls — backward compatible)
     void playNote(int target, int note, int velocity);
     void stopNote(int target, int note);
     void sendCC(int target, int controller, int value); // FluidLite CC
+
+    // Playback — channel-aware (used by StylePlayer)
+    void playNote(int target, int channel, int note, int velocity);
+    void stopNote(int target, int channel, int note);
+    void sendCC(int target, int channel, int controller, int value);
+    void sendProgramChange(int target, int channel, int bank, int program);
+    void allNotesOff(int target, int channel);
+    void allSoundsOff(int target);  // 立即杀死所有 voice, 释放复音数
 
     // SoundFont management
     bool loadSoundFont(int target, const char* path);
     int  getInstrumentCount(int target);
     const char* getInstrumentName(int target, int index);
     void setInstrument(int target, int index);
+    int  getInstrumentBank(int target, int index);
     void setMasterVolume(int target, float gain);
 
     // Oboe callback

@@ -189,7 +189,7 @@ pointer-events: none;
 #fab-btn { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: max(20px, env(safe-area-inset-left)); width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.5); color: #fff; font-size: 20px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 900; transition: all 0.3s; }
 #fab-btn.success { color: #00e676; border-color: rgba(0, 230, 118, 0.4); }
 
-#settings-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(5,5,5,0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); z-index: 1000; display: none; flex-direction: column; align-items: center; padding-top: max(60px, env(safe-area-inset-top)); box-sizing: border-box; }
+#settings-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(5,5,5,0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); z-index: 1000; display: none; flex-direction: column; align-items: center; padding-top: max(60px, env(safe-area-inset-top)); box-sizing: border-box; overflow-y: auto; padding-bottom: 40px; }
 #settings-page.show { display: flex; }
 #back-btn { position: absolute; top: max(20px, env(safe-area-inset-top)); left: max(20px, env(safe-area-inset-left)); background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; padding: 10px 15px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; backdrop-filter: blur(10px); }
 select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margin-bottom: 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 16px; outline: none; }
@@ -281,6 +281,11 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     background: rgba(255, 255, 255, 0.9) !important;
     color: #121212 !important;
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+}
+
+@keyframes style-blink {
+    from { box-shadow: 0 0 4px rgba(255,255,255,0.3); }
+    to   { box-shadow: 0 0 16px rgba(255,255,255,0.9); }
 }
 
 /* ==========================================

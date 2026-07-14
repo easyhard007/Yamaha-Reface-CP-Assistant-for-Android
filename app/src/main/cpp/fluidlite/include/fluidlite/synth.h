@@ -90,6 +90,10 @@ FLUIDSYNTH_API int fluid_synth_noteoff(fluid_synth_t* synth, int chan, int key);
   /** Send a control change message. Returns 0 if no error occurred, -1 otherwise.  */
 FLUIDSYNTH_API int fluid_synth_cc(fluid_synth_t* synth, int chan, int ctrl, int val);
 
+  /** Turn off all notes on a channel (release envelopes). Returns 0 if no error occurred. */
+FLUIDSYNTH_API int fluid_synth_all_notes_off(fluid_synth_t* synth, int chan);
+FLUIDSYNTH_API int fluid_synth_all_sounds_off(fluid_synth_t* synth, int chan);
+
   /** Get a control value. Returns 0 if no error occurred, -1 otherwise.  */
 FLUIDSYNTH_API int fluid_synth_get_cc(fluid_synth_t* synth, int chan, int ctrl, int* pval);
 

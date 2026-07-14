@@ -40,7 +40,7 @@ bool AudioEngine::init(const char* sf2Path) {
     mLeadInstruments.clear(); mAccompInstruments.clear();
 
     mSettings = new_fluid_settings();
-    fluid_settings_setint(mSettings, "synth.polyphony", 48);
+    fluid_settings_setint(mSettings, "synth.polyphony", 128);
     mLeadSynth = new_fluid_synth(mSettings);
     mAccompSynth = new_fluid_synth(mSettings);
     if (!mLeadSynth || !mAccompSynth) {
@@ -87,6 +87,7 @@ void AudioEngine::stop() {
     if (mSettings) { delete_fluid_settings(mSettings); mSettings = nullptr; }
 }
 
+// --- channel-0 convenience methods (backward compatible) ---
 void AudioEngine::playNote(int target, int note, int velocity) {
     std::lock_guard<std::mutex> lock(mLock);
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
@@ -103,6 +104,46 @@ void AudioEngine::sendCC(int target, int controller, int value) {
     std::lock_guard<std::mutex> lock(mLock);
     if (target == 0 && mLeadSynth) fluid_synth_cc(mLeadSynth, 0, controller, value);
     else if (target == 1 && mAccompSynth) fluid_synth_cc(mAccompSynth, 0, controller, value);
+}
+
+// --- channel-aware methods (used by StylePlayer) ---
+void AudioEngine::playNote(int target, int channel, int note, int velocity) {
+    std::lock_guard<std::mutex> lock(mLock);
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    if (synth) fluid_synth_noteon(synth, channel, note, velocity);
+}
+
+void AudioEngine::stopNote(int target, int channel, int note) {
+    std::lock_guard<std::mutex> lock(mLock);
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    if (synth) fluid_synth_noteoff(synth, channel, note);
+}
+
+void AudioEngine::sendCC(int target, int channel, int controller, int value) {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (target == 0 && mLeadSynth) fluid_synth_cc(mLeadSynth, channel, controller, value);
+    else if (target == 1 && mAccompSynth) fluid_synth_cc(mAccompSynth, channel, controller, value);
+}
+
+void AudioEngine::sendProgramChange(int target, int channel, int bank, int program) {
+    std::lock_guard<std::mutex> lock(mLock);
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    if (synth) {
+        fluid_synth_bank_select(synth, channel, bank);
+        fluid_synth_program_change(synth, channel, program);
+    }
+}
+
+void AudioEngine::allNotesOff(int target, int channel) {
+    std::lock_guard<std::mutex> lock(mLock);
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    if (synth) fluid_synth_all_notes_off(synth, channel);
+}
+
+void AudioEngine::allSoundsOff(int target) {
+    std::lock_guard<std::mutex> lock(mLock);
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    if (synth) for (int ch = 0; ch < 16; ++ch) fluid_synth_all_sounds_off(synth, ch);
 }
 
 bool AudioEngine::loadSoundFont(int target, const char* path) {
@@ -147,6 +188,13 @@ void AudioEngine::setInstrument(int target, int index) {
     }
 }
 
+int AudioEngine::getInstrumentBank(int target, int index) {
+    std::lock_guard<std::mutex> lock(mLock);
+    auto* list = (target == 0) ? &mLeadInstruments : &mAccompInstruments;
+    if (index < 0 || index >= (int)list->size()) return 0;
+    return (*list)[index].bank;
+}
+
 void AudioEngine::setMasterVolume(int target, float gain) {
     std::lock_guard<std::mutex> lock(mLock);
     if (target == 0 && mLeadSynth) fluid_synth_set_gain(mLeadSynth, gain);
@@ -161,7 +209,13 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     asm volatile("mrs %0, fpcr" : "=r"(fpscr));
     asm volatile("msr fpcr, %0" : : "r" (fpscr | (1U << 24)));
 #endif
-    std::lock_guard<std::mutex> lock(mLock);
+    // try_lock: never block the audio callback. If a MIDI operation holds the lock,
+    // output silence for this frame (~2.9ms) — imperceptible, and avoids xruns.
+    std::unique_lock<std::mutex> lock(mLock, std::try_to_lock);
+    if (!lock.owns_lock()) {
+        memset(outBuffer, 0, numFrames * 2 * sizeof(float));
+        return oboe::DataCallbackResult::Continue;
+    }
     if (mLeadSynth && mAccompSynth) {
         fluid_synth_write_float(mLeadSynth, numFrames, outBuffer, 0, 2, outBuffer, 1, 2);
         float* mixPtr = mMixBuffer.data();

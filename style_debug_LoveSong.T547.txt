@@ -1,0 +1,3018 @@
+============================================================
+  STYLE DEBUG DUMP
+  File: E:\Projects\Yamaha Reface CP Assistant for Android\app\src\main\assets\styles\LoveSong.T547.sty
+============================================================
+
+--- HEADER ---
+Resolution (ticks/beat): 1920
+Tempo (us/qn): 857142  (70.0001 BPM)
+Total events: 9052
+Total markers: 17
+CASM data: 2119 bytes
+
+--- MARKERS / SCENES ---
+  [      0]  SFF2  (duration: 0 ticks)
+  [      0]  SInt  (duration: 7680 ticks)
+  [   7680]  Main A  (duration: 30720 ticks)
+  [  38400]  Main B  (duration: 30720 ticks)
+  [  69120]  Main C  (duration: 30720 ticks)
+  [  99840]  Main D  (duration: 30720 ticks)
+  [ 130560]  Fill In AA  (duration: 7680 ticks)
+  [ 138240]  Fill In BB  (duration: 7680 ticks)
+  [ 145920]  Fill In CC  (duration: 7680 ticks)
+  [ 153600]  Fill In DD  (duration: 7680 ticks)
+  [ 161280]  Intro A  (duration: 7680 ticks)
+  [ 168960]  Intro B  (duration: 30720 ticks)
+  [ 199680]  Intro C  (duration: 30720 ticks)
+  [ 230400]  Ending A  (duration: 7680 ticks)
+  [ 238080]  Ending B  (duration: 30720 ticks)
+  [ 268800]  Ending C  (duration: 30720 ticks)
+  [ 299520]  Fill In BA
+
+--- CHANNEL SUMMARY ---
+  Ch  1  Notes=   59  ProgChg= 1  CC= 26  progs=[17]
+  Ch  2  Notes=  388  ProgChg= 1  CC= 24  progs=[0]
+  Ch  3  Notes=  334  ProgChg= 2  CC= 25  progs=[1,1]
+  Ch  4  Notes=  135  ProgChg= 1  CC=439  progs=[49]
+  Ch  8  Notes=  514  ProgChg= 1  CC=  4  progs=[73]
+  Ch  9  Notes=  538  ProgChg= 1  CC=  5  progs=[73]
+  Ch 10  Notes=  144  ProgChg= 1  CC= 88  progs=[17]
+  Ch 11  Notes=  595  ProgChg= 1  CC= 24  progs=[0]
+  Ch 12  Notes=  713  ProgChg= 6  CC= 41  progs=[1,1,1,1,1,1]
+  Ch 13  Notes=  181  ProgChg= 1  CC=1095  progs=[49]
+  Ch 14  Notes=    8  ProgChg= 1  CC= 46  progs=[49]
+
+--- ALL PROGRAM CHANGES (sorted by tick) ---
+  tick=     261  ch= 1  prog=17
+  tick=     261  ch= 2  prog=0
+  tick=     261  ch= 3  prog=1
+  tick=     261  ch= 4  prog=49
+  tick=     261  ch= 8  prog=73
+  tick=     261  ch= 9  prog=73
+  tick=     261  ch=10  prog=17
+  tick=     261  ch=11  prog=0
+  tick=     261  ch=12  prog=1
+  tick=     261  ch=13  prog=49
+  tick=     261  ch=14  prog=49
+  tick=    7700  ch=12  prog=1
+  tick=   38420  ch=12  prog=1
+  tick=  130580  ch=12  prog=1
+  tick=  138260  ch=12  prog=1
+  tick=  168980  ch= 3  prog=1
+  tick=  168980  ch=12  prog=1
+
+--- SCENE BREAKDOWN ---
+
+=== Scene [0] 'SFF2'  ticks [0,0)  duration=0 ===
+
+=== Scene [1] 'SInt'  ticks [0,7680)  duration=7680 ===
+
+=== Scene [2] 'Main A'  ticks [7680,38400)  duration=30720 ===
+  Ch  2 (18 notes):
+    relTick=     0  C4  vel=65
+    relTick=   960  C4  vel=48
+    relTick=  2880  C4  vel=48
+    relTick=  4800  C4  vel=53
+    relTick=  6716  C4  vel=59
+    relTick=  8644  C4  vel=46
+    relTick= 10568  C4  vel=48
+    relTick= 12480  C4  vel=48
+    relTick= 14396  C4  vel=55
+    relTick= 15360  C4  vel=65
+    relTick= 16316  C4  vel=55
+    relTick= 18240  C4  vel=49
+    relTick= 20156  C4  vel=49
+    relTick= 22084  C4  vel=58
+    relTick= 24008  C4  vel=53
+    relTick= 25920  C4  vel=53
+    relTick= 27840  C4  vel=46
+    relTick= 29752  C4  vel=46
+  Ch  8 (40 notes):
+    relTick=     0  A4  vel=40
+    relTick=   960  A4  vel=20
+    relTick=  1920  A4  vel=60
+    relTick=  2880  A4  vel=20
+    relTick=  3840  A4  vel=40
+    relTick=  4800  A4  vel=20
+    relTick=  5760  A4  vel=60
+    relTick=  6720  A4  vel=20
+    relTick=  7680  A4  vel=40
+    relTick=  8640  A4  vel=20
+    relTick=  9600  A4  vel=60
+    relTick= 10560  A4  vel=20
+    relTick= 11520  A4  vel=40
+    relTick= 12480  A4  vel=20
+    relTick= 13440  F#3  vel=94
+    relTick= 13440  A4  vel=60
+    relTick= 14400  A4  vel=20
+    relTick= 15360  A4  vel=40
+    relTick= 16320  A4  vel=20
+    relTick= 17280  A4  vel=60
+    relTick= 17760  A#5  vel=29
+    relTick= 18240  A4  vel=20
+    relTick= 18240  A#5  vel=43
+    relTick= 18720  A#5  vel=43
+    relTick= 19200  A4  vel=40
+    relTick= 20160  A4  vel=20
+    relTick= 21120  A4  vel=60
+    relTick= 22080  A4  vel=20
+    relTick= 23040  A4  vel=40
+    relTick= 24000  A4  vel=20
+    relTick= 24960  A4  vel=60
+    relTick= 25920  A4  vel=20
+    relTick= 26880  A4  vel=40
+    relTick= 27840  A4  vel=20
+    relTick= 28800  F#3  vel=68
+    relTick= 28800  A4  vel=60
+    relTick= 29280  F#3  vel=33
+    relTick= 29760  F#3  vel=14
+    relTick= 29760  A4  vel=20
+    relTick= 30240  F#3  vel=2
+    ... (0 more)
+  Ch  9 (12 notes):
+    relTick=     0  A1  vel=82
+    relTick=  1920  E0  vel=39
+    relTick=  5760  E0  vel=39
+    relTick=  9600  E0  vel=39
+    relTick= 13440  E0  vel=39
+    relTick= 15360  A1  vel=82
+    relTick= 17280  E0  vel=39
+    relTick= 21120  E0  vel=39
+    relTick= 22080  A1  vel=68
+    relTick= 23040  A1  vel=82
+    relTick= 24960  E0  vel=39
+    relTick= 28800  E0  vel=39
+  Ch 10 (7 notes):
+    relTick=     0  C1  vel=59
+    relTick=  6720  C1  vel=55
+    relTick=  7680  C1  vel=59
+    relTick= 15360  C1  vel=59
+    relTick= 22080  C1  vel=55
+    relTick= 23040  C1  vel=59
+    relTick= 29760  C1  vel=55
+  Ch 11 (50 notes):
+    relTick=     0  B3  vel=65
+    relTick=     0  E4  vel=71
+    relTick=     0  G4  vel=76
+    relTick=   964  B3  vel=48
+    relTick=  1916  G4  vel=72
+    relTick=  1924  E4  vel=69
+    relTick=  2880  B3  vel=46
+    relTick=  3844  E4  vel=55
+    relTick=  3844  G4  vel=65
+    relTick=  4800  B3  vel=52
+    relTick=  5756  E4  vel=64
+    relTick=  5756  G4  vel=78
+    relTick=  6712  B3  vel=54
+    relTick=  7680  E4  vel=68
+    relTick=  7680  G4  vel=80
+    relTick=  8640  B3  vel=49
+    relTick=  9604  E4  vel=56
+    relTick=  9604  G4  vel=69
+    relTick= 10552  B3  vel=48
+    relTick= 11520  G4  vel=62
+    relTick= 11524  E4  vel=56
+    relTick= 12480  B3  vel=49
+    relTick= 13440  E4  vel=66
+    relTick= 13440  G4  vel=61
+    relTick= 14392  B3  vel=59
+    relTick= 15360  B3  vel=65
+    relTick= 15360  E4  vel=71
+    relTick= 15360  G4  vel=80
+    relTick= 16312  B3  vel=55
+    relTick= 17276  E4  vel=65
+    relTick= 17284  G4  vel=73
+    relTick= 18236  B3  vel=48
+    relTick= 19200  G4  vel=65
+    relTick= 19208  E4  vel=55
+    relTick= 20168  B3  vel=49
+    relTick= 21112  G4  vel=69
+    relTick= 21128  E4  vel=59
+    relTick= 22076  B3  vel=57
+    relTick= 23040  E4  vel=65
+    relTick= 23040  G4  vel=78
+    ... (10 more)
+  Ch 12 (10 notes):
+    relTick=    28  C3  vel=21
+    relTick=    28  F3  vel=20
+    relTick=   960  A3  vel=30
+    relTick=  1920  G3  vel=20
+    relTick=  2900  B3  vel=30
+    relTick= 15360  C3  vel=21
+    relTick= 15360  F3  vel=20
+    relTick= 16320  G3  vel=30
+    relTick= 17280  A3  vel=20
+    relTick= 18260  B3  vel=30
+  Ch 13 (3 notes):
+    relTick=     4  G3  vel=22
+    relTick=     4  B3  vel=22
+    relTick=     4  E4  vel=22
+
+=== Scene [3] 'Main B'  ticks [38400,69120)  duration=30720 ===
+  Ch  2 (18 notes):
+    relTick=     0  C4  vel=61
+    relTick=   960  C4  vel=49
+    relTick=  2880  C4  vel=52
+    relTick=  4792  C4  vel=56
+    relTick=  6720  C4  vel=60
+    relTick=  8636  C4  vel=53
+    relTick= 10556  C4  vel=50
+    relTick= 12476  C4  vel=52
+    relTick= 14408  C4  vel=62
+    relTick= 15360  C4  vel=68
+    relTick= 16328  C4  vel=58
+    relTick= 18240  C4  vel=50
+    relTick= 20152  C4  vel=47
+    relTick= 22080  C4  vel=58
+    relTick= 23992  C4  vel=53
+    relTick= 25924  C4  vel=53
+    relTick= 27848  C4  vel=52
+    relTick= 29764  C4  vel=52
+  Ch  8 (14 notes):
+    relTick=  1920  F#3  vel=106
+    relTick=  5760  F#3  vel=106
+    relTick=  9600  F#3  vel=106
+    relTick= 13440  F#3  vel=106
+    relTick= 17280  F#3  vel=106
+    relTick= 17760  A#5  vel=25
+    relTick= 18240  A#5  vel=39
+    relTick= 18720  A#5  vel=39
+    relTick= 21120  F#3  vel=106
+    relTick= 24960  F#3  vel=106
+    relTick= 25440  A#5  vel=29
+    relTick= 25920  A#5  vel=43
+    relTick= 26400  A#5  vel=43
+    relTick= 28800  F#3  vel=106
+  Ch  9 (44 notes):
+    relTick=     0  C#0  vel=77
+    relTick=     0  A1  vel=83
+    relTick=   960  D#0  vel=39
+    relTick=  1920  C#2  vel=110
+    relTick=  2880  D#0  vel=43
+    relTick=  2880  A1  vel=67
+    relTick=  3840  C#0  vel=77
+    relTick=  3840  A1  vel=83
+    relTick=  4800  D#0  vel=43
+    relTick=  5760  C#2  vel=110
+    relTick=  6720  D#0  vel=43
+    relTick=  7680  C#0  vel=77
+    relTick=  7680  A1  vel=83
+    relTick=  8640  D#0  vel=41
+    relTick=  9600  C#2  vel=110
+    relTick= 10560  D#0  vel=43
+    relTick= 10560  A1  vel=67
+    relTick= 11520  C#0  vel=77
+    relTick= 11520  A1  vel=83
+    relTick= 12480  D#0  vel=48
+    relTick= 13440  C#2  vel=110
+    relTick= 14400  D#0  vel=36
+    relTick= 15360  C#0  vel=77
+    relTick= 15360  A1  vel=83
+    relTick= 16320  D#0  vel=39
+    relTick= 17280  C#2  vel=110
+    relTick= 18240  D#0  vel=38
+    relTick= 18240  A1  vel=78
+    relTick= 19200  C#0  vel=77
+    relTick= 19200  A1  vel=91
+    relTick= 20160  D#0  vel=38
+    relTick= 21120  C#2  vel=110
+    relTick= 22080  D#0  vel=38
+    relTick= 23040  C#0  vel=77
+    relTick= 23040  A1  vel=91
+    relTick= 24000  D#0  vel=41
+    relTick= 24960  C#2  vel=110
+    relTick= 25920  D#0  vel=39
+    relTick= 25920  A1  vel=78
+    relTick= 26880  C#0  vel=77
+    ... (4 more)
+  Ch 10 (12 notes):
+    relTick=     0  C2  vel=59
+    relTick=  2880  C2  vel=53
+    relTick=  3840  C2  vel=58
+    relTick=  7680  C2  vel=59
+    relTick= 10560  C2  vel=53
+    relTick= 11520  C2  vel=58
+    relTick= 15360  C2  vel=59
+    relTick= 18240  C2  vel=53
+    relTick= 19200  C2  vel=58
+    relTick= 23040  C2  vel=59
+    relTick= 25920  C2  vel=53
+    relTick= 26880  C2  vel=58
+  Ch 11 (50 notes):
+    relTick=     0  B3  vel=61
+    relTick=     0  E4  vel=72
+    relTick=     0  G4  vel=73
+    relTick=   968  B3  vel=52
+    relTick=  1920  G4  vel=74
+    relTick=  1924  E4  vel=67
+    relTick=  2880  B3  vel=53
+    relTick=  3832  E4  vel=62
+    relTick=  3840  G4  vel=72
+    relTick=  4800  B3  vel=51
+    relTick=  5752  E4  vel=67
+    relTick=  5764  G4  vel=79
+    relTick=  6712  B3  vel=60
+    relTick=  7680  E4  vel=71
+    relTick=  7680  G4  vel=83
+    relTick=  8640  B3  vel=52
+    relTick=  9600  E4  vel=61
+    relTick=  9600  G4  vel=73
+    relTick= 10552  B3  vel=51
+    relTick= 11520  E4  vel=58
+    relTick= 11528  G4  vel=66
+    relTick= 12480  B3  vel=52
+    relTick= 13436  E4  vel=70
+    relTick= 13440  G4  vel=64
+    relTick= 14408  B3  vel=63
+    relTick= 15360  B3  vel=68
+    relTick= 15360  E4  vel=74
+    relTick= 15360  G4  vel=80
+    relTick= 16320  B3  vel=59
+    relTick= 17284  E4  vel=67
+    relTick= 17284  G4  vel=78
+    relTick= 18244  B3  vel=53
+    relTick= 19192  G4  vel=68
+    relTick= 19200  E4  vel=58
+    relTick= 20160  B3  vel=47
+    relTick= 21112  E4  vel=64
+    relTick= 21116  G4  vel=70
+    relTick= 22072  B3  vel=62
+    relTick= 23040  E4  vel=68
+    relTick= 23040  G4  vel=81
+    ... (10 more)
+  Ch 12 (32 notes):
+    relTick=    40  C3  vel=21
+    relTick=    40  F3  vel=20
+    relTick=   960  A3  vel=30
+    relTick=  1920  G3  vel=20
+    relTick=  2900  B3  vel=30
+    relTick=  4800  G3  vel=20
+    relTick=  5780  A3  vel=30
+    relTick=  6720  F3  vel=20
+    relTick=  7680  C3  vel=21
+    relTick=  8640  G3  vel=30
+    relTick=  9600  F3  vel=20
+    relTick= 10580  A3  vel=30
+    relTick= 10580  B3  vel=30
+    relTick= 12480  F3  vel=20
+    relTick= 13460  G3  vel=30
+    relTick= 14400  A3  vel=20
+    relTick= 15360  C3  vel=21
+    relTick= 15360  F3  vel=20
+    relTick= 16320  G3  vel=30
+    relTick= 17280  A3  vel=20
+    relTick= 18260  B3  vel=30
+    relTick= 20180  A3  vel=30
+    relTick= 21120  G3  vel=20
+    relTick= 22080  F3  vel=20
+    relTick= 23040  C3  vel=21
+    relTick= 24000  F3  vel=20
+    relTick= 24960  G3  vel=30
+    relTick= 25940  A3  vel=30
+    relTick= 25940  B3  vel=30
+    relTick= 27840  G3  vel=20
+    relTick= 28820  A3  vel=30
+    relTick= 29760  F3  vel=20
+  Ch 13 (3 notes):
+    relTick=     4  B3  vel=22
+    relTick=     4  E4  vel=22
+    relTick=     4  G4  vel=22
+
+=== Scene [4] 'Main C'  ticks [69120,99840)  duration=30720 ===
+  Ch  2 (16 notes):
+    relTick=     0  C3  vel=79
+    relTick=  1908  C3  vel=70
+    relTick=  3816  C3  vel=68
+    relTick=  5752  C3  vel=64
+    relTick=  7676  C3  vel=72
+    relTick=  9584  C3  vel=65
+    relTick= 11532  C3  vel=69
+    relTick= 13456  C3  vel=71
+    relTick= 15348  C3  vel=70
+    relTick= 17292  C3  vel=74
+    relTick= 19204  C3  vel=67
+    relTick= 21124  C3  vel=67
+    relTick= 23064  C3  vel=73
+    relTick= 24968  C3  vel=72
+    relTick= 26868  C3  vel=77
+    relTick= 28804  C3  vel=70
+  Ch  8 (72 notes):
+    relTick=     0  A#5  vel=30
+    relTick=   480  A#5  vel=28
+    relTick=   960  A#5  vel=65
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=30
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=30
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  A#5  vel=30
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  A#5  vel=28
+    relTick=  7680  A#5  vel=30
+    relTick=  8160  A#5  vel=28
+    relTick=  8640  A#5  vel=65
+    relTick=  9120  A#5  vel=28
+    relTick=  9600  F#3  vel=110
+    relTick=  9600  A#5  vel=30
+    relTick= 10080  A#5  vel=28
+    relTick= 10560  A#5  vel=65
+    relTick= 11040  A#5  vel=28
+    relTick= 11520  A#5  vel=30
+    relTick= 12000  A#5  vel=28
+    relTick= 12480  A#5  vel=65
+    relTick= 12960  A#5  vel=28
+    relTick= 13440  F#3  vel=110
+    relTick= 13440  A#5  vel=30
+    relTick= 13920  A#5  vel=28
+    relTick= 14400  A#5  vel=65
+    relTick= 14880  A#5  vel=28
+    relTick= 15360  A#5  vel=30
+    relTick= 15840  A#5  vel=28
+    relTick= 16320  A#5  vel=65
+    relTick= 16800  A#5  vel=28
+    ... (32 more)
+  Ch  9 (56 notes):
+    relTick=     0  E0  vel=57
+    relTick=     0  A1  vel=94
+    relTick=   960  F0  vel=32
+    relTick=  1920  E0  vel=75
+    relTick=  1920  G1  vel=110
+    relTick=  2880  E0  vel=36
+    relTick=  3360  A1  vel=59
+    relTick=  3840  E0  vel=57
+    relTick=  3840  A1  vel=94
+    relTick=  4800  E0  vel=36
+    relTick=  4800  A1  vel=80
+    relTick=  5760  E0  vel=75
+    relTick=  5760  G1  vel=110
+    relTick=  6720  F0  vel=38
+    relTick=  7680  E0  vel=57
+    relTick=  7680  A1  vel=94
+    relTick=  8640  E0  vel=36
+    relTick=  9600  E0  vel=75
+    relTick=  9600  G1  vel=110
+    relTick= 10560  F#0  vel=36
+    relTick= 11040  A1  vel=59
+    relTick= 11520  E0  vel=57
+    relTick= 11520  A1  vel=94
+    relTick= 12480  E0  vel=34
+    relTick= 12480  A1  vel=70
+    relTick= 13440  E0  vel=75
+    relTick= 13440  G1  vel=110
+    relTick= 14400  E0  vel=41
+    relTick= 15360  E0  vel=57
+    relTick= 15360  A1  vel=94
+    relTick= 16320  F0  vel=39
+    relTick= 17280  E0  vel=75
+    relTick= 17280  G1  vel=110
+    relTick= 18240  F0  vel=36
+    relTick= 18720  A1  vel=59
+    relTick= 19200  E0  vel=57
+    relTick= 19200  A1  vel=94
+    relTick= 20160  E0  vel=32
+    relTick= 20160  A1  vel=80
+    relTick= 21120  E0  vel=75
+    ... (16 more)
+  Ch 10 (19 notes):
+    relTick=     0  C1  vel=61
+    relTick=  3400  C1  vel=50
+    relTick=  3840  C1  vel=61
+    relTick=  4800  C1  vel=57
+    relTick=  7680  C1  vel=61
+    relTick= 11080  C1  vel=57
+    relTick= 11520  C1  vel=61
+    relTick= 12480  C1  vel=57
+    relTick= 14400  G1  vel=56
+    relTick= 15360  C1  vel=61
+    relTick= 18760  C1  vel=57
+    relTick= 19200  C1  vel=61
+    relTick= 20160  C1  vel=57
+    relTick= 23040  C1  vel=60
+    relTick= 26440  C1  vel=57
+    relTick= 26880  C1  vel=60
+    relTick= 27840  C1  vel=57
+    relTick= 29320  C1  vel=56
+    relTick= 29760  G1  vel=54
+  Ch 11 (54 notes):
+    relTick=     0  G3  vel=74
+    relTick=     0  B3  vel=79
+    relTick=    20  E4  vel=81
+    relTick=  1904  G3  vel=69
+    relTick=  1908  B3  vel=66
+    relTick=  1920  E4  vel=82
+    relTick=  2896  G3  vel=56
+    relTick=  3828  B3  vel=69
+    relTick=  3828  E4  vel=71
+    relTick=  3848  G3  vel=55
+    relTick=  5748  G3  vel=59
+    relTick=  5748  B3  vel=61
+    relTick=  5748  E4  vel=68
+    relTick=  6732  G3  vel=52
+    relTick=  7672  G3  vel=74
+    relTick=  7680  B3  vel=76
+    relTick=  7692  E4  vel=73
+    relTick=  9588  B3  vel=66
+    relTick=  9604  G3  vel=72
+    relTick=  9604  E4  vel=74
+    relTick= 10548  G3  vel=55
+    relTick= 11524  E4  vel=77
+    relTick= 11532  B3  vel=70
+    relTick= 12468  G3  vel=56
+    relTick= 13420  E4  vel=81
+    relTick= 13452  G3  vel=58
+    relTick= 13456  B3  vel=71
+    relTick= 14412  G3  vel=52
+    relTick= 15336  B3  vel=70
+    relTick= 15356  E4  vel=75
+    relTick= 15376  G3  vel=74
+    relTick= 17284  B3  vel=76
+    relTick= 17284  E4  vel=69
+    relTick= 17296  G3  vel=57
+    relTick= 18216  G3  vel=51
+    relTick= 19212  B3  vel=66
+    relTick= 19216  E4  vel=76
+    relTick= 20148  G3  vel=66
+    relTick= 21116  E4  vel=74
+    relTick= 21128  B3  vel=67
+    ... (14 more)
+  Ch 12 (71 notes):
+    relTick=    40  C3  vel=30
+    relTick=    48  G3  vel=30
+    relTick=    60  A3  vel=30
+    relTick=   960  F3  vel=20
+    relTick=   960  G3  vel=20
+    relTick=  1440  B3  vel=40
+    relTick=  1460  A3  vel=40
+    relTick=  1480  G3  vel=40
+    relTick=  2880  G3  vel=20
+    relTick=  3360  A3  vel=40
+    relTick=  3840  C3  vel=30
+    relTick=  4320  F3  vel=20
+    relTick=  4800  G3  vel=40
+    relTick=  5280  F3  vel=20
+    relTick=  5760  A3  vel=40
+    relTick=  6240  F3  vel=20
+    relTick=  6720  G3  vel=40
+    relTick=  7200  F3  vel=20
+    relTick=  7680  C3  vel=30
+    relTick=  8160  G3  vel=30
+    relTick=  8640  F3  vel=20
+    relTick=  9120  B3  vel=40
+    relTick=  9140  A3  vel=40
+    relTick=  9160  G3  vel=40
+    relTick= 10080  F3  vel=20
+    relTick= 10560  G3  vel=20
+    relTick= 11040  A3  vel=40
+    relTick= 11520  C3  vel=30
+    relTick= 12000  F3  vel=20
+    relTick= 12480  G3  vel=40
+    relTick= 12960  F3  vel=20
+    relTick= 13440  B3  vel=40
+    relTick= 13920  G3  vel=20
+    relTick= 14400  A3  vel=40
+    relTick= 14880  F3  vel=20
+    relTick= 15360  C3  vel=30
+    relTick= 15360  F3  vel=30
+    relTick= 15360  G3  vel=30
+    relTick= 15360  A3  vel=30
+    relTick= 16320  F3  vel=20
+    ... (31 more)
+  Ch 13 (19 notes):
+    relTick=     4  G3  vel=26
+    relTick=     4  B3  vel=26
+    relTick=     4  E4  vel=26
+    relTick=  5764  G3  vel=69
+    relTick=  5764  B3  vel=67
+    relTick=  5764  E4  vel=68
+    relTick=  7684  G3  vel=26
+    relTick=  7684  B3  vel=26
+    relTick=  7684  E4  vel=26
+    relTick= 13444  E4  vel=68
+    relTick= 15364  G3  vel=26
+    relTick= 15364  B3  vel=26
+    relTick= 15364  E4  vel=26
+    relTick= 21124  G3  vel=69
+    relTick= 21124  B3  vel=67
+    relTick= 21124  E4  vel=68
+    relTick= 23044  G3  vel=26
+    relTick= 23044  B3  vel=26
+    relTick= 23044  E4  vel=26
+  Ch 14 (2 notes):
+    relTick=     4  B4  vel=31
+    relTick=     4  B5  vel=31
+
+=== Scene [5] 'Main D'  ticks [99840,130560)  duration=30720 ===
+  Ch  2 (32 notes):
+    relTick=     0  C4  vel=81
+    relTick=   960  C4  vel=59
+    relTick=  1908  C4  vel=82
+    relTick=  2868  C4  vel=52
+    relTick=  3852  C4  vel=84
+    relTick=  4792  C4  vel=55
+    relTick=  5772  C4  vel=88
+    relTick=  6720  C4  vel=59
+    relTick=  7676  C4  vel=83
+    relTick=  8644  C4  vel=52
+    relTick=  9600  C4  vel=89
+    relTick= 10540  C4  vel=43
+    relTick= 11052  C4  vel=49
+    relTick= 11524  C4  vel=73
+    relTick= 13436  C4  vel=86
+    relTick= 14400  C4  vel=68
+    relTick= 15368  C4  vel=90
+    relTick= 16320  C4  vel=53
+    relTick= 17280  C4  vel=75
+    relTick= 18252  C4  vel=41
+    relTick= 18708  C4  vel=47
+    relTick= 19208  C4  vel=79
+    relTick= 21116  C4  vel=89
+    relTick= 22560  C4  vel=65
+    relTick= 23040  C4  vel=89
+    relTick= 24948  C4  vel=92
+    relTick= 25928  C4  vel=45
+    relTick= 26404  C4  vel=44
+    relTick= 26880  C4  vel=83
+    relTick= 27836  C4  vel=64
+    relTick= 28796  C4  vel=91
+    relTick= 29756  C4  vel=83
+  Ch  8 (117 notes):
+    relTick=     0  A5  vel=81
+    relTick=     0  A#5  vel=31
+    relTick=   480  A#5  vel=28
+    relTick=   960  G#5  vel=63
+    relTick=   960  A#5  vel=65
+    relTick=  1440  G#5  vel=71
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=31
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  G#5  vel=57
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A5  vel=76
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=31
+    relTick=  4320  A5  vel=69
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  G#5  vel=73
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  G#5  vel=77
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  D#5  vel=110
+    relTick=  5760  A#5  vel=31
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  G#5  vel=71
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  G#5  vel=82
+    relTick=  7200  A#5  vel=28
+    relTick=  7680  A5  vel=68
+    relTick=  7680  A#5  vel=31
+    relTick=  8160  A#5  vel=28
+    relTick=  8640  G#5  vel=60
+    relTick=  8640  A#5  vel=65
+    relTick=  9120  G#5  vel=74
+    relTick=  9120  A#5  vel=28
+    relTick=  9600  F#3  vel=110
+    relTick=  9600  A#5  vel=31
+    relTick= 10080  A#5  vel=28
+    relTick= 10560  G#5  vel=56
+    ... (77 more)
+  Ch  9 (96 notes):
+    relTick=     0  A0  vel=42
+    relTick=     0  A1  vel=94
+    relTick=     0  D#3  vel=53
+    relTick=   960  A0  vel=28
+    relTick=   960  D#3  vel=64
+    relTick=  1440  F3  vel=39
+    relTick=  1920  A0  vel=42
+    relTick=  1920  G1  vel=110
+    relTick=  1920  D#3  vel=53
+    relTick=  2880  A0  vel=28
+    relTick=  2880  D#3  vel=64
+    relTick=  3360  A1  vel=59
+    relTick=  3840  A0  vel=42
+    relTick=  3840  A1  vel=94
+    relTick=  3840  D#3  vel=53
+    relTick=  4800  A0  vel=28
+    relTick=  4800  A1  vel=80
+    relTick=  4800  D#3  vel=64
+    relTick=  5760  A0  vel=42
+    relTick=  5760  G1  vel=110
+    relTick=  5760  D#3  vel=53
+    relTick=  6720  A0  vel=28
+    relTick=  6720  D#3  vel=64
+    relTick=  7680  A0  vel=42
+    relTick=  7680  A1  vel=94
+    relTick=  7680  D#3  vel=53
+    relTick=  8640  A0  vel=28
+    relTick=  8640  D#3  vel=64
+    relTick=  9600  A0  vel=42
+    relTick=  9600  G1  vel=110
+    relTick=  9600  D#3  vel=53
+    relTick= 10560  A0  vel=28
+    relTick= 10560  D#3  vel=64
+    relTick= 11040  A1  vel=59
+    relTick= 11520  A0  vel=42
+    relTick= 11520  A1  vel=94
+    relTick= 11520  D#3  vel=53
+    relTick= 12480  A0  vel=28
+    relTick= 12480  A1  vel=70
+    relTick= 12480  D#3  vel=64
+    ... (56 more)
+  Ch 10 (19 notes):
+    relTick=     0  C1  vel=61
+    relTick=  3400  C1  vel=57
+    relTick=  3840  C1  vel=61
+    relTick=  4800  C1  vel=59
+    relTick=  7680  C1  vel=61
+    relTick= 11080  C1  vel=57
+    relTick= 11520  C1  vel=61
+    relTick= 12480  C1  vel=59
+    relTick= 14400  G0  vel=59
+    relTick= 15360  C1  vel=61
+    relTick= 18760  C1  vel=57
+    relTick= 19200  C1  vel=61
+    relTick= 20160  C1  vel=59
+    relTick= 23040  C1  vel=61
+    relTick= 26440  C1  vel=57
+    relTick= 26880  C1  vel=61
+    relTick= 27840  C1  vel=59
+    relTick= 29320  C1  vel=58
+    relTick= 29760  G1  vel=59
+  Ch 11 (70 notes):
+    relTick=     0  B3  vel=81
+    relTick=     0  E4  vel=86
+    relTick=     0  G4  vel=80
+    relTick=   960  B3  vel=60
+    relTick=  1908  B3  vel=82
+    relTick=  1908  E4  vel=72
+    relTick=  1908  G4  vel=62
+    relTick=  2868  B3  vel=55
+    relTick=  3844  E4  vel=75
+    relTick=  3852  B3  vel=83
+    relTick=  3852  G4  vel=68
+    relTick=  4800  B3  vel=60
+    relTick=  5744  G4  vel=73
+    relTick=  5768  E4  vel=73
+    relTick=  5772  B3  vel=87
+    relTick=  6724  B3  vel=63
+    relTick=  7668  B3  vel=80
+    relTick=  7684  E4  vel=86
+    relTick=  7684  G4  vel=81
+    relTick=  8640  B3  vel=46
+    relTick=  9600  E4  vel=78
+    relTick=  9608  B3  vel=84
+    relTick=  9608  G4  vel=76
+    relTick= 10548  B3  vel=42
+    relTick= 11048  B3  vel=48
+    relTick= 11508  E4  vel=77
+    relTick= 11520  G4  vel=69
+    relTick= 11532  B3  vel=74
+    relTick= 13444  B3  vel=83
+    relTick= 13452  E4  vel=81
+    relTick= 13452  G4  vel=71
+    relTick= 14384  E4  vel=66
+    relTick= 14400  B3  vel=68
+    relTick= 14404  G4  vel=69
+    relTick= 15352  G4  vel=73
+    relTick= 15360  B3  vel=86
+    relTick= 15360  E4  vel=77
+    relTick= 16324  B3  vel=54
+    relTick= 17268  G4  vel=71
+    relTick= 17280  B3  vel=79
+    ... (30 more)
+  Ch 12 (168 notes):
+    relTick=     8  C3  vel=31
+    relTick=     8  F3  vel=40
+    relTick=     8  A#7  vel=70
+    relTick=    20  G3  vel=47
+    relTick=    28  A3  vel=44
+    relTick=    40  B3  vel=46
+    relTick=  1440  A3  vel=29
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=25
+    relTick=  1460  F3  vel=23
+    relTick=  1920  F3  vel=42
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=43
+    relTick=  1940  A3  vel=39
+    relTick=  1948  B3  vel=35
+    relTick=  2880  F3  vel=26
+    relTick=  2880  C8  vel=50
+    relTick=  2888  G3  vel=27
+    relTick=  3360  B3  vel=40
+    relTick=  3360  G#7  vel=70
+    relTick=  3368  A3  vel=41
+    relTick=  3380  G3  vel=41
+    relTick=  3388  F3  vel=40
+    relTick=  3400  C3  vel=30
+    relTick=  4320  B3  vel=35
+    relTick=  4320  D7  vel=70
+    relTick=  4328  A3  vel=35
+    relTick=  4340  G3  vel=34
+    relTick=  5280  G3  vel=25
+    relTick=  5280  G#7  vel=50
+    relTick=  5288  F3  vel=31
+    relTick=  5760  C3  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5768  F3  vel=37
+    relTick=  5780  G3  vel=42
+    relTick=  5788  A3  vel=43
+    relTick=  5800  B3  vel=41
+    relTick=  6720  G3  vel=38
+    relTick=  6720  C8  vel=70
+    relTick=  6728  A3  vel=39
+    ... (128 more)
+  Ch 13 (3 notes):
+    relTick=    20  G3  vel=26
+    relTick=    20  B3  vel=26
+    relTick=    20  E4  vel=26
+  Ch 14 (2 notes):
+    relTick=     4  B4  vel=33
+    relTick=     4  B5  vel=34
+
+=== Scene [6] 'Fill In AA'  ticks [130560,138240)  duration=7680 ===
+  Ch  2 (3 notes):
+    relTick=     0  C4  vel=63
+    relTick=   956  C4  vel=59
+    relTick=  2880  C4  vel=70
+  Ch  8 (13 notes):
+    relTick=     0  A4  vel=40
+    relTick=   960  A4  vel=20
+    relTick=  1440  F#3  vel=14
+    relTick=  1592  F#3  vel=33
+    relTick=  1760  F#3  vel=59
+    relTick=  1920  F#3  vel=90
+    relTick=  1920  A4  vel=60
+    relTick=  2880  A4  vel=20
+    relTick=  3840  A4  vel=40
+    relTick=  4800  A4  vel=20
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  A4  vel=60
+    relTick=  6720  A4  vel=20
+  Ch  9 (10 notes):
+    relTick=     0  A1  vel=83
+    relTick=     0  A3  vel=64
+    relTick=  1920  E0  vel=37
+    relTick=  1920  C#2  vel=110
+    relTick=  4800  B2  vel=84
+    relTick=  5280  A1  vel=83
+    relTick=  5760  E0  vel=42
+    relTick=  5760  G1  vel=122
+    relTick=  6720  G2  vel=100
+    relTick=  7660  C#3  vel=70
+  Ch 10 (6 notes):
+    relTick=     0  C1  vel=59
+    relTick=  3360  C1  vel=50
+    relTick=  3840  C1  vel=59
+    relTick=  4800  C1  vel=56
+    relTick=  6240  C1  vel=50
+    relTick=  6720  G1  vel=58
+  Ch 11 (13 notes):
+    relTick=     0  B3  vel=63
+    relTick=     0  E4  vel=60
+    relTick=     0  G4  vel=74
+    relTick=   956  B3  vel=58
+    relTick=  1920  G4  vel=64
+    relTick=  1928  E4  vel=52
+    relTick=  2880  B3  vel=71
+    relTick=  2888  E4  vel=71
+    relTick=  2888  G4  vel=75
+    relTick=  4804  G4  vel=64
+    relTick=  5752  G4  vel=73
+    relTick=  5752  B4  vel=83
+    relTick=  5756  E4  vel=79
+  Ch 12 (9 notes):
+    relTick=    28  C3  vel=21
+    relTick=    28  F3  vel=20
+    relTick=   960  G3  vel=30
+    relTick=  1920  A3  vel=20
+    relTick=  2900  B3  vel=30
+    relTick=  4800  A3  vel=20
+    relTick=  5760  G3  vel=30
+    relTick=  6720  F3  vel=20
+    relTick=  6720  E9  vel=35
+  Ch 13 (3 notes):
+    relTick=    20  B3  vel=27
+    relTick=    20  E4  vel=27
+    relTick=    20  G4  vel=27
+
+=== Scene [7] 'Fill In BB'  ticks [138240,145920)  duration=7680 ===
+  Ch  2 (4 notes):
+    relTick=     0  C4  vel=72
+    relTick=  1920  C4  vel=69
+    relTick=  3844  C4  vel=65
+    relTick=  5760  C4  vel=62
+  Ch  8 (5 notes):
+    relTick=  1440  F#3  vel=14
+    relTick=  1600  F#3  vel=33
+    relTick=  1760  F#3  vel=59
+    relTick=  1920  F#3  vel=90
+    relTick=  5760  F#3  vel=106
+  Ch  9 (16 notes):
+    relTick=     0  C#0  vel=71
+    relTick=     0  A1  vel=83
+    relTick=   960  D#0  vel=36
+    relTick=  1920  C#0  vel=76
+    relTick=  1920  C#2  vel=110
+    relTick=  2880  C#0  vel=25
+    relTick=  3360  A1  vel=48
+    relTick=  3840  F#0  vel=49
+    relTick=  3840  A1  vel=83
+    relTick=  4780  D3  vel=62
+    relTick=  4840  C3  vel=89
+    relTick=  5760  E0  vel=42
+    relTick=  5760  G1  vel=101
+    relTick=  6240  B2  vel=67
+    relTick=  6720  G2  vel=93
+    relTick=  7660  A3  vel=70
+  Ch 10 (6 notes):
+    relTick=     0  C2  vel=59
+    relTick=  3360  C2  vel=56
+    relTick=  3840  C2  vel=59
+    relTick=  4800  C2  vel=56
+    relTick=  6240  C2  vel=55
+    relTick=  6720  G1  vel=58
+  Ch 11 (13 notes):
+    relTick=     0  B3  vel=72
+    relTick=     0  E4  vel=78
+    relTick=     0  G4  vel=79
+    relTick=   964  E4  vel=53
+    relTick=  1912  G4  vel=78
+    relTick=  1924  B3  vel=65
+    relTick=  2872  E4  vel=45
+    relTick=  3836  G4  vel=78
+    relTick=  3840  B3  vel=68
+    relTick=  4804  E4  vel=48
+    relTick=  5760  B3  vel=61
+    relTick=  5760  G4  vel=75
+    relTick=  6728  E4  vel=58
+  Ch 12 (1 notes):
+    relTick=  7200  E9  vel=30
+  Ch 13 (3 notes):
+    relTick=     4  B3  vel=27
+    relTick=     4  E4  vel=27
+    relTick=     4  G4  vel=27
+
+=== Scene [8] 'Fill In CC'  ticks [145920,153600)  duration=7680 ===
+  Ch  2 (2 notes):
+    relTick=     0  C3  vel=84
+    relTick=  1924  C4  vel=84
+  Ch  8 (17 notes):
+    relTick=     0  A#5  vel=30
+    relTick=   480  A#5  vel=28
+    relTick=   960  A#5  vel=65
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=30
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=30
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  A#5  vel=30
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  A#5  vel=28
+  Ch  9 (21 notes):
+    relTick=     0  C#0  vel=77
+    relTick=     0  A1  vel=94
+    relTick=   960  D#0  vel=41
+    relTick=  1480  A1  vel=70
+    relTick=  1920  C#0  vel=77
+    relTick=  2880  D#0  vel=47
+    relTick=  2880  A1  vel=94
+    relTick=  3360  D#0  vel=36
+    relTick=  3600  C#0  vel=34
+    relTick=  3840  F#0  vel=52
+    relTick=  4320  G1  vel=69
+    relTick=  4800  G1  vel=101
+    relTick=  5280  B2  vel=67
+    relTick=  5520  B2  vel=90
+    relTick=  5760  E0  vel=42
+    relTick=  5760  G1  vel=122
+    relTick=  6280  D3  vel=85
+    relTick=  6720  E0  vel=42
+    relTick=  6720  A2  vel=103
+    relTick=  7200  G1  vel=121
+    relTick=  7660  C#3  vel=83
+  Ch 10 (7 notes):
+    relTick=     0  C1  vel=60
+    relTick=  1440  C1  vel=56
+    relTick=  1920  G0  vel=59
+    relTick=  2880  C1  vel=60
+    relTick=  4800  C1  vel=58
+    relTick=  6240  C1  vel=60
+    relTick=  6720  G0  vel=60
+  Ch 11 (18 notes):
+    relTick=     0  G3  vel=81
+    relTick=     0  B3  vel=84
+    relTick=     0  E4  vel=78
+    relTick=  1912  B3  vel=81
+    relTick=  1916  G4  vel=85
+    relTick=  1928  E4  vel=80
+    relTick=  3836  E4  vel=82
+    relTick=  3836  G4  vel=82
+    relTick=  3836  B4  vel=84
+    relTick=  5272  E5  vel=72
+    relTick=  5280  G4  vel=68
+    relTick=  5280  B4  vel=81
+    relTick=  5752  G4  vel=90
+    relTick=  5760  B4  vel=101
+    relTick=  5760  E5  vel=104
+    relTick=  6712  G5  vel=80
+    relTick=  6720  B4  vel=81
+    relTick=  6720  E5  vel=77
+  Ch 12 (18 notes):
+    relTick=    40  C3  vel=30
+    relTick=   480  G3  vel=30
+    relTick=   960  F3  vel=20
+    relTick=  1440  G3  vel=40
+    relTick=  1440  A3  vel=40
+    relTick=  1440  B3  vel=40
+    relTick=  2400  F3  vel=20
+    relTick=  2880  G3  vel=20
+    relTick=  3360  A3  vel=40
+    relTick=  3840  C3  vel=30
+    relTick=  4320  F3  vel=20
+    relTick=  4800  G3  vel=40
+    relTick=  5280  F3  vel=20
+    relTick=  5760  B3  vel=40
+    relTick=  6240  G3  vel=20
+    relTick=  6720  A3  vel=40
+    relTick=  7200  F3  vel=20
+    relTick=  7200  C9  vel=30
+  Ch 13 (3 notes):
+    relTick=     4  G3  vel=27
+    relTick=     4  B3  vel=27
+    relTick=     4  E4  vel=27
+  Ch 14 (2 notes):
+    relTick=     4  B4  vel=31
+    relTick=     4  B5  vel=31
+
+=== Scene [9] 'Fill In DD'  ticks [153600,161280)  duration=7680 ===
+  Ch  2 (1 notes):
+    relTick=     0  C3  vel=83
+  Ch  8 (32 notes):
+    relTick=     0  A5  vel=81
+    relTick=     0  A#5  vel=31
+    relTick=   480  A#5  vel=28
+    relTick=   960  G#5  vel=63
+    relTick=   960  A#5  vel=65
+    relTick=  1440  G#5  vel=71
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=31
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  G#5  vel=57
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A5  vel=76
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=31
+    relTick=  4320  A5  vel=69
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  G#5  vel=73
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  G#5  vel=77
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  D#5  vel=110
+    relTick=  5760  A#5  vel=31
+    relTick=  6240  F#3  vel=59
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  F#3  vel=28
+    relTick=  6720  G#5  vel=71
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  F#3  vel=18
+    relTick=  7200  G#5  vel=82
+    relTick=  7200  A#5  vel=28
+  Ch  9 (23 notes):
+    relTick=     0  E0  vel=42
+    relTick=     0  A1  vel=94
+    relTick=     0  D#3  vel=58
+    relTick=   960  F#0  vel=38
+    relTick=   960  A1  vel=93
+    relTick=   960  D#3  vel=42
+    relTick=  1920  G1  vel=110
+    relTick=  1920  A3  vel=72
+    relTick=  2880  F0  vel=38
+    relTick=  2880  D#3  vel=42
+    relTick=  3400  A1  vel=64
+    relTick=  3840  G0  vel=42
+    relTick=  3840  A1  vel=94
+    relTick=  3840  D#3  vel=58
+    relTick=  4320  G1  vel=73
+    relTick=  4800  A2  vel=83
+    relTick=  5280  A1  vel=84
+    relTick=  5520  A1  vel=94
+    relTick=  5760  A#0  vel=48
+    relTick=  5760  G1  vel=100
+    relTick=  6720  G2  vel=101
+    relTick=  7200  A2  vel=89
+    relTick=  7660  C#3  vel=77
+  Ch 10 (6 notes):
+    relTick=     0  C1  vel=61
+    relTick=   960  C1  vel=61
+    relTick=  3360  C1  vel=57
+    relTick=  3840  C1  vel=61
+    relTick=  5760  G1  vel=61
+    relTick=  6720  E1  vel=57
+  Ch 11 (18 notes):
+    relTick=     0  B3  vel=83
+    relTick=     0  E4  vel=85
+    relTick=     0  G4  vel=79
+    relTick=  1920  G4  vel=78
+    relTick=  1924  E4  vel=82
+    relTick=  1924  B4  vel=86
+    relTick=  3832  G4  vel=79
+    relTick=  3832  B4  vel=82
+    relTick=  3844  E5  vel=85
+    relTick=  5280  B4  vel=65
+    relTick=  5280  E5  vel=69
+    relTick=  5284  G5  vel=74
+    relTick=  5756  B4  vel=95
+    relTick=  5760  E5  vel=97
+    relTick=  5764  G5  vel=100
+    relTick=  6712  E5  vel=80
+    relTick=  6720  G5  vel=81
+    relTick=  6720  B5  vel=80
+  Ch 12 (47 notes):
+    relTick=    36  C3  vel=31
+    relTick=    36  F3  vel=41
+    relTick=    36  A#7  vel=70
+    relTick=    40  B3  vel=47
+    relTick=    48  G3  vel=48
+    relTick=    56  A3  vel=45
+    relTick=   960  C8  vel=70
+    relTick=  1440  A3  vel=30
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=26
+    relTick=  1460  F3  vel=24
+    relTick=  1920  F3  vel=43
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=44
+    relTick=  1940  A3  vel=40
+    relTick=  1948  B3  vel=36
+    relTick=  2880  F3  vel=27
+    relTick=  2880  C8  vel=50
+    relTick=  2888  G3  vel=28
+    relTick=  3360  B3  vel=41
+    relTick=  3360  G#7  vel=70
+    relTick=  3368  A3  vel=42
+    relTick=  3380  G3  vel=42
+    relTick=  3388  F3  vel=41
+    relTick=  3400  C3  vel=30
+    relTick=  4320  B3  vel=36
+    relTick=  4320  D7  vel=70
+    relTick=  4328  A3  vel=36
+    relTick=  4340  G3  vel=35
+    relTick=  4800  C8  vel=70
+    relTick=  5280  G3  vel=26
+    relTick=  5280  G#7  vel=50
+    relTick=  5288  F3  vel=32
+    relTick=  5760  C3  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5768  F3  vel=38
+    relTick=  5780  G3  vel=43
+    relTick=  5788  A3  vel=44
+    relTick=  5800  B3  vel=42
+    relTick=  6720  G3  vel=39
+    ... (7 more)
+  Ch 13 (3 notes):
+    relTick=    20  G3  vel=27
+    relTick=    20  B3  vel=27
+    relTick=    20  E4  vel=27
+  Ch 14 (2 notes):
+    relTick=     4  B4  vel=36
+    relTick=     4  B5  vel=36
+
+=== Scene [10] 'Intro A'  ticks [161280,168960)  duration=7680 ===
+  Ch  8 (1 notes):
+    relTick=  5760  F#3  vel=110
+  Ch  9 (8 notes):
+    relTick=     0  E0  vel=42
+    relTick=  1920  E0  vel=37
+    relTick=  3840  E0  vel=42
+    relTick=  5280  A1  vel=83
+    relTick=  5760  F#0  vel=52
+    relTick=  5760  G1  vel=121
+    relTick=  6720  B2  vel=91
+    relTick=  7660  C#3  vel=70
+
+=== Scene [11] 'Intro B'  ticks [168960,199680)  duration=30720 ===
+  Ch  1 (7 notes):
+    relTick=     0  C3  vel=38
+    relTick=  7680  B2  vel=36
+    relTick= 15360  A#1  vel=58
+    relTick= 17280  A#2  vel=43
+    relTick= 19200  A2  vel=42
+    relTick= 21120  G#2  vel=41
+    relTick= 23040  G2  vel=46
+  Ch  2 (61 notes):
+    relTick=     0  C3  vel=87
+    relTick=     8  C5  vel=86
+    relTick=     8  D#5  vel=102
+    relTick=   964  G3  vel=63
+    relTick=  1928  C4  vel=91
+    relTick=  2880  G3  vel=51
+    relTick=  3852  D4  vel=77
+    relTick=  4796  G5  vel=116
+    relTick=  5760  D#4  vel=84
+    relTick=  5764  D5  vel=88
+    relTick=  5808  F5  vel=102
+    relTick=  7140  D#5  vel=87
+    relTick=  7144  C5  vel=73
+    relTick=  7680  B2  vel=82
+    relTick=  7680  C5  vel=90
+    relTick=  7680  D#5  vel=105
+    relTick=  8636  G3  vel=70
+    relTick=  9132  A3  vel=67
+    relTick=  9588  D5  vel=97
+    relTick=  9596  B3  vel=89
+    relTick=  9596  B4  vel=89
+    relTick= 10552  G3  vel=72
+    relTick= 11548  C4  vel=74
+    relTick= 12480  G3  vel=60
+    relTick= 12484  F5  vel=118
+    relTick= 13448  D4  vel=84
+    relTick= 13468  C5  vel=105
+    relTick= 13472  D#5  vel=113
+    relTick= 14400  D5  vel=85
+    relTick= 14476  G3  vel=60
+    relTick= 15360  A#2  vel=89
+    relTick= 15360  F4  vel=77
+    relTick= 15360  A#4  vel=87
+    relTick= 15360  D5  vel=120
+    relTick= 15832  D#5  vel=84
+    relTick= 16140  D5  vel=81
+    relTick= 16312  D#4  vel=87
+    relTick= 16312  C5  vel=102
+    relTick= 16324  G3  vel=75
+    relTick= 17284  A#3  vel=88
+    ... (21 more)
+  Ch  3 (37 notes):
+    relTick=    40  C3  vel=40
+    relTick=   960  G3  vel=19
+    relTick=  1920  C4  vel=40
+    relTick=  2880  G3  vel=19
+    relTick=  3840  D4  vel=41
+    relTick=  4800  G3  vel=19
+    relTick=  5760  D#4  vel=40
+    relTick=  6720  G3  vel=19
+    relTick=  7200  E9  vel=36
+    relTick=  7680  B2  vel=40
+    relTick=  8640  G3  vel=19
+    relTick=  9600  B3  vel=40
+    relTick= 10560  G3  vel=19
+    relTick= 11520  C4  vel=41
+    relTick= 12480  G3  vel=19
+    relTick= 13440  D4  vel=40
+    relTick= 14400  G3  vel=19
+    relTick= 14880  C#9  vel=36
+    relTick= 15360  A#2  vel=40
+    relTick= 16320  D#3  vel=40
+    relTick= 17280  G3  vel=20
+    relTick= 18240  C4  vel=41
+    relTick= 18720  D9  vel=31
+    relTick= 19200  A2  vel=40
+    relTick= 20160  C4  vel=40
+    relTick= 20640  E9  vel=31
+    relTick= 21120  G#2  vel=40
+    relTick= 22080  G3  vel=20
+    relTick= 22080  C9  vel=26
+    relTick= 22800  G2  vel=29
+    relTick= 22960  D3  vel=40
+    relTick= 23120  G3  vel=40
+    relTick= 23280  C4  vel=39
+    relTick= 26720  G2  vel=29
+    relTick= 26880  D3  vel=40
+    relTick= 27040  G3  vel=40
+    relTick= 27200  B3  vel=39
+  Ch  4 (14 notes):
+    relTick=    20  C2  vel=5
+    relTick=    20  G5  vel=24
+    relTick=    20  D#6  vel=24
+    relTick=  7680  B1  vel=7
+    relTick=  7680  D6  vel=27
+    relTick= 15360  A#1  vel=10
+    relTick= 15360  D#5  vel=29
+    relTick= 15360  C6  vel=29
+    relTick= 19200  A1  vel=8
+    relTick= 19200  G5  vel=28
+    relTick= 21120  G#1  vel=7
+    relTick= 23040  G1  vel=7
+    relTick= 23040  G5  vel=27
+    relTick= 26880  B5  vel=27
+  Ch  8 (1 notes):
+    relTick=     0  C6  vel=70
+  Ch  9 (16 notes):
+    relTick=     0  D#3  vel=62
+    relTick=  5760  A0  vel=35
+    relTick=  7680  D#3  vel=62
+    relTick= 13440  A0  vel=35
+    relTick= 15360  D#3  vel=62
+    relTick= 17280  A0  vel=35
+    relTick= 19200  D#3  vel=62
+    relTick= 21120  A0  vel=35
+    relTick= 23040  D#3  vel=62
+    relTick= 24960  A0  vel=35
+    relTick= 26880  D#3  vel=62
+    relTick= 28320  A2  vel=83
+    relTick= 28800  A0  vel=35
+    relTick= 28800  G1  vel=120
+    relTick= 29760  F2  vel=100
+    relTick= 30700  C#3  vel=75
+  Ch 10 (8 notes):
+    relTick=     0  C3  vel=38
+    relTick=  7680  B2  vel=36
+    relTick= 15360  A1  vel=58
+    relTick= 17280  A2  vel=43
+    relTick= 19200  G2  vel=42
+    relTick= 21120  E2  vel=41
+    relTick= 23040  F2  vel=46
+    relTick= 26880  G2  vel=46
+  Ch 11 (70 notes):
+    relTick=     0  C3  vel=87
+    relTick=     8  C5  vel=86
+    relTick=     8  E5  vel=102
+    relTick=   964  G3  vel=63
+    relTick=  1928  C4  vel=91
+    relTick=  2880  G3  vel=51
+    relTick=  3852  D4  vel=77
+    relTick=  4796  G5  vel=116
+    relTick=  5760  E4  vel=84
+    relTick=  5764  D5  vel=88
+    relTick=  5808  F5  vel=102
+    relTick=  7140  E5  vel=87
+    relTick=  7144  C5  vel=73
+    relTick=  7680  B2  vel=82
+    relTick=  7680  C5  vel=90
+    relTick=  7680  E5  vel=105
+    relTick=  8636  G3  vel=70
+    relTick=  9132  A3  vel=67
+    relTick=  9588  D5  vel=97
+    relTick=  9596  B3  vel=89
+    relTick=  9596  B4  vel=89
+    relTick= 10552  G3  vel=72
+    relTick= 11548  C4  vel=74
+    relTick= 12480  G3  vel=60
+    relTick= 12484  F5  vel=118
+    relTick= 13448  D4  vel=84
+    relTick= 13468  C5  vel=105
+    relTick= 13472  E5  vel=113
+    relTick= 14400  D5  vel=85
+    relTick= 14476  G3  vel=60
+    relTick= 15360  A2  vel=94
+    relTick= 15360  B4  vel=87
+    relTick= 15360  D5  vel=120
+    relTick= 15832  E5  vel=84
+    relTick= 16140  D5  vel=81
+    relTick= 16312  E3  vel=85
+    relTick= 16320  C5  vel=86
+    relTick= 16328  A4  vel=81
+    relTick= 17284  A3  vel=71
+    relTick= 18232  A4  vel=97
+    ... (30 more)
+  Ch 12 (40 notes):
+    relTick=    40  C3  vel=40
+    relTick=   960  G3  vel=19
+    relTick=  1920  C4  vel=40
+    relTick=  2880  G3  vel=19
+    relTick=  3840  D4  vel=41
+    relTick=  4800  G3  vel=19
+    relTick=  5760  E4  vel=40
+    relTick=  6720  G3  vel=19
+    relTick=  7200  E9  vel=35
+    relTick=  7680  B2  vel=40
+    relTick=  8640  G3  vel=19
+    relTick=  9600  B3  vel=40
+    relTick= 10560  G3  vel=19
+    relTick= 11520  C4  vel=41
+    relTick= 12480  G3  vel=19
+    relTick= 13440  D4  vel=40
+    relTick= 14400  G3  vel=19
+    relTick= 14880  C#9  vel=35
+    relTick= 15360  A2  vel=40
+    relTick= 16320  E3  vel=40
+    relTick= 17280  A3  vel=20
+    relTick= 18240  C4  vel=41
+    relTick= 18720  D9  vel=30
+    relTick= 19200  G2  vel=40
+    relTick= 19200  D3  vel=94
+    relTick= 19200  G3  vel=94
+    relTick= 20160  B3  vel=40
+    relTick= 20640  E9  vel=30
+    relTick= 22080  G3  vel=20
+    relTick= 22080  C9  vel=25
+    relTick= 22720  C4  vel=41
+    relTick= 22880  A3  vel=41
+    relTick= 23040  F3  vel=40
+    relTick= 23200  C3  vel=40
+    relTick= 23360  F2  vel=20
+    relTick= 26560  G2  vel=20
+    relTick= 26720  D3  vel=29
+    relTick= 26880  F3  vel=40
+    relTick= 27040  A3  vel=40
+    relTick= 27200  C4  vel=39
+    ... (0 more)
+  Ch 13 (15 notes):
+    relTick=    20  C2  vel=4
+    relTick=    20  G5  vel=24
+    relTick=    20  E6  vel=29
+    relTick=  7680  B1  vel=7
+    relTick=  7680  D6  vel=31
+    relTick= 15360  A1  vel=9
+    relTick= 15360  E5  vel=29
+    relTick= 15360  C6  vel=29
+    relTick= 19200  G1  vel=8
+    relTick= 19200  B5  vel=28
+    relTick= 21120  E1  vel=7
+    relTick= 21120  G5  vel=27
+    relTick= 23040  F1  vel=7
+    relTick= 23040  A5  vel=27
+    relTick= 26880  G1  vel=7
+
+=== Scene [12] 'Intro C'  ticks [199680,230400)  duration=30720 ===
+  Ch  1 (25 notes):
+    relTick=     0  C1  vel=63
+    relTick=  3400  C1  vel=59
+    relTick=  3840  C1  vel=63
+    relTick=  4800  D1  vel=61
+    relTick=  5760  D#1  vel=61
+    relTick=  6720  G#1  vel=63
+    relTick=  9600  G#1  vel=63
+    relTick= 10560  G1  vel=63
+    relTick= 12000  G2  vel=64
+    relTick= 12480  G1  vel=62
+    relTick= 12960  F1  vel=62
+    relTick= 13440  E1  vel=61
+    relTick= 14400  F1  vel=63
+    relTick= 18760  C1  vel=59
+    relTick= 19200  F1  vel=63
+    relTick= 20160  F1  vel=63
+    relTick= 21120  F1  vel=63
+    relTick= 22080  G1  vel=64
+    relTick= 24000  G1  vel=63
+    relTick= 24960  G1  vel=63
+    relTick= 26880  G2  vel=59
+    relTick= 27360  G2  vel=63
+    relTick= 28320  G2  vel=63
+    relTick= 29280  D2  vel=60
+    relTick= 29760  G1  vel=61
+  Ch  2 (86 notes):
+    relTick=     0  G3  vel=85
+    relTick=     4  D#4  vel=117
+    relTick=     8  C2  vel=87
+    relTick=   964  C4  vel=69
+    relTick=  1448  G3  vel=69
+    relTick=  1924  G4  vel=102
+    relTick=  2400  G3  vel=85
+    relTick=  2876  C4  vel=85
+    relTick=  3360  G3  vel=85
+    relTick=  3840  C4  vel=102
+    relTick=  3840  D#4  vel=112
+    relTick=  3848  C2  vel=101
+    relTick=  4312  G3  vel=77
+    relTick=  4800  D2  vel=104
+    relTick=  4800  F4  vel=117
+    relTick=  4808  D4  vel=106
+    relTick=  5284  A#3  vel=89
+    relTick=  5752  D#4  vel=104
+    relTick=  5764  D#2  vel=108
+    relTick=  5764  A#3  vel=103
+    relTick=  5764  G4  vel=112
+    relTick=  6236  G3  vel=93
+    relTick=  6712  G#2  vel=113
+    relTick=  6712  G#4  vel=108
+    relTick=  6712  C5  vel=117
+    relTick=  6724  D#4  vel=109
+    relTick=  8164  C4  vel=68
+    relTick=  8640  D#4  vel=85
+    relTick=  9124  G#4  vel=69
+    relTick=  9592  D#4  vel=105
+    relTick=  9596  G#2  vel=103
+    relTick=  9596  G#4  vel=86
+    relTick=  9596  C5  vel=115
+    relTick= 10088  C4  vel=86
+    relTick= 10560  G2  vel=102
+    relTick= 10564  A#4  vel=117
+    relTick= 11044  A#3  vel=73
+    relTick= 11516  D#4  vel=73
+    relTick= 12000  G4  vel=84
+    relTick= 12472  A#4  vel=89
+    ... (46 more)
+  Ch  3 (148 notes):
+    relTick=     4  C1  vel=31
+    relTick=     4  A#7  vel=70
+    relTick=     8  G1  vel=41
+    relTick=    20  G3  vel=48
+    relTick=    28  C4  vel=45
+    relTick=    40  D#4  vel=47
+    relTick=   960  C8  vel=70
+    relTick=  1440  C4  vel=30
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=26
+    relTick=  1460  G1  vel=24
+    relTick=  1920  G1  vel=43
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=44
+    relTick=  1940  C4  vel=40
+    relTick=  1948  D#4  vel=36
+    relTick=  2400  D7  vel=30
+    relTick=  2880  G1  vel=27
+    relTick=  2880  C8  vel=50
+    relTick=  2888  G3  vel=28
+    relTick=  3360  D#4  vel=41
+    relTick=  3360  G#7  vel=70
+    relTick=  3368  C4  vel=42
+    relTick=  3380  G3  vel=42
+    relTick=  3388  G1  vel=41
+    relTick=  3400  C1  vel=30
+    relTick=  4320  D#4  vel=36
+    relTick=  4320  D7  vel=70
+    relTick=  4328  C4  vel=36
+    relTick=  4340  G3  vel=35
+    relTick=  4800  C8  vel=70
+    relTick=  5280  G3  vel=26
+    relTick=  5280  G#7  vel=50
+    relTick=  5288  G1  vel=32
+    relTick=  5760  C1  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5768  G1  vel=38
+    relTick=  5780  G3  vel=43
+    relTick=  5788  A#3  vel=44
+    relTick=  5800  D#4  vel=42
+    ... (108 more)
+  Ch  4 (57 notes):
+    relTick=    20  C2  vel=53
+    relTick=    20  C3  vel=30
+    relTick=    20  G3  vel=30
+    relTick=    20  D#4  vel=36
+    relTick=  3840  C2  vel=53
+    relTick=  3840  C3  vel=30
+    relTick=  3840  G3  vel=30
+    relTick=  3840  D#4  vel=56
+    relTick=  4800  D2  vel=76
+    relTick=  4800  F4  vel=76
+    relTick=  5760  D#2  vel=53
+    relTick=  5760  D#4  vel=30
+    relTick=  5760  G4  vel=56
+    relTick=  6720  G#1  vel=53
+    relTick=  6720  G#3  vel=35
+    relTick=  6720  D#4  vel=30
+    relTick=  6720  C5  vel=77
+    relTick=  9600  G#1  vel=53
+    relTick=  9600  G#3  vel=35
+    relTick=  9600  D#4  vel=30
+    relTick=  9600  C5  vel=56
+    relTick= 10560  G1  vel=53
+    relTick= 10560  A#3  vel=30
+    relTick= 10560  D#4  vel=30
+    relTick= 10560  A#4  vel=37
+    relTick= 13440  E1  vel=53
+    relTick= 13440  A#3  vel=36
+    relTick= 13440  E4  vel=36
+    relTick= 13440  G4  vel=56
+    relTick= 14400  F1  vel=53
+    relTick= 14400  C3  vel=35
+    relTick= 14400  G#3  vel=35
+    relTick= 14400  D#4  vel=35
+    relTick= 19200  F1  vel=53
+    relTick= 19200  C3  vel=35
+    relTick= 19200  G#3  vel=35
+    relTick= 19200  D#4  vel=35
+    relTick= 20160  F1  vel=53
+    relTick= 20160  C3  vel=54
+    relTick= 20160  G#3  vel=54
+    ... (17 more)
+  Ch  8 (116 notes):
+    relTick=     0  A#5  vel=31
+    relTick=   480  A#5  vel=28
+    relTick=   960  G#5  vel=63
+    relTick=   960  A#5  vel=65
+    relTick=  1440  G#5  vel=71
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=31
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  G#5  vel=57
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A5  vel=76
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=31
+    relTick=  4320  A5  vel=69
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  G#5  vel=73
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  G#5  vel=77
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  D#5  vel=70
+    relTick=  5760  A#5  vel=31
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  G#5  vel=71
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  G#5  vel=82
+    relTick=  7200  A#5  vel=28
+    relTick=  7680  A5  vel=68
+    relTick=  7680  A#5  vel=31
+    relTick=  8160  A#5  vel=28
+    relTick=  8640  G#5  vel=60
+    relTick=  8640  A#5  vel=65
+    relTick=  9120  G#5  vel=74
+    relTick=  9120  A#5  vel=28
+    relTick=  9600  F#3  vel=110
+    relTick=  9600  A#5  vel=31
+    relTick= 10080  A#5  vel=28
+    relTick= 10560  G#5  vel=56
+    relTick= 10560  A#5  vel=65
+    ... (76 more)
+  Ch  9 (99 notes):
+    relTick=     0  E0  vel=42
+    relTick=     0  A1  vel=94
+    relTick=     0  C#3  vel=76
+    relTick=   960  E0  vel=28
+    relTick=   960  D#3  vel=71
+    relTick=  1440  D#3  vel=31
+    relTick=  1920  E0  vel=42
+    relTick=  1920  G1  vel=110
+    relTick=  1920  F3  vel=60
+    relTick=  2880  E0  vel=28
+    relTick=  2880  D#3  vel=71
+    relTick=  3360  A1  vel=59
+    relTick=  3840  E0  vel=42
+    relTick=  3840  A1  vel=94
+    relTick=  3840  D#3  vel=60
+    relTick=  4800  E0  vel=28
+    relTick=  4800  A1  vel=80
+    relTick=  4800  D#3  vel=71
+    relTick=  5760  E0  vel=42
+    relTick=  5760  G1  vel=120
+    relTick=  5760  F3  vel=60
+    relTick=  6720  E0  vel=28
+    relTick=  6720  A1  vel=94
+    relTick=  6720  A3  vel=73
+    relTick=  7680  E0  vel=42
+    relTick=  7680  D#3  vel=60
+    relTick=  8640  E0  vel=28
+    relTick=  8640  A1  vel=59
+    relTick=  8640  D#3  vel=71
+    relTick=  9600  E0  vel=42
+    relTick=  9600  G1  vel=110
+    relTick=  9600  G3  vel=60
+    relTick= 10560  E0  vel=28
+    relTick= 10560  A1  vel=94
+    relTick= 10560  C#3  vel=81
+    relTick= 11520  E0  vel=42
+    relTick= 11520  D#3  vel=60
+    relTick= 12480  E0  vel=28
+    relTick= 12480  A1  vel=70
+    relTick= 12480  D#3  vel=71
+    ... (59 more)
+  Ch 10 (25 notes):
+    relTick=     0  C1  vel=63
+    relTick=  3400  C1  vel=59
+    relTick=  3840  C1  vel=63
+    relTick=  4800  D1  vel=61
+    relTick=  5760  E1  vel=61
+    relTick=  6720  A1  vel=63
+    relTick=  9600  A1  vel=63
+    relTick= 10560  G1  vel=63
+    relTick= 12000  G2  vel=64
+    relTick= 12480  G1  vel=62
+    relTick= 12960  F1  vel=62
+    relTick= 13440  E1  vel=61
+    relTick= 14400  F1  vel=63
+    relTick= 18760  D1  vel=59
+    relTick= 19200  F#1  vel=63
+    relTick= 20160  F#1  vel=63
+    relTick= 21120  F#1  vel=63
+    relTick= 22080  G1  vel=64
+    relTick= 24000  G1  vel=63
+    relTick= 24960  G1  vel=63
+    relTick= 26880  G2  vel=59
+    relTick= 27840  G2  vel=63
+    relTick= 28800  G2  vel=63
+    relTick= 29280  D2  vel=60
+    relTick= 29760  G1  vel=61
+  Ch 11 (86 notes):
+    relTick=     0  G3  vel=85
+    relTick=     4  E4  vel=117
+    relTick=     8  C2  vel=87
+    relTick=   964  C4  vel=69
+    relTick=  1448  G3  vel=69
+    relTick=  1924  G4  vel=102
+    relTick=  2400  G3  vel=85
+    relTick=  2876  C4  vel=85
+    relTick=  3360  G3  vel=85
+    relTick=  3840  C4  vel=102
+    relTick=  3840  E4  vel=112
+    relTick=  3848  C2  vel=101
+    relTick=  4312  G3  vel=77
+    relTick=  4800  D2  vel=104
+    relTick=  4800  F4  vel=117
+    relTick=  4808  D4  vel=106
+    relTick=  5284  G3  vel=89
+    relTick=  5752  E4  vel=104
+    relTick=  5764  E2  vel=108
+    relTick=  5764  C4  vel=103
+    relTick=  5764  G4  vel=112
+    relTick=  6236  G3  vel=93
+    relTick=  6712  A2  vel=113
+    relTick=  6712  A4  vel=108
+    relTick=  6712  C5  vel=117
+    relTick=  6724  E4  vel=109
+    relTick=  8164  C4  vel=68
+    relTick=  8640  E4  vel=85
+    relTick=  9124  A4  vel=69
+    relTick=  9592  E4  vel=105
+    relTick=  9596  A2  vel=103
+    relTick=  9596  A4  vel=86
+    relTick=  9596  C5  vel=115
+    relTick= 10088  C4  vel=86
+    relTick= 10560  G2  vel=102
+    relTick= 10564  B4  vel=117
+    relTick= 11044  B3  vel=73
+    relTick= 11516  E4  vel=73
+    relTick= 12000  G4  vel=84
+    relTick= 12472  B4  vel=89
+    ... (46 more)
+  Ch 12 (150 notes):
+    relTick=     4  C1  vel=31
+    relTick=     4  A#7  vel=70
+    relTick=     8  G1  vel=41
+    relTick=    20  G3  vel=48
+    relTick=    28  C4  vel=45
+    relTick=    40  E4  vel=47
+    relTick=   960  C8  vel=70
+    relTick=  1440  C4  vel=30
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=26
+    relTick=  1460  G1  vel=24
+    relTick=  1920  G1  vel=43
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=44
+    relTick=  1940  D4  vel=40
+    relTick=  1948  E4  vel=36
+    relTick=  2400  D7  vel=30
+    relTick=  2880  G1  vel=27
+    relTick=  2880  C8  vel=50
+    relTick=  2888  G3  vel=28
+    relTick=  3360  E4  vel=41
+    relTick=  3360  G#7  vel=70
+    relTick=  3368  D4  vel=42
+    relTick=  3380  G3  vel=42
+    relTick=  3388  G1  vel=41
+    relTick=  3400  C1  vel=30
+    relTick=  4320  E4  vel=36
+    relTick=  4320  D7  vel=70
+    relTick=  4328  C4  vel=36
+    relTick=  4340  G3  vel=35
+    relTick=  4800  C8  vel=70
+    relTick=  5280  G3  vel=26
+    relTick=  5280  G#7  vel=50
+    relTick=  5288  G1  vel=32
+    relTick=  5760  C1  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5768  G1  vel=38
+    relTick=  5780  G3  vel=43
+    relTick=  5788  C4  vel=44
+    relTick=  5800  E4  vel=42
+    ... (110 more)
+  Ch 13 (57 notes):
+    relTick=    20  C2  vel=53
+    relTick=    20  C3  vel=30
+    relTick=    20  G3  vel=30
+    relTick=    20  E4  vel=36
+    relTick=  3840  C2  vel=53
+    relTick=  3840  C3  vel=30
+    relTick=  3840  G3  vel=30
+    relTick=  3840  E4  vel=56
+    relTick=  4800  D2  vel=76
+    relTick=  4800  F4  vel=76
+    relTick=  5760  E2  vel=53
+    relTick=  5760  E4  vel=30
+    relTick=  5760  G4  vel=56
+    relTick=  6720  A1  vel=53
+    relTick=  6720  A3  vel=35
+    relTick=  6720  E4  vel=30
+    relTick=  6720  C5  vel=77
+    relTick=  9600  A1  vel=53
+    relTick=  9600  A3  vel=35
+    relTick=  9600  E4  vel=30
+    relTick=  9600  C5  vel=56
+    relTick= 10560  G1  vel=53
+    relTick= 10560  B3  vel=30
+    relTick= 10560  E4  vel=30
+    relTick= 10560  B4  vel=37
+    relTick= 13440  E1  vel=53
+    relTick= 13440  C4  vel=36
+    relTick= 13440  E4  vel=36
+    relTick= 13440  G4  vel=56
+    relTick= 14400  F1  vel=53
+    relTick= 14400  C3  vel=35
+    relTick= 14400  A3  vel=35
+    relTick= 14400  E4  vel=35
+    relTick= 19200  F#1  vel=53
+    relTick= 19200  C3  vel=35
+    relTick= 19200  A3  vel=35
+    relTick= 19200  E4  vel=35
+    relTick= 20160  F#1  vel=53
+    relTick= 20160  C3  vel=54
+    relTick= 20160  A3  vel=54
+    ... (17 more)
+
+=== Scene [13] 'Ending A'  ticks [230400,238080)  duration=7680 ===
+  Ch  2 (1 notes):
+    relTick=     0  C3  vel=71
+  Ch  9 (1 notes):
+    relTick=     0  A1  vel=83
+  Ch 10 (1 notes):
+    relTick=     0  C2  vel=59
+  Ch 11 (3 notes):
+    relTick=     0  G3  vel=71
+    relTick=     0  B3  vel=71
+    relTick=     0  E4  vel=71
+  Ch 12 (6 notes):
+    relTick=     0  C3  vel=29
+    relTick=     0  A#7  vel=70
+    relTick=     8  F3  vel=41
+    relTick=    20  G3  vel=44
+    relTick=    28  A3  vel=47
+    relTick=    40  B3  vel=41
+  Ch 13 (3 notes):
+    relTick=     0  G3  vel=26
+    relTick=     0  B3  vel=26
+    relTick=     0  E4  vel=26
+
+=== Scene [14] 'Ending B'  ticks [238080,268800)  duration=30720 ===
+  Ch  1 (7 notes):
+    relTick=     0  C3  vel=38
+    relTick=  7680  B2  vel=36
+    relTick= 15360  A#2  vel=43
+    relTick= 17280  A2  vel=43
+    relTick= 19200  G#2  vel=42
+    relTick= 21120  G2  vel=41
+    relTick= 23040  C2  vel=61
+  Ch  2 (65 notes):
+    relTick=     0  C3  vel=87
+    relTick=     8  C5  vel=86
+    relTick=     8  D#5  vel=102
+    relTick=   964  G3  vel=63
+    relTick=  1928  C4  vel=91
+    relTick=  2880  G3  vel=51
+    relTick=  3852  D4  vel=77
+    relTick=  4796  G5  vel=116
+    relTick=  5760  D#4  vel=84
+    relTick=  5764  D5  vel=88
+    relTick=  5808  F5  vel=102
+    relTick=  7140  D#5  vel=87
+    relTick=  7144  C5  vel=73
+    relTick=  7680  B2  vel=82
+    relTick=  7680  C5  vel=90
+    relTick=  7680  D#5  vel=105
+    relTick=  8636  G3  vel=70
+    relTick=  9132  A3  vel=67
+    relTick=  9588  D5  vel=97
+    relTick=  9596  B3  vel=89
+    relTick=  9596  B4  vel=89
+    relTick= 10552  G3  vel=72
+    relTick= 11548  C4  vel=74
+    relTick= 12480  G3  vel=60
+    relTick= 12484  F5  vel=118
+    relTick= 13448  D4  vel=84
+    relTick= 13468  C5  vel=105
+    relTick= 13472  D#5  vel=113
+    relTick= 14400  D5  vel=85
+    relTick= 14476  G3  vel=60
+    relTick= 15360  A#2  vel=89
+    relTick= 15360  F4  vel=77
+    relTick= 15360  A#4  vel=87
+    relTick= 15360  D5  vel=120
+    relTick= 15832  D#5  vel=84
+    relTick= 16140  D5  vel=81
+    relTick= 16312  G3  vel=77
+    relTick= 16320  C5  vel=91
+    relTick= 16328  D#4  vel=81
+    relTick= 17276  A2  vel=79
+    ... (25 more)
+  Ch  3 (41 notes):
+    relTick=     8  C3  vel=40
+    relTick=   960  G3  vel=19
+    relTick=  1920  C4  vel=40
+    relTick=  2880  G3  vel=19
+    relTick=  3840  D4  vel=41
+    relTick=  4800  G3  vel=19
+    relTick=  5760  D#4  vel=40
+    relTick=  6720  G3  vel=19
+    relTick=  7200  E9  vel=41
+    relTick=  7680  B2  vel=40
+    relTick=  8640  G3  vel=19
+    relTick=  9600  B3  vel=40
+    relTick= 10560  G3  vel=19
+    relTick= 11520  C4  vel=41
+    relTick= 12480  G3  vel=19
+    relTick= 13440  D4  vel=40
+    relTick= 14880  C#9  vel=36
+    relTick= 15360  A#2  vel=41
+    relTick= 15840  G3  vel=20
+    relTick= 16320  C4  vel=30
+    relTick= 16800  D4  vel=41
+    relTick= 17280  A2  vel=41
+    relTick= 17280  D#4  vel=100
+    relTick= 18240  C4  vel=40
+    relTick= 18720  G3  vel=20
+    relTick= 18720  E9  vel=31
+    relTick= 19200  G#2  vel=40
+    relTick= 19200  F#3  vel=94
+    relTick= 20160  C4  vel=40
+    relTick= 21120  G2  vel=40
+    relTick= 21120  F3  vel=40
+    relTick= 21120  D4  vel=40
+    relTick= 21920  E9  vel=18
+    relTick= 22080  G3  vel=95
+    relTick= 22080  D#4  vel=95
+    relTick= 22720  C9  vel=21
+    relTick= 23060  C3  vel=40
+    relTick= 23160  D#3  vel=20
+    relTick= 23280  G3  vel=40
+    relTick= 23400  C4  vel=41
+    ... (1 more)
+  Ch  4 (19 notes):
+    relTick=    20  C2  vel=10
+    relTick=    20  G5  vel=29
+    relTick=    20  D#6  vel=29
+    relTick=  7680  B1  vel=10
+    relTick=  7680  D6  vel=29
+    relTick= 15360  A#1  vel=10
+    relTick= 15360  D#5  vel=29
+    relTick= 15360  C6  vel=29
+    relTick= 17280  A1  vel=8
+    relTick= 19200  G#1  vel=8
+    relTick= 19200  D5  vel=28
+    relTick= 19200  G#5  vel=28
+    relTick= 21120  G1  vel=6
+    relTick= 21120  F5  vel=26
+    relTick= 21120  D6  vel=26
+    relTick= 22080  B5  vel=26
+    relTick= 23040  C2  vel=7
+    relTick= 23040  G5  vel=27
+    relTick= 23040  D#6  vel=27
+  Ch  8 (1 notes):
+    relTick= 23040  C6  vel=70
+  Ch  9 (15 notes):
+    relTick=     0  A1  vel=63
+    relTick=     0  D#3  vel=62
+    relTick=  1920  A0  vel=35
+    relTick=  5760  A0  vel=35
+    relTick=  7680  D#3  vel=62
+    relTick=  9600  A0  vel=35
+    relTick= 13440  A0  vel=35
+    relTick= 15360  D#3  vel=62
+    relTick= 17280  A0  vel=35
+    relTick= 19200  D#3  vel=64
+    relTick= 20160  B3  vel=42
+    relTick= 21120  A0  vel=35
+    relTick= 21120  D#3  vel=64
+    relTick= 22080  B3  vel=42
+    relTick= 23040  D#3  vel=64
+  Ch 10 (7 notes):
+    relTick=     0  C3  vel=38
+    relTick=  7680  B2  vel=36
+    relTick= 15360  A1  vel=58
+    relTick= 17280  A2  vel=43
+    relTick= 19200  F2  vel=42
+    relTick= 21120  G2  vel=41
+    relTick= 23040  C2  vel=61
+  Ch 11 (67 notes):
+    relTick=     0  C3  vel=87
+    relTick=     8  C5  vel=86
+    relTick=     8  E5  vel=102
+    relTick=   964  G3  vel=63
+    relTick=  1928  C4  vel=91
+    relTick=  2880  G3  vel=51
+    relTick=  3852  D4  vel=77
+    relTick=  4796  G5  vel=116
+    relTick=  5760  E4  vel=84
+    relTick=  5764  D5  vel=88
+    relTick=  5808  F5  vel=102
+    relTick=  7140  E5  vel=87
+    relTick=  7144  C5  vel=73
+    relTick=  7680  B2  vel=82
+    relTick=  7680  C5  vel=90
+    relTick=  7680  E5  vel=105
+    relTick=  8636  G3  vel=70
+    relTick=  9132  A3  vel=67
+    relTick=  9588  D5  vel=97
+    relTick=  9596  B3  vel=89
+    relTick=  9596  B4  vel=89
+    relTick= 10552  G3  vel=72
+    relTick= 11548  C4  vel=74
+    relTick= 12480  G3  vel=60
+    relTick= 12484  F5  vel=118
+    relTick= 13448  D4  vel=84
+    relTick= 13468  C5  vel=105
+    relTick= 13472  E5  vel=113
+    relTick= 14400  D5  vel=85
+    relTick= 14476  G3  vel=60
+    relTick= 15360  A2  vel=84
+    relTick= 15360  B4  vel=87
+    relTick= 15360  D5  vel=120
+    relTick= 15832  E5  vel=84
+    relTick= 16140  D5  vel=81
+    relTick= 16312  E3  vel=72
+    relTick= 16320  C5  vel=86
+    relTick= 16328  A4  vel=81
+    relTick= 17284  A3  vel=80
+    relTick= 18228  C4  vel=81
+    ... (27 more)
+  Ch 12 (44 notes):
+    relTick=     8  C3  vel=40
+    relTick=   960  G3  vel=19
+    relTick=  1920  C4  vel=40
+    relTick=  2880  G3  vel=19
+    relTick=  3840  D4  vel=41
+    relTick=  4800  G3  vel=19
+    relTick=  5760  E4  vel=40
+    relTick=  6720  G3  vel=19
+    relTick=  7200  E9  vel=40
+    relTick=  7680  B2  vel=40
+    relTick=  8640  G3  vel=19
+    relTick=  9600  B3  vel=40
+    relTick= 10560  G3  vel=19
+    relTick= 11520  C4  vel=41
+    relTick= 12480  G3  vel=19
+    relTick= 13440  D4  vel=40
+    relTick= 14880  C#9  vel=35
+    relTick= 15360  A2  vel=41
+    relTick= 15840  E3  vel=20
+    relTick= 16320  A3  vel=30
+    relTick= 16800  B3  vel=41
+    relTick= 17280  C4  vel=100
+    relTick= 17760  B3  vel=100
+    relTick= 18240  A3  vel=40
+    relTick= 18720  E3  vel=20
+    relTick= 18720  E9  vel=30
+    relTick= 19200  F2  vel=40
+    relTick= 19200  F3  vel=94
+    relTick= 20160  A3  vel=40
+    relTick= 21120  G2  vel=40
+    relTick= 21120  D3  vel=94
+    relTick= 21120  A3  vel=40
+    relTick= 21120  F4  vel=40
+    relTick= 21920  A#3  vel=95
+    relTick= 21920  F#4  vel=95
+    relTick= 21920  E9  vel=17
+    relTick= 22080  B3  vel=95
+    relTick= 22080  G4  vel=95
+    relTick= 22720  C9  vel=20
+    relTick= 23060  C3  vel=40
+    ... (4 more)
+  Ch 13 (18 notes):
+    relTick=    20  C2  vel=9
+    relTick=    20  G5  vel=29
+    relTick=    20  E6  vel=29
+    relTick=  7680  B1  vel=9
+    relTick=  7680  D6  vel=29
+    relTick= 15360  A1  vel=9
+    relTick= 15360  E5  vel=29
+    relTick= 15360  C6  vel=29
+    relTick= 19200  F1  vel=8
+    relTick= 19200  D5  vel=28
+    relTick= 19200  A5  vel=28
+    relTick= 21120  G1  vel=6
+    relTick= 21120  F5  vel=26
+    relTick= 21120  D6  vel=26
+    relTick= 22080  B5  vel=26
+    relTick= 23040  C2  vel=7
+    relTick= 23040  G5  vel=27
+    relTick= 23040  E6  vel=27
+
+=== Scene [15] 'Ending C'  ticks [268800,299520)  duration=30720 ===
+  Ch  1 (20 notes):
+    relTick=     0  C1  vel=63
+    relTick=   480  C1  vel=63
+    relTick=  1440  C1  vel=59
+    relTick=  1920  C3  vel=62
+    relTick=  3840  C1  vel=63
+    relTick=  4800  D1  vel=61
+    relTick=  5760  D#1  vel=61
+    relTick=  6720  G#1  vel=63
+    relTick=  9600  G#1  vel=63
+    relTick= 10560  G1  vel=63
+    relTick= 12000  G2  vel=64
+    relTick= 12480  G1  vel=62
+    relTick= 12960  F1  vel=62
+    relTick= 13440  D#1  vel=61
+    relTick= 14400  F1  vel=63
+    relTick= 18760  C1  vel=59
+    relTick= 19200  G1  vel=63
+    relTick= 20160  G1  vel=63
+    relTick= 21120  G1  vel=63
+    relTick= 22080  C1  vel=64
+  Ch  2 (80 notes):
+    relTick=     0  C2  vel=92
+    relTick=     8  C4  vel=79
+    relTick=     8  D#4  vel=107
+    relTick=    12  G3  vel=93
+    relTick=   960  C4  vel=73
+    relTick=  1440  D#4  vel=88
+    relTick=  1912  D#4  vel=96
+    relTick=  1920  C2  vel=103
+    relTick=  1920  G4  vel=96
+    relTick=  1928  C5  vel=99
+    relTick=  1928  D#5  vel=117
+    relTick=  3832  G3  vel=79
+    relTick=  3840  D#4  vel=117
+    relTick=  3844  C4  vel=107
+    relTick=  3848  C2  vel=114
+    relTick=  4796  G3  vel=92
+    relTick=  4800  D2  vel=104
+    relTick=  4804  D4  vel=107
+    relTick=  4808  F4  vel=117
+    relTick=  5748  D#2  vel=103
+    relTick=  5748  G3  vel=94
+    relTick=  5748  G4  vel=117
+    relTick=  5760  C4  vel=101
+    relTick=  5764  D#4  vel=106
+    relTick=  6712  G#4  vel=106
+    relTick=  6712  C5  vel=117
+    relTick=  6724  G#2  vel=111
+    relTick=  6724  D#4  vel=109
+    relTick=  8160  C4  vel=70
+    relTick=  8648  D#4  vel=91
+    relTick=  9120  G#4  vel=69
+    relTick=  9592  G#2  vel=99
+    relTick=  9592  D#4  vel=110
+    relTick=  9592  G#4  vel=113
+    relTick=  9608  C5  vel=117
+    relTick= 10072  C4  vel=93
+    relTick= 10556  G2  vel=99
+    relTick= 10560  A#3  vel=80
+    relTick= 10560  A#4  vel=98
+    relTick= 11520  D#4  vel=79
+    ... (40 more)
+  Ch  3 (108 notes):
+    relTick=     4  C1  vel=31
+    relTick=     4  A#7  vel=70
+    relTick=     8  G1  vel=41
+    relTick=    20  G3  vel=48
+    relTick=    28  C4  vel=45
+    relTick=    40  D#4  vel=47
+    relTick=  1440  C4  vel=30
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=26
+    relTick=  1460  G1  vel=24
+    relTick=  1920  G1  vel=43
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=44
+    relTick=  1940  C4  vel=40
+    relTick=  1948  D#4  vel=36
+    relTick=  2400  D7  vel=30
+    relTick=  2880  C8  vel=50
+    relTick=  3360  G#7  vel=70
+    relTick=  3840  D#4  vel=41
+    relTick=  3840  A#7  vel=70
+    relTick=  3848  C4  vel=42
+    relTick=  3860  G3  vel=42
+    relTick=  3868  C1  vel=41
+    relTick=  4800  F4  vel=36
+    relTick=  4800  C8  vel=70
+    relTick=  4808  D1  vel=38
+    relTick=  4808  D4  vel=36
+    relTick=  4820  A#3  vel=35
+    relTick=  5760  D#1  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5780  G3  vel=43
+    relTick=  5788  A#3  vel=44
+    relTick=  5800  D#4  vel=42
+    relTick=  6720  D#1  vel=29
+    relTick=  6720  C8  vel=70
+    relTick=  6728  G#1  vel=41
+    relTick=  6740  G#3  vel=44
+    relTick=  6748  C4  vel=47
+    relTick=  6760  D#4  vel=41
+    relTick=  9120  C4  vel=28
+    ... (68 more)
+  Ch  4 (45 notes):
+    relTick=    20  C2  vel=53
+    relTick=    20  C3  vel=30
+    relTick=    20  G3  vel=30
+    relTick=    20  D#4  vel=36
+    relTick=  1940  C2  vel=105
+    relTick=  1940  C3  vel=105
+    relTick=  1940  G3  vel=105
+    relTick=  1940  D#4  vel=105
+    relTick=  3840  C2  vel=53
+    relTick=  3840  C3  vel=30
+    relTick=  3840  G3  vel=30
+    relTick=  3840  D#4  vel=56
+    relTick=  4800  D2  vel=76
+    relTick=  4800  F4  vel=76
+    relTick=  5760  D#2  vel=53
+    relTick=  5760  D#4  vel=30
+    relTick=  5760  G4  vel=56
+    relTick=  6720  G#1  vel=53
+    relTick=  6720  G#3  vel=35
+    relTick=  6720  D#4  vel=30
+    relTick=  6720  C5  vel=77
+    relTick=  9600  G#1  vel=53
+    relTick=  9600  G#3  vel=35
+    relTick=  9600  D#4  vel=30
+    relTick=  9600  C5  vel=56
+    relTick= 10560  G1  vel=53
+    relTick= 10560  A#3  vel=30
+    relTick= 10560  D#4  vel=30
+    relTick= 10560  A#4  vel=37
+    relTick= 13440  D#1  vel=53
+    relTick= 13440  A#3  vel=36
+    relTick= 13440  D#4  vel=36
+    relTick= 13440  G4  vel=56
+    relTick= 14400  F1  vel=53
+    relTick= 14400  C3  vel=35
+    relTick= 14400  G#3  vel=35
+    relTick= 14400  D#4  vel=35
+    relTick= 19200  G1  vel=53
+    relTick= 19200  F3  vel=30
+    relTick= 19200  G3  vel=30
+    ... (5 more)
+  Ch  8 (85 notes):
+    relTick=     0  A5  vel=81
+    relTick=     0  A#5  vel=31
+    relTick=   480  A#5  vel=28
+    relTick=   960  G#5  vel=63
+    relTick=   960  A#5  vel=65
+    relTick=  1440  G#5  vel=71
+    relTick=  1440  A#5  vel=28
+    relTick=  1920  F#3  vel=110
+    relTick=  1920  A#5  vel=31
+    relTick=  2400  A#5  vel=28
+    relTick=  2880  G#5  vel=57
+    relTick=  2880  A#5  vel=65
+    relTick=  3360  A5  vel=76
+    relTick=  3360  A#5  vel=28
+    relTick=  3840  A#5  vel=31
+    relTick=  4320  A5  vel=69
+    relTick=  4320  A#5  vel=28
+    relTick=  4800  G#5  vel=73
+    relTick=  4800  A#5  vel=65
+    relTick=  5280  G#5  vel=77
+    relTick=  5280  A#5  vel=28
+    relTick=  5760  F#3  vel=110
+    relTick=  5760  D#5  vel=70
+    relTick=  5760  A#5  vel=31
+    relTick=  6240  A#5  vel=28
+    relTick=  6720  G#5  vel=71
+    relTick=  6720  A#5  vel=65
+    relTick=  7200  G#5  vel=82
+    relTick=  7200  A#5  vel=28
+    relTick=  7680  A5  vel=68
+    relTick=  7680  A#5  vel=31
+    relTick=  8160  A#5  vel=28
+    relTick=  8640  G#5  vel=60
+    relTick=  8640  A#5  vel=65
+    relTick=  9120  G#5  vel=74
+    relTick=  9120  A#5  vel=28
+    relTick=  9600  F#3  vel=110
+    relTick=  9600  A#5  vel=31
+    relTick= 10080  A#5  vel=28
+    relTick= 10560  G#5  vel=56
+    ... (45 more)
+  Ch  9 (111 notes):
+    relTick=     0  E0  vel=42
+    relTick=     0  A1  vel=109
+    relTick=     0  C#3  vel=81
+    relTick=   480  A1  vel=90
+    relTick=   960  E0  vel=28
+    relTick=   960  B2  vel=78
+    relTick=   980  A2  vel=88
+    relTick=  1440  A1  vel=97
+    relTick=  1920  A1  vel=97
+    relTick=  1940  G1  vel=121
+    relTick=  3360  G1  vel=121
+    relTick=  3840  E0  vel=42
+    relTick=  3840  A1  vel=100
+    relTick=  3840  C#3  vel=79
+    relTick=  4320  A1  vel=100
+    relTick=  4800  E0  vel=28
+    relTick=  4800  A2  vel=82
+    relTick=  4820  G2  vel=90
+    relTick=  5280  A1  vel=80
+    relTick=  5760  E0  vel=42
+    relTick=  5760  G1  vel=110
+    relTick=  6240  A1  vel=94
+    relTick=  6712  A1  vel=109
+    relTick=  6720  E0  vel=28
+    relTick=  6720  A3  vel=73
+    relTick=  7680  E0  vel=42
+    relTick=  7680  D#3  vel=70
+    relTick=  8640  E0  vel=28
+    relTick=  8640  A1  vel=103
+    relTick=  8640  D#3  vel=84
+    relTick=  9600  E0  vel=42
+    relTick=  9600  G1  vel=110
+    relTick=  9600  G3  vel=60
+    relTick= 10560  E0  vel=28
+    relTick= 10560  A1  vel=107
+    relTick= 10560  C#3  vel=87
+    relTick= 11520  E0  vel=42
+    relTick= 11520  D#3  vel=70
+    relTick= 12480  E0  vel=28
+    relTick= 12480  A1  vel=70
+    ... (71 more)
+  Ch 10 (20 notes):
+    relTick=     0  C1  vel=63
+    relTick=   480  C1  vel=63
+    relTick=  1440  C1  vel=59
+    relTick=  1920  C3  vel=62
+    relTick=  3840  C1  vel=63
+    relTick=  4800  D1  vel=61
+    relTick=  5760  E1  vel=61
+    relTick=  6720  A1  vel=63
+    relTick=  9600  A1  vel=63
+    relTick= 10560  G1  vel=63
+    relTick= 12000  G2  vel=64
+    relTick= 12480  G1  vel=62
+    relTick= 12960  F1  vel=62
+    relTick= 13440  E1  vel=61
+    relTick= 14400  F1  vel=63
+    relTick= 18760  D1  vel=59
+    relTick= 19200  G1  vel=63
+    relTick= 20160  G1  vel=63
+    relTick= 21120  G1  vel=63
+    relTick= 22080  C1  vel=64
+  Ch 11 (80 notes):
+    relTick=     0  C2  vel=92
+    relTick=     8  C4  vel=79
+    relTick=     8  E4  vel=107
+    relTick=    12  G3  vel=93
+    relTick=   960  C4  vel=73
+    relTick=  1440  E4  vel=88
+    relTick=  1912  E4  vel=96
+    relTick=  1920  C2  vel=103
+    relTick=  1920  G4  vel=96
+    relTick=  1928  C5  vel=99
+    relTick=  1928  E5  vel=117
+    relTick=  3832  G3  vel=79
+    relTick=  3840  E4  vel=117
+    relTick=  3844  C4  vel=107
+    relTick=  3848  C2  vel=114
+    relTick=  4796  G3  vel=92
+    relTick=  4800  D2  vel=104
+    relTick=  4804  D4  vel=107
+    relTick=  4808  F4  vel=117
+    relTick=  5748  E2  vel=103
+    relTick=  5748  G3  vel=94
+    relTick=  5748  G4  vel=117
+    relTick=  5760  C4  vel=101
+    relTick=  5764  E4  vel=106
+    relTick=  6712  A4  vel=106
+    relTick=  6712  C5  vel=117
+    relTick=  6724  A2  vel=111
+    relTick=  6724  E4  vel=109
+    relTick=  8160  C4  vel=70
+    relTick=  8648  E4  vel=91
+    relTick=  9120  A4  vel=69
+    relTick=  9592  A2  vel=99
+    relTick=  9592  E4  vel=110
+    relTick=  9592  A4  vel=113
+    relTick=  9608  C5  vel=117
+    relTick= 10072  C4  vel=93
+    relTick= 10556  G2  vel=99
+    relTick= 10560  B3  vel=80
+    relTick= 10560  B4  vel=98
+    relTick= 11520  E4  vel=79
+    ... (40 more)
+  Ch 12 (110 notes):
+    relTick=     4  C1  vel=31
+    relTick=     4  A#7  vel=70
+    relTick=     8  G1  vel=41
+    relTick=    20  G3  vel=48
+    relTick=    28  C4  vel=45
+    relTick=    40  E4  vel=47
+    relTick=  1440  C4  vel=30
+    relTick=  1440  G#7  vel=50
+    relTick=  1448  G3  vel=26
+    relTick=  1460  G1  vel=24
+    relTick=  1920  G1  vel=43
+    relTick=  1920  A#7  vel=70
+    relTick=  1928  G3  vel=44
+    relTick=  1940  C4  vel=40
+    relTick=  1948  E4  vel=36
+    relTick=  2400  D7  vel=30
+    relTick=  2880  C8  vel=50
+    relTick=  3360  G#7  vel=70
+    relTick=  3840  E4  vel=41
+    relTick=  3840  A#7  vel=70
+    relTick=  3848  C4  vel=42
+    relTick=  3860  G3  vel=42
+    relTick=  3868  C1  vel=41
+    relTick=  4800  F4  vel=36
+    relTick=  4800  C8  vel=70
+    relTick=  4808  D1  vel=38
+    relTick=  4808  C4  vel=36
+    relTick=  4820  A3  vel=35
+    relTick=  5760  E1  vel=25
+    relTick=  5760  A#7  vel=70
+    relTick=  5780  G3  vel=43
+    relTick=  5788  C4  vel=44
+    relTick=  5800  E4  vel=42
+    relTick=  6720  E1  vel=29
+    relTick=  6720  C8  vel=70
+    relTick=  6728  A1  vel=41
+    relTick=  6740  G3  vel=44
+    relTick=  6748  C4  vel=47
+    relTick=  6760  E4  vel=41
+    relTick=  9120  C4  vel=28
+    ... (70 more)
+  Ch 13 (45 notes):
+    relTick=    20  C2  vel=53
+    relTick=    20  C3  vel=30
+    relTick=    20  G3  vel=30
+    relTick=    20  E4  vel=36
+    relTick=  1940  C2  vel=105
+    relTick=  1940  C3  vel=105
+    relTick=  1940  G3  vel=105
+    relTick=  1940  E4  vel=105
+    relTick=  3840  C2  vel=53
+    relTick=  3840  C3  vel=30
+    relTick=  3840  G3  vel=30
+    relTick=  3840  E4  vel=56
+    relTick=  4800  D2  vel=76
+    relTick=  4800  F4  vel=76
+    relTick=  5760  E2  vel=53
+    relTick=  5760  E4  vel=30
+    relTick=  5760  G4  vel=56
+    relTick=  6720  A1  vel=53
+    relTick=  6720  A3  vel=35
+    relTick=  6720  E4  vel=30
+    relTick=  6720  C5  vel=77
+    relTick=  9600  A1  vel=53
+    relTick=  9600  A3  vel=35
+    relTick=  9600  E4  vel=30
+    relTick=  9600  C5  vel=56
+    relTick= 10560  G1  vel=53
+    relTick= 10560  B3  vel=30
+    relTick= 10560  E4  vel=30
+    relTick= 10560  B4  vel=37
+    relTick= 13440  E1  vel=53
+    relTick= 13440  C4  vel=36
+    relTick= 13440  E4  vel=36
+    relTick= 13440  G4  vel=56
+    relTick= 14400  F1  vel=53
+    relTick= 14400  C3  vel=35
+    relTick= 14400  A3  vel=35
+    relTick= 14400  E4  vel=35
+    relTick= 19200  G1  vel=53
+    relTick= 19200  A2  vel=30
+    relTick= 19200  F3  vel=30
+    ... (5 more)
+
+=== Scene [16] 'Fill In BA'  ticks [299520,314876)  duration=15356 ===
+  Ch  2 (1 notes):
+    relTick=     0  C3  vel=75
+  Ch  9 (10 notes):
+    relTick=     0  A1  vel=83
+    relTick=     0  A3  vel=72
+    relTick=  1920  A0  vel=42
+    relTick=  3840  A0  vel=36
+    relTick=  5280  A1  vel=83
+    relTick=  5760  A0  vel=42
+    relTick=  5760  G1  vel=121
+    relTick=  6720  G1  vel=105
+    relTick=  7200  G2  vel=60
+    relTick=  7660  C#3  vel=83
+  Ch 10 (1 notes):
+    relTick=     0  C2  vel=59
+  Ch 11 (3 notes):
+    relTick=     0  G3  vel=75
+    relTick=     0  B3  vel=75
+    relTick=     0  E4  vel=75
+  Ch 12 (7 notes):
+    relTick=     0  C3  vel=29
+    relTick=     0  A#7  vel=70
+    relTick=     8  F3  vel=40
+    relTick=    20  G3  vel=43
+    relTick=    28  A3  vel=46
+    relTick=    40  B3  vel=40
+    relTick=   960  C8  vel=30
+  Ch 13 (3 notes):
+    relTick=     0  G3  vel=30
+    relTick=     0  B3  vel=30
+    relTick=     0  E4  vel=30
+
+--- RAW EVENTS (first 500 of 9052) ---
+       226  ch 1  CC      d1=   7  d2=  61
+       226  ch 2  CC      d1=   7  d2=  76
+       226  ch 3  CC      d1=   7  d2=  77
+       226  ch 4  CC      d1=   7  d2=  55
+       226  ch 8  CC      d1=   7  d2=  54
+       226  ch 9  CC      d1=   7  d2=  68
+       226  ch10  CC      d1=   7  d2=  61
+       226  ch11  CC      d1=   7  d2=  76
+       226  ch12  CC      d1=   7  d2=  77
+       226  ch13  CC      d1=   7  d2=  55
+       226  ch14  CC      d1=   7  d2=  52
+       231  ch 4  CC      d1=  10  d2=  56
+       231  ch13  CC      d1=  10  d2=  56
+       231  ch14  CC      d1=  10  d2=  84
+       236  ch14  CC      d1=  11  d2=  83
+       241  ch 1  CC      d1=  91  d2=   0
+       241  ch 2  CC      d1=  91  d2=  30
+       241  ch 3  CC      d1=  91  d2=  26
+       241  ch 4  CC      d1=  91  d2=  60
+       241  ch 8  CC      d1=  91  d2=  60
+       241  ch 9  CC      d1=  91  d2=  20
+       241  ch10  CC      d1=  91  d2=   0
+       241  ch11  CC      d1=  91  d2=  30
+       241  ch12  CC      d1=  91  d2=  26
+       241  ch13  CC      d1=  91  d2=  60
+       241  ch14  CC      d1=  91  d2=  60
+       246  ch 4  CC      d1=  72  d2=  80
+       246  ch13  CC      d1=  72  d2=  80
+       246  ch14  CC      d1=  72  d2=  80
+       251  ch 1  CC      d1=   0  d2=   8
+       251  ch 2  CC      d1=   0  d2=   0
+       251  ch 3  CC      d1=   0  d2=   8
+       251  ch 4  CC      d1=   0  d2=   8
+       251  ch 8  CC      d1=   0  d2= 127
+       251  ch 9  CC      d1=   0  d2= 127
+       251  ch10  CC      d1=   0  d2=   8
+       251  ch11  CC      d1=   0  d2=   0
+       251  ch12  CC      d1=   0  d2=   8
+       251  ch13  CC      d1=   0  d2=   8
+       251  ch14  CC      d1=   0  d2=   8
+       256  ch 1  CC      d1=  32  d2=   2
+       256  ch 2  CC      d1=  32  d2= 122
+       256  ch 3  CC      d1=  32  d2=   5
+       256  ch 4  CC      d1=  32  d2=   1
+       256  ch 8  CC      d1=  32  d2=   0
+       256  ch 9  CC      d1=  32  d2=   0
+       256  ch10  CC      d1=  32  d2=   2
+       256  ch11  CC      d1=  32  d2= 122
+       256  ch12  CC      d1=  32  d2=   5
+       256  ch13  CC      d1=  32  d2=   1
+       256  ch14  CC      d1=  32  d2=   1
+       261  ch 1  ProgChg  d1=  17  d2=   0
+       261  ch 2  ProgChg  d1=   0  d2=   0
+       261  ch 3  ProgChg  d1=   1  d2=   0
+       261  ch 4  ProgChg  d1=  49  d2=   0
+       261  ch 8  ProgChg  d1=  73  d2=   0
+       261  ch 9  ProgChg  d1=  73  d2=   0
+       261  ch10  ProgChg  d1=  17  d2=   0
+       261  ch11  ProgChg  d1=   0  d2=   0
+       261  ch12  ProgChg  d1=   1  d2=   0
+       261  ch13  ProgChg  d1=  49  d2=   0
+       261  ch14  ProgChg  d1=  49  d2=   0
+      7680  ch 2  NoteOn   d1=  60  d2=  65  (C4)
+      7680  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+      7680  ch 9  NoteOn   d1=  33  d2=  82  (A1)
+      7680  ch10  NoteOn   d1=  24  d2=  59  (C1)
+      7680  ch11  NoteOn   d1=  59  d2=  65  (B3)
+      7680  ch11  NoteOn   d1=  64  d2=  71  (E4)
+      7680  ch11  NoteOn   d1=  67  d2=  76  (G4)
+      7680  ch13  CC      d1=  11  d2= 127
+      7684  ch12  CC      d1=   0  d2=   8
+      7684  ch13  NoteOn   d1=  55  d2=  22  (G3)
+      7684  ch13  NoteOn   d1=  59  d2=  22  (B3)
+      7684  ch13  NoteOn   d1=  64  d2=  22  (E4)
+      7688  ch12  CC      d1=  32  d2=   1
+      7696  ch 9  NoteOff  d1=  33  d2=   0
+      7700  ch 8  NoteOff  d1=  69  d2=   0
+      7700  ch12  ProgChg  d1=   1  d2=   0
+      7708  ch12  NoteOn   d1=  48  d2=  21  (C3)
+      7708  ch12  NoteOn   d1=  53  d2=  20  (F3)
+      7712  ch12  CC      d1=  10  d2=  54
+      8244  ch13  CC      d1=  11  d2= 126
+      8528  ch13  CC      d1=  11  d2= 125
+      8624  ch 2  NoteOff  d1=  60  d2=  64
+      8628  ch11  NoteOff  d1=  59  d2=  64
+      8640  ch 2  NoteOn   d1=  60  d2=  48  (C4)
+      8640  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+      8640  ch12  NoteOn   d1=  57  d2=  30  (A3)
+      8644  ch11  NoteOn   d1=  59  d2=  48  (B3)
+      8660  ch 8  NoteOff  d1=  69  d2=   0
+      8808  ch13  CC      d1=  11  d2= 124
+      9092  ch13  CC      d1=  11  d2= 123
+      9376  ch13  CC      d1=  11  d2= 122
+      9580  ch11  NoteOff  d1=  67  d2=  64
+      9588  ch11  NoteOff  d1=  64  d2=  64
+      9596  ch11  NoteOn   d1=  67  d2=  72  (G4)
+      9600  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+      9600  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+      9600  ch12  NoteOn   d1=  55  d2=  20  (G3)
+      9604  ch11  NoteOn   d1=  64  d2=  69  (E4)
+      9616  ch 9  NoteOff  d1=  16  d2=   0
+      9620  ch 8  NoteOff  d1=  69  d2=   0
+      9656  ch13  CC      d1=  11  d2= 121
+      9940  ch13  CC      d1=  11  d2= 120
+     10220  ch13  CC      d1=  11  d2= 119
+     10504  ch13  CC      d1=  11  d2= 118
+     10544  ch 2  NoteOff  d1=  60  d2=  64
+     10544  ch11  NoteOff  d1=  59  d2=  64
+     10560  ch 2  NoteOn   d1=  60  d2=  48  (C4)
+     10560  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     10560  ch11  NoteOn   d1=  59  d2=  46  (B3)
+     10580  ch 8  NoteOff  d1=  69  d2=   0
+     10580  ch12  NoteOn   d1=  59  d2=  30  (B3)
+     10784  ch13  CC      d1=  11  d2= 117
+     11072  ch13  CC      d1=  11  d2= 116
+     11352  ch13  CC      d1=  11  d2= 115
+     11508  ch11  NoteOff  d1=  64  d2=  64
+     11508  ch11  NoteOff  d1=  67  d2=  64
+     11520  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     11524  ch11  NoteOn   d1=  64  d2=  55  (E4)
+     11524  ch11  NoteOn   d1=  67  d2=  65  (G4)
+     11540  ch 8  NoteOff  d1=  69  d2=   0
+     11632  ch13  CC      d1=  11  d2= 114
+     11916  ch13  CC      d1=  11  d2= 113
+     12196  ch13  CC      d1=  11  d2= 112
+     12464  ch 2  NoteOff  d1=  60  d2=  64
+     12464  ch11  NoteOff  d1=  59  d2=  64
+     12480  ch 2  NoteOn   d1=  60  d2=  53  (C4)
+     12480  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     12480  ch11  NoteOn   d1=  59  d2=  52  (B3)
+     12484  ch13  CC      d1=  11  d2= 111
+     12500  ch 8  NoteOff  d1=  69  d2=   0
+     12764  ch13  CC      d1=  11  d2= 110
+     13044  ch13  CC      d1=  11  d2= 109
+     13328  ch13  CC      d1=  11  d2= 108
+     13420  ch11  NoteOff  d1=  64  d2=  64
+     13420  ch11  NoteOff  d1=  67  d2=  64
+     13436  ch11  NoteOn   d1=  64  d2=  64  (E4)
+     13436  ch11  NoteOn   d1=  67  d2=  78  (G4)
+     13440  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     13440  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     13456  ch 9  NoteOff  d1=  16  d2=   0
+     13460  ch 8  NoteOff  d1=  69  d2=   0
+     13608  ch13  CC      d1=  11  d2= 107
+     13892  ch13  CC      d1=  11  d2= 106
+     13960  ch10  NoteOff  d1=  24  d2=   0
+     14176  ch13  CC      d1=  11  d2= 105
+     14376  ch11  NoteOff  d1=  59  d2=  64
+     14380  ch 2  NoteOff  d1=  60  d2=  64
+     14392  ch11  NoteOn   d1=  59  d2=  54  (B3)
+     14396  ch 2  NoteOn   d1=  60  d2=  59  (C4)
+     14400  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     14400  ch10  NoteOn   d1=  24  d2=  55  (C1)
+     14420  ch 8  NoteOff  d1=  69  d2=   0
+     14456  ch13  CC      d1=  11  d2= 104
+     14740  ch13  CC      d1=  11  d2= 103
+     15020  ch13  CC      d1=  11  d2= 102
+     15040  ch10  NoteOff  d1=  24  d2=   0
+     15260  ch13  CC      d1=  11  d2= 101
+     15304  ch13  CC      d1=  11  d2= 100
+     15340  ch12  NoteOff  d1=  55  d2=   0
+     15340  ch12  NoteOff  d1=  57  d2=   0
+     15344  ch11  NoteOff  d1=  64  d2=  64
+     15344  ch11  NoteOff  d1=  67  d2=  64
+     15360  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     15360  ch10  NoteOn   d1=  24  d2=  59  (C1)
+     15360  ch11  NoteOn   d1=  64  d2=  68  (E4)
+     15360  ch11  NoteOn   d1=  67  d2=  80  (G4)
+     15360  ch12  NoteOff  d1=  59  d2=   0
+     15368  ch12  NoteOff  d1=  48  d2=   0
+     15368  ch12  NoteOff  d1=  53  d2=   0
+     15372  ch 8  NoteOff  d1=  69  d2=   0
+     15872  ch13  CC      d1=  11  d2= 101
+     16156  ch13  CC      d1=  11  d2= 102
+     16304  ch11  NoteOff  d1=  59  d2=  64
+     16308  ch 2  NoteOff  d1=  60  d2=  64
+     16320  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     16320  ch11  NoteOn   d1=  59  d2=  49  (B3)
+     16324  ch 2  NoteOn   d1=  60  d2=  46  (C4)
+     16332  ch 8  NoteOff  d1=  69  d2=   0
+     16444  ch13  CC      d1=  11  d2= 103
+     16728  ch13  CC      d1=  11  d2= 104
+     17012  ch13  CC      d1=  11  d2= 105
+     17268  ch11  NoteOff  d1=  64  d2=  64
+     17268  ch11  NoteOff  d1=  67  d2=  64
+     17280  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     17280  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     17284  ch11  NoteOn   d1=  64  d2=  56  (E4)
+     17284  ch11  NoteOn   d1=  67  d2=  69  (G4)
+     17292  ch 8  NoteOff  d1=  69  d2=   0
+     17296  ch 9  NoteOff  d1=  16  d2=   0
+     17296  ch13  CC      d1=  11  d2= 106
+     17580  ch13  CC      d1=  11  d2= 107
+     17864  ch13  CC      d1=  11  d2= 108
+     18152  ch13  CC      d1=  11  d2= 109
+     18216  ch11  NoteOff  d1=  59  d2=  64
+     18232  ch 2  NoteOff  d1=  60  d2=  64
+     18232  ch11  NoteOn   d1=  59  d2=  48  (B3)
+     18240  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     18248  ch 2  NoteOn   d1=  60  d2=  48  (C4)
+     18252  ch 8  NoteOff  d1=  69  d2=   0
+     18436  ch13  CC      d1=  11  d2= 110
+     18720  ch13  CC      d1=  11  d2= 111
+     19004  ch13  CC      d1=  11  d2= 112
+     19184  ch11  NoteOff  d1=  67  d2=  64
+     19188  ch11  NoteOff  d1=  64  d2=  64
+     19200  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     19200  ch11  NoteOn   d1=  67  d2=  62  (G4)
+     19204  ch11  NoteOn   d1=  64  d2=  56  (E4)
+     19212  ch 8  NoteOff  d1=  69  d2=   0
+     19288  ch13  CC      d1=  11  d2= 113
+     19572  ch13  CC      d1=  11  d2= 114
+     19860  ch13  CC      d1=  11  d2= 115
+     20144  ch 2  NoteOff  d1=  60  d2=  64
+     20144  ch11  NoteOff  d1=  59  d2=  64
+     20144  ch13  CC      d1=  11  d2= 116
+     20160  ch 2  NoteOn   d1=  60  d2=  48  (C4)
+     20160  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     20160  ch11  NoteOn   d1=  59  d2=  49  (B3)
+     20172  ch 8  NoteOff  d1=  69  d2=   0
+     20428  ch13  CC      d1=  11  d2= 117
+     20712  ch13  CC      d1=  11  d2= 118
+     20996  ch13  CC      d1=  11  d2= 119
+     21104  ch11  NoteOff  d1=  64  d2=  64
+     21104  ch11  NoteOff  d1=  67  d2=  64
+     21120  ch 8  NoteOn   d1=  54  d2=  94  (F#3)
+     21120  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     21120  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     21120  ch11  NoteOn   d1=  64  d2=  66  (E4)
+     21120  ch11  NoteOn   d1=  67  d2=  61  (G4)
+     21136  ch 9  NoteOff  d1=  16  d2=   0
+     21140  ch 8  NoteOff  d1=  54  d2=   0
+     21140  ch 8  NoteOff  d1=  69  d2=   0
+     21280  ch13  CC      d1=  11  d2= 120
+     21568  ch13  CC      d1=  11  d2= 121
+     21852  ch13  CC      d1=  11  d2= 122
+     22056  ch11  NoteOff  d1=  59  d2=  64
+     22060  ch 2  NoteOff  d1=  60  d2=  64
+     22072  ch11  NoteOn   d1=  59  d2=  59  (B3)
+     22076  ch 2  NoteOn   d1=  60  d2=  55  (C4)
+     22080  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     22100  ch 8  NoteOff  d1=  69  d2=   0
+     22136  ch13  CC      d1=  11  d2= 123
+     22420  ch13  CC      d1=  11  d2= 124
+     22704  ch13  CC      d1=  11  d2= 125
+     22740  ch10  NoteOff  d1=  24  d2=   0
+     22944  ch13  CC      d1=  11  d2= 126
+     22988  ch13  CC      d1=  11  d2= 127
+     23024  ch 2  NoteOff  d1=  60  d2=  64
+     23024  ch11  NoteOff  d1=  59  d2=  64
+     23024  ch11  NoteOff  d1=  64  d2=  64
+     23024  ch11  NoteOff  d1=  67  d2=  64
+     23040  ch 2  NoteOn   d1=  60  d2=  65  (C4)
+     23040  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     23040  ch 9  NoteOn   d1=  33  d2=  82  (A1)
+     23040  ch10  NoteOn   d1=  24  d2=  59  (C1)
+     23040  ch11  NoteOn   d1=  59  d2=  65  (B3)
+     23040  ch11  NoteOn   d1=  64  d2=  71  (E4)
+     23040  ch11  NoteOn   d1=  67  d2=  80  (G4)
+     23040  ch12  NoteOn   d1=  48  d2=  21  (C3)
+     23040  ch12  NoteOn   d1=  53  d2=  20  (F3)
+     23056  ch 9  NoteOff  d1=  33  d2=   0
+     23060  ch 8  NoteOff  d1=  69  d2=   0
+     23564  ch13  CC      d1=  11  d2= 126
+     23848  ch13  CC      d1=  11  d2= 125
+     23976  ch11  NoteOff  d1=  59  d2=  64
+     23980  ch 2  NoteOff  d1=  60  d2=  64
+     23992  ch11  NoteOn   d1=  59  d2=  55  (B3)
+     23996  ch 2  NoteOn   d1=  60  d2=  55  (C4)
+     24000  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     24000  ch12  NoteOn   d1=  55  d2=  30  (G3)
+     24020  ch 8  NoteOff  d1=  69  d2=   0
+     24132  ch13  CC      d1=  11  d2= 124
+     24416  ch13  CC      d1=  11  d2= 123
+     24704  ch13  CC      d1=  11  d2= 122
+     24940  ch11  NoteOff  d1=  64  d2=  64
+     24948  ch11  NoteOff  d1=  67  d2=  64
+     24956  ch11  NoteOn   d1=  64  d2=  65  (E4)
+     24960  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     24960  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     24960  ch12  NoteOn   d1=  57  d2=  20  (A3)
+     24964  ch11  NoteOn   d1=  67  d2=  73  (G4)
+     24976  ch 9  NoteOff  d1=  16  d2=   0
+     24980  ch 8  NoteOff  d1=  69  d2=   0
+     24988  ch13  CC      d1=  11  d2= 121
+     25276  ch13  CC      d1=  11  d2= 120
+     25440  ch 8  NoteOn   d1=  82  d2=  29  (A#5)
+     25460  ch 8  NoteOff  d1=  82  d2=   0
+     25560  ch13  CC      d1=  11  d2= 119
+     25844  ch13  CC      d1=  11  d2= 118
+     25900  ch11  NoteOff  d1=  59  d2=  64
+     25904  ch 2  NoteOff  d1=  60  d2=  64
+     25916  ch11  NoteOn   d1=  59  d2=  48  (B3)
+     25920  ch 2  NoteOn   d1=  60  d2=  49  (C4)
+     25920  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     25920  ch 8  NoteOn   d1=  82  d2=  43  (A#5)
+     25940  ch 8  NoteOff  d1=  69  d2=   0
+     25940  ch 8  NoteOff  d1=  82  d2=   0
+     25940  ch12  NoteOn   d1=  59  d2=  30  (B3)
+     26132  ch13  CC      d1=  11  d2= 117
+     26400  ch 8  NoteOn   d1=  82  d2=  43  (A#5)
+     26416  ch13  CC      d1=  11  d2= 116
+     26420  ch 8  NoteOff  d1=  82  d2=   0
+     26704  ch13  CC      d1=  11  d2= 115
+     26864  ch11  NoteOff  d1=  67  d2=  64
+     26872  ch11  NoteOff  d1=  64  d2=  64
+     26880  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     26880  ch11  NoteOn   d1=  67  d2=  65  (G4)
+     26888  ch11  NoteOn   d1=  64  d2=  55  (E4)
+     26900  ch 8  NoteOff  d1=  69  d2=   0
+     26988  ch13  CC      d1=  11  d2= 114
+     27272  ch13  CC      d1=  11  d2= 113
+     27560  ch13  CC      d1=  11  d2= 112
+     27820  ch 2  NoteOff  d1=  60  d2=  64
+     27832  ch11  NoteOff  d1=  59  d2=  64
+     27836  ch 2  NoteOn   d1=  60  d2=  49  (C4)
+     27840  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     27844  ch13  CC      d1=  11  d2= 111
+     27848  ch11  NoteOn   d1=  59  d2=  49  (B3)
+     27860  ch 8  NoteOff  d1=  69  d2=   0
+     28132  ch13  CC      d1=  11  d2= 110
+     28416  ch13  CC      d1=  11  d2= 109
+     28700  ch13  CC      d1=  11  d2= 108
+     28776  ch11  NoteOff  d1=  67  d2=  64
+     28792  ch11  NoteOff  d1=  64  d2=  64
+     28792  ch11  NoteOn   d1=  67  d2=  69  (G4)
+     28800  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     28800  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     28808  ch11  NoteOn   d1=  64  d2=  59  (E4)
+     28816  ch 9  NoteOff  d1=  16  d2=   0
+     28820  ch 8  NoteOff  d1=  69  d2=   0
+     28988  ch13  CC      d1=  11  d2= 107
+     29180  ch10  NoteOff  d1=  24  d2=   0
+     29272  ch13  CC      d1=  11  d2= 106
+     29560  ch13  CC      d1=  11  d2= 105
+     29740  ch11  NoteOff  d1=  59  d2=  64
+     29748  ch 2  NoteOff  d1=  60  d2=  64
+     29756  ch11  NoteOn   d1=  59  d2=  57  (B3)
+     29760  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     29760  ch 9  NoteOn   d1=  33  d2=  68  (A1)
+     29760  ch10  NoteOn   d1=  24  d2=  55  (C1)
+     29764  ch 2  NoteOn   d1=  60  d2=  58  (C4)
+     29776  ch 9  NoteOff  d1=  33  d2=   0
+     29780  ch 8  NoteOff  d1=  69  d2=   0
+     29844  ch13  CC      d1=  11  d2= 104
+     30128  ch13  CC      d1=  11  d2= 103
+     30400  ch10  NoteOff  d1=  24  d2=   0
+     30416  ch13  CC      d1=  11  d2= 102
+     30656  ch13  CC      d1=  11  d2= 101
+     30700  ch12  NoteOff  d1=  48  d2=   0
+     30700  ch12  NoteOff  d1=  53  d2=   0
+     30700  ch12  NoteOff  d1=  55  d2=   0
+     30700  ch12  NoteOff  d1=  57  d2=   0
+     30700  ch13  CC      d1=  11  d2= 100
+     30704  ch11  NoteOff  d1=  64  d2=  64
+     30704  ch11  NoteOff  d1=  67  d2=  64
+     30720  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     30720  ch 9  NoteOn   d1=  33  d2=  82  (A1)
+     30720  ch10  NoteOn   d1=  24  d2=  59  (C1)
+     30720  ch11  NoteOn   d1=  64  d2=  65  (E4)
+     30720  ch11  NoteOn   d1=  67  d2=  78  (G4)
+     30720  ch12  NoteOff  d1=  59  d2=   0
+     30736  ch 9  NoteOff  d1=  33  d2=   0
+     30740  ch 8  NoteOff  d1=  69  d2=   0
+     31272  ch13  CC      d1=  11  d2= 101
+     31556  ch13  CC      d1=  11  d2= 102
+     31664  ch11  NoteOff  d1=  59  d2=  64
+     31672  ch 2  NoteOff  d1=  60  d2=  64
+     31680  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     31680  ch11  NoteOn   d1=  59  d2=  55  (B3)
+     31688  ch 2  NoteOn   d1=  60  d2=  53  (C4)
+     31700  ch 8  NoteOff  d1=  69  d2=   0
+     31840  ch13  CC      d1=  11  d2= 103
+     32128  ch13  CC      d1=  11  d2= 104
+     32412  ch13  CC      d1=  11  d2= 105
+     32620  ch11  NoteOff  d1=  64  d2=  64
+     32620  ch11  NoteOff  d1=  67  d2=  64
+     32636  ch11  NoteOn   d1=  64  d2=  62  (E4)
+     32636  ch11  NoteOn   d1=  67  d2=  70  (G4)
+     32640  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     32640  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     32656  ch 9  NoteOff  d1=  16  d2=   0
+     32660  ch 8  NoteOff  d1=  69  d2=   0
+     32696  ch13  CC      d1=  11  d2= 106
+     32980  ch13  CC      d1=  11  d2= 107
+     33268  ch13  CC      d1=  11  d2= 108
+     33552  ch13  CC      d1=  11  d2= 109
+     33584  ch 2  NoteOff  d1=  60  d2=  64
+     33592  ch11  NoteOff  d1=  59  d2=  64
+     33600  ch 2  NoteOn   d1=  60  d2=  53  (C4)
+     33600  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     33608  ch11  NoteOn   d1=  59  d2=  52  (B3)
+     33620  ch 8  NoteOff  d1=  69  d2=   0
+     33836  ch13  CC      d1=  11  d2= 110
+     34124  ch13  CC      d1=  11  d2= 111
+     34408  ch13  CC      d1=  11  d2= 112
+     34536  ch11  NoteOff  d1=  67  d2=  64
+     34544  ch11  NoteOff  d1=  64  d2=  64
+     34552  ch11  NoteOn   d1=  67  d2=  57  (G4)
+     34560  ch 8  NoteOn   d1=  69  d2=  40  (A4)
+     34560  ch11  NoteOn   d1=  64  d2=  58  (E4)
+     34580  ch 8  NoteOff  d1=  69  d2=   0
+     34692  ch13  CC      d1=  11  d2= 113
+     34976  ch13  CC      d1=  11  d2= 114
+     35264  ch13  CC      d1=  11  d2= 115
+     35500  ch11  NoteOff  d1=  59  d2=  64
+     35504  ch 2  NoteOff  d1=  60  d2=  64
+     35516  ch11  NoteOn   d1=  59  d2=  46  (B3)
+     35520  ch 2  NoteOn   d1=  60  d2=  46  (C4)
+     35520  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     35540  ch 8  NoteOff  d1=  69  d2=   0
+     35548  ch13  CC      d1=  11  d2= 116
+     35832  ch13  CC      d1=  11  d2= 117
+     36120  ch13  CC      d1=  11  d2= 118
+     36404  ch13  CC      d1=  11  d2= 119
+     36464  ch11  NoteOff  d1=  64  d2=  64
+     36464  ch11  NoteOff  d1=  67  d2=  64
+     36480  ch 8  NoteOn   d1=  54  d2=  68  (F#3)
+     36480  ch 8  NoteOn   d1=  69  d2=  60  (A4)
+     36480  ch 9  NoteOn   d1=  16  d2=  39  (E0)
+     36480  ch11  NoteOn   d1=  64  d2=  61  (E4)
+     36480  ch11  NoteOn   d1=  67  d2=  69  (G4)
+     36496  ch 9  NoteOff  d1=  16  d2=   0
+     36500  ch 8  NoteOff  d1=  54  d2=   0
+     36500  ch 8  NoteOff  d1=  69  d2=   0
+     36688  ch13  CC      d1=  11  d2= 120
+     36960  ch 8  NoteOn   d1=  54  d2=  33  (F#3)
+     36976  ch13  CC      d1=  11  d2= 121
+     36980  ch 8  NoteOff  d1=  54  d2=   0
+     37260  ch13  CC      d1=  11  d2= 122
+     37408  ch10  NoteOff  d1=  24  d2=   0
+     37416  ch 2  NoteOff  d1=  60  d2=  64
+     37416  ch11  NoteOff  d1=  59  d2=  64
+     37432  ch 2  NoteOn   d1=  60  d2=  46  (C4)
+     37432  ch11  NoteOn   d1=  59  d2=  44  (B3)
+     37440  ch 8  NoteOn   d1=  54  d2=  14  (F#3)
+     37440  ch 8  NoteOn   d1=  69  d2=  20  (A4)
+     37440  ch10  NoteOn   d1=  24  d2=  55  (C1)
+     37460  ch 8  NoteOff  d1=  54  d2=   0
+     37460  ch 8  NoteOff  d1=  69  d2=   0
+     37544  ch13  CC      d1=  11  d2= 123
+     37828  ch13  CC      d1=  11  d2= 124
+     37920  ch 8  NoteOn   d1=  54  d2=   2  (F#3)
+     37940  ch 8  NoteOff  d1=  54  d2=   0
+     38116  ch13  CC      d1=  11  d2= 125
+     38356  ch13  CC      d1=  11  d2= 126
+     38360  ch10  NoteOff  d1=  24  d2=   0
+     38380  ch13  NoteOff  d1=  55  d2=   0
+     38380  ch13  NoteOff  d1=  59  d2=   0
+     38380  ch13  NoteOff  d1=  64  d2=   0
+     38384  ch 2  NoteOff  d1=  60  d2=  64
+     38384  ch11  NoteOff  d1=  59  d2=  64
+     38384  ch11  NoteOff  d1=  64  d2=  64
+     38384  ch11  NoteOff  d1=  67  d2=  64
+     38400  ch 2  NoteOn   d1=  60  d2=  61  (C4)
+     38400  ch 9  NoteOn   d1=  13  d2=  77  (C#0)
+     38400  ch 9  NoteOn   d1=  33  d2=  83  (A1)
+     38400  ch10  NoteOn   d1=  36  d2=  59  (C2)
+     38400  ch11  NoteOn   d1=  59  d2=  61  (B3)
+     38400  ch11  NoteOn   d1=  64  d2=  72  (E4)
+     38400  ch11  NoteOn   d1=  67  d2=  73  (G4)
+     38404  ch12  CC      d1=   0  d2=   8
+     38404  ch13  NoteOn   d1=  59  d2=  22  (B3)
+     38404  ch13  NoteOn   d1=  64  d2=  22  (E4)
+     38404  ch13  NoteOn   d1=  67  d2=  22  (G4)
+     38408  ch12  CC      d1=  32  d2=   1
+     38416  ch 9  NoteOff  d1=  13  d2=   0
+     38416  ch 9  NoteOff  d1=  33  d2=   0
+     38420  ch12  ProgChg  d1=   1  d2=   0
+     38432  ch12  CC      d1=  10  d2=  54
+     38440  ch12  NoteOn   d1=  48  d2=  21  (C3)
+     38440  ch12  NoteOn   d1=  53  d2=  20  (F3)
+     38964  ch13  CC      d1=  11  d2= 126
+     39248  ch13  CC      d1=  11  d2= 125
+     39344  ch 2  NoteOff  d1=  60  d2=  64
+     39352  ch11  NoteOff  d1=  59  d2=  64
+     39360  ch 2  NoteOn   d1=  60  d2=  49  (C4)
+     39360  ch 9  NoteOn   d1=  15  d2=  39  (D#0)
+     39360  ch12  NoteOn   d1=  57  d2=  30  (A3)
+     39368  ch11  NoteOn   d1=  59  d2=  52  (B3)
+     39376  ch 9  NoteOff  d1=  15  d2=   0
+     39528  ch13  CC      d1=  11  d2= 124
+     39812  ch13  CC      d1=  11  d2= 123
+     40096  ch13  CC      d1=  11  d2= 122
+     40304  ch11  NoteOff  d1=  67  d2=  64
+     40308  ch11  NoteOff  d1=  64  d2=  64
+     40320  ch 8  NoteOn   d1=  54  d2= 106  (F#3)
+     40320  ch 9  NoteOn   d1=  37  d2= 110  (C#2)
+     40320  ch11  NoteOn   d1=  67  d2=  74  (G4)
+     40320  ch12  NoteOn   d1=  55  d2=  20  (G3)
+     40324  ch11  NoteOn   d1=  64  d2=  67  (E4)
+     40336  ch 9  NoteOff  d1=  37  d2=   0
+     40340  ch 8  NoteOff  d1=  54  d2=   0
+     40376  ch13  CC      d1=  11  d2= 121
+     40660  ch13  CC      d1=  11  d2= 120
+     40940  ch10  NoteOff  d1=  36  d2=   0
+     40940  ch13  CC      d1=  11  d2= 119
+     41224  ch13  CC      d1=  11  d2= 118
+     41264  ch 2  NoteOff  d1=  60  d2=  64
+     41264  ch11  NoteOff  d1=  59  d2=  64
+  ... truncated
+
+============================================================
+  END OF DUMP
+============================================================

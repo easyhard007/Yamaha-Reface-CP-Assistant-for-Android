@@ -2,9 +2,11 @@
 #include <string>
 #include "AudioEngine.h"
 #include "MidiProcessor.h"
+#include "StylePlayer.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
+static StylePlayer stylePlayer;
 
 // ===== Audio Engine (FluidLite) =====
 extern "C" JNIEXPORT void JNICALL
@@ -55,6 +57,10 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetInstrumentName(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetInstrument(
         JNIEnv*, jobject, jint index) { audio.setInstrument(0, index); }
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetInstrumentBank(
+        JNIEnv*, jobject, jint index) { return audio.getInstrumentBank(0, index); }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetMasterVolume(
@@ -120,3 +126,104 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeTranspose(
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeSplitPoint(
         JNIEnv*, jobject, jint delta) { return midi.changeSplitPoint(delta); }
+
+// ===== Style / Rhythm Playback =====
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeLoadStyle(
+        JNIEnv* env, jobject, jstring styPath) {
+    const char* path = env->GetStringUTFChars(styPath, nullptr);
+    bool ok = stylePlayer.loadStyle(path);
+    env->ReleaseStringUTFChars(styPath, path);
+    if (!ok) {
+        return env->NewStringUTF("{\"error\":\"Failed to load style\"}");
+    }
+    return env->NewStringUTF(stylePlayer.getScenesJson().c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStyleSelectScene(
+        JNIEnv*, jobject, jint sceneIndex) {
+    stylePlayer.selectScene(sceneIndex);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStyleStart(
+        JNIEnv*, jobject) {
+    stylePlayer.start(&audio, 1);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStopStyle(
+        JNIEnv*, jobject) {
+    stylePlayer.stop();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsStylePlaying(
+        JNIEnv*, jobject) {
+    return stylePlayer.isPlaying() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentScene(
+        JNIEnv*, jobject) {
+    return stylePlayer.getCurrentScene();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetPendingScene(
+        JNIEnv*, jobject) {
+    return stylePlayer.getPendingScene();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDumpStyleDebug(
+        JNIEnv* env, jobject, jstring styPath, jstring outputPath) {
+    const char* sty = env->GetStringUTFChars(styPath, nullptr);
+    const char* out = env->GetStringUTFChars(outputPath, nullptr);
+    bool ok = stylePlayer.dumpDebug(sty, out);
+    env->ReleaseStringUTFChars(styPath, sty);
+    env->ReleaseStringUTFChars(outputPath, out);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeLoadStyleSoundFont(
+        JNIEnv* env, jobject, jstring sf2Path) {
+    const char* path = env->GetStringUTFChars(sf2Path, nullptr);
+    audio.loadSoundFont(1, path); // load sf2 onto accompaniment synth
+    env->ReleaseStringUTFChars(sf2Path, path);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetStyleChannels(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(stylePlayer.getChannelsJson().c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetStyleChannelInst(
+        JNIEnv*, jobject, jint channel, jint bank, jint program) {
+    stylePlayer.setChannelOverride(channel, bank, program);
+    audio.sendProgramChange(1, (int)channel, (int)bank, (int)program);
+    audio.allNotesOff(1, (int)channel);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeToggleMute(
+        JNIEnv*, jobject, jint channel) {
+    stylePlayer.toggleMute(channel);
+    if (stylePlayer.isMuted(channel)) audio.allNotesOff(1, (int)channel);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetActiveChannels(
+        JNIEnv*, jobject) {
+    return (jint)stylePlayer.getActiveChannels();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsChannelMuted(
+        JNIEnv*, jobject, jint channel) {
+    return stylePlayer.isMuted((int)channel) ? JNI_TRUE : JNI_FALSE;
+}

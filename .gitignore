@@ -3,6 +3,7 @@
 *.iml
 *.log
 /build
+/references
 /captures
 .externalNativeBuild
 .cxx
