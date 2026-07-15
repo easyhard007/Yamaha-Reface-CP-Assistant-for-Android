@@ -7,8 +7,19 @@
 #include <string>
 #include "fluidlite.h"
 
+enum class MidiCmdType { NoteOn, NoteOff, CC, ProgramChange, AllNotesOff, AllSoundsOff, SetReverb, SetGain };
+
+struct MidiCmd {
+    MidiCmdType type;
+    int target;   // 0=lead, 1=accomp
+    int channel;
+    int data1;    // note / controller / bank
+    int data2;    // velocity / value / program
+    double fdata1; // reverb roomSize
+    double fdata2; // reverb level
+};
+
 /// Audio-only engine — plays SoundFont via FluidLite + Oboe.
-/// No MIDI logic, no note tracking, no auto-sustain.
 class AudioEngine : public oboe::AudioStreamCallback {
 public:
     AudioEngine() = default;
@@ -18,20 +29,20 @@ public:
     void start();
     void stop();
 
-    // Playback (channel 0 calls — backward compatible)
-    void playNote(int target, int note, int velocity);
-    void stopNote(int target, int note);
-    void sendCC(int target, int controller, int value); // FluidLite CC
+    // Enqueue MIDI commands (lock-free from callback perspective)
+    void enqueueNoteOn(int target, int channel, int note, int velocity);
+    void enqueueNoteOff(int target, int channel, int note);
+    void enqueueCC(int target, int channel, int controller, int value);
+    void enqueueProgramChange(int target, int channel, int bank, int program);
+    void enqueueAllNotesOff(int target, int channel);
+    void enqueueAllSoundsOff(int target);
+    void enqueueSetReverb(int target, double roomSize, double level);
+    void enqueueSetGain(int target, double gain);
+    double getGain(int target);
+    double getReverbRoomSize(int target);
+    double getReverbLevel(int target);
 
-    // Playback — channel-aware (used by StylePlayer)
-    void playNote(int target, int channel, int note, int velocity);
-    void stopNote(int target, int channel, int note);
-    void sendCC(int target, int channel, int controller, int value);
-    void sendProgramChange(int target, int channel, int bank, int program);
-    void allNotesOff(int target, int channel);
-    void allSoundsOff(int target);  // 立即杀死所有 voice, 释放复音数
-
-    // SoundFont management
+    // Direct synth access (for init/load only — not thread-safe during playback)
     bool loadSoundFont(int target, const char* path);
     int  getInstrumentCount(int target);
     const char* getInstrumentName(int target, int index);
@@ -47,6 +58,9 @@ private:
     struct InstrumentInfo { std::string name; int bank; int program; };
     void scanPresets(fluid_synth_t* synth, std::vector<InstrumentInfo>& list);
 
+    void processPendingCommands();
+    void execCommand(const MidiCmd& cmd);
+
     std::shared_ptr<oboe::AudioStream> stream;
     std::mutex mLock;
 
@@ -60,4 +74,10 @@ private:
     std::vector<InstrumentInfo> mLeadInstruments;
     std::vector<InstrumentInfo> mAccompInstruments;
     std::vector<float> mMixBuffer;
+
+    // Lock-free MIDI command queue (swap-based)
+    std::mutex mCmdMutex;
+    std::vector<MidiCmd> mCmdQueue;
+    double mLeadGain = 0.8;
+    double mAccompGain = 0.8;
 };

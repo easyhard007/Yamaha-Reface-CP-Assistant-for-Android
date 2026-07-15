@@ -98,19 +98,21 @@
                 <div id="sustain-btn" class="glass-btn btn-rect" onclick="toggleAutoSustain()">AUTO-SUSTAIN</div>
                 <!-- 新增增强按钮，移除 BREAK TEST -->
                 <div id="enhance-btn" class="glass-btn btn-rect" onclick="toggleBassEnhance()">ENHANCE: 50%</div>
+                <div id="lead-overlay-btn" class="glass-btn btn-rect btn-active" onclick="toggleLeadOverlay()">Lead Overlay: 80%</div>
             </div>
         </div>
 
         <!-- 节奏测试卡片 -->
         <div class="card" id="style-card">
             <h3>🎵 节奏测试 (Style Test)</h3>
-            <div style="display:flex; gap:8px; margin-bottom:4px; flex-wrap:wrap; align-items:center;">
-                <div class="glass-btn btn-rect" onclick="loadTestStyle()" id="load-style-btn">📂 Load Style</div>
-                <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="display:none; background:#2e7d32;">▶ Start</div>
-                <select id="style-file-select" style="display:none; background:#222; color:#fff; border:1px solid #555; border-radius:6px; padding:6px; font-size:13px; max-width:200px;"></select>
-                <div id="style-confirm-btn" class="glass-btn btn-rect" onclick="confirmLoadStyle()" style="display:none; font-size:12px; padding:6px 12px;">✅ 确认</div>
-                <div class="glass-btn btn-rect" onclick="dumpStyleDebug()" id="style-dump-btn" style="display:none; font-size:11px;">🛠 Dump</div>
+            <div class="glass-btn btn-rect" onclick="loadTestStyle()" id="load-style-btn" style="width:100%; box-sizing:border-box; margin-bottom:4px;">📂 Load Style</div>
+            <div style="display:none; gap:6px; margin-bottom:4px;" id="style-ctrl-row">
+                <div class="glass-btn btn-rect" id="style-tempo-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Tempo:120</div>
+                <div class="glass-btn btn-rect" onclick="onVolBtnClick()" id="style-vol-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Vol:80%</div>
+                <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="background:#2e7d32; flex:1; text-align:center;">▶ Start</div>
+                <div class="glass-btn btn-rect" id="style-sync-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">SYNC</div>
             </div>
+            <div id="beat-dots" style="display:none; justify-content:center; gap:6px; margin-bottom:4px;"></div>
             <div id="style-info" style="color:#aaa; font-size:11px; margin-bottom:4px;">点击按钮选择节奏文件并加载</div>
             <div id="scene-list" style="display:none;">
                 <p style="color:#ccc; font-size:12px; margin:4px 0;">场景:</p>
@@ -173,6 +175,14 @@
             <div style="display:flex; gap:8px; margin-top:10px;">
                 <button id="start-btn" class="action-btn" style="flex:1; font-size:14px; padding:8px;" onclick="startControl()">🟢 启动</button>
                 <button class="action-btn stop-btn" style="flex:1; font-size:14px; padding:8px;" onclick="stopControl()">⏹ 停止</button>
+            </div>
+            <p style="color:#d500f9; font-size:11px; margin:8px 0 2px 0;">Reverb</p>
+            <div style="display:flex; align-items:center; gap:6px; width:100%; box-sizing:border-box;">
+                <span style="color:#aaa; font-size:10px; flex:0 0 auto;">Room</span>
+                <input type="range" id="reverb-room" min="0" max="100" value="85" oninput="onReverbChange()" style="flex:1; min-width:0;">
+                <span style="color:#aaa; font-size:10px; flex:0 0 auto;">Level</span>
+                <input type="range" id="reverb-level" min="0" max="100" value="70" oninput="onReverbChange()" style="flex:1; min-width:0;">
+                <span id="reverb-val" style="color:#666; font-size:9px; flex:0 0 auto;">R:85 L:70</span>
             </div>
         </div>
         <!-- MIDI 日志 -->
@@ -322,33 +332,42 @@
         window.styleFileNames = [];
         window.styleSelectedScene = 0;
         window.styleTimer = null;
+        window.styleLoadedName = '';
 
         function loadTestStyle() {
             if (typeof Android === 'undefined') { document.getElementById('style-info').innerText = 'Android only'; return; }
-            clearStyleTimer();
             try {
                 var listJson = Android.getStyleFileList();
                 window.styleFileNames = JSON.parse(listJson);
                 if (window.styleFileNames.length === 0) { document.getElementById('style-info').innerText = 'No style files'; return; }
                 if (window.styleFileNames.length === 1) { doLoadStyle(0); return; }
-                var sel = document.getElementById('style-file-select');
-                sel.innerHTML = '';
+                // Popup overlay
+                var html = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="closeStylePopup()">' +
+                    '<div style="background:#1a1a1a; border-radius:12px; padding:16px; max-width:320px; width:90%;" onclick="event.stopPropagation()">' +
+                    '<p style="color:#fff; font-size:14px; margin:0 0 10px 0;">Select Style</p>';
                 for (var i = 0; i < window.styleFileNames.length; i++) {
-                    var opt = document.createElement('option'); opt.value = i; opt.textContent = window.styleFileNames[i];
-                    sel.appendChild(opt);
+                    var name = window.styleFileNames[i].replace(/\.sty$/i, '').replace(/\.STY$/i, '');
+                    html += '<div class="glass-btn btn-rect" onclick="closeStylePopup();doLoadStyle(' + i + ')" style="font-size:12px; padding:6px 10px; margin-bottom:4px; width:100%; box-sizing:border-box;">' + name + '</div>';
                 }
-                sel.style.display = 'inline-block';
-                document.getElementById('style-confirm-btn').style.display = 'inline-block';
-                document.getElementById('style-info').innerText = 'Select a style file (' + window.styleFileNames.length + ' available)';
+                html += '<div class="glass-btn btn-rect" onclick="closeStylePopup()" style="font-size:11px; padding:6px 10px; margin-top:6px; width:100%; box-sizing:border-box;">Cancel</div>';
+                html += '</div></div>';
+                var popup = document.createElement('div');
+                popup.id = 'style-popup';
+                popup.innerHTML = html;
+                document.body.appendChild(popup);
             } catch(e) { document.getElementById('style-info').innerText = 'Error: ' + e.message; }
         }
-        function confirmLoadStyle() {
-            var idx = parseInt(document.getElementById('style-file-select').value);
-            document.getElementById('style-file-select').style.display = 'none';
-            document.getElementById('style-confirm-btn').style.display = 'none';
-            doLoadStyle(idx);
+        function closeStylePopup() {
+            var p = document.getElementById('style-popup');
+            if (p) p.remove();
         }
         function doLoadStyle(fileIdx) {
+            // 记住当前是否在播放, 然后停掉旧 midi 信号 (但不停止播放线程)
+            var wasPlaying = (typeof Android !== 'undefined' && Android.isStylePlaying());
+            if (wasPlaying) {
+                Android.stopStyle();
+                clearStyleTimer();
+            }
             document.getElementById('style-info').innerText = 'Loading ' + window.styleFileNames[fileIdx] + ' ...';
             try {
                 var json = Android.loadStyleFile(fileIdx);
@@ -357,12 +376,28 @@
                 window.styleScenes = scenes;
                 window.styleSelectedScene = 0;
                 Android.selectStyleScene(0);
-                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleFileNames[fileIdx] + ' (' + scenes.length + ' scenes)';
+                var name = window.styleFileNames[fileIdx].replace(/\.sty$/i, '').replace(/\.STY$/i, '');
+                window.styleLoadedName = name;
+                document.getElementById('load-style-btn').innerText = name;
+                document.getElementById('style-info').innerText = 'Loaded: ' + name + ' (' + scenes.length + ' scenes)';
                 refreshSceneButtons(scenes, 0);
                 refreshTrackRows();
                 document.getElementById('scene-list').style.display = 'block';
-                document.getElementById('style-play-btn').style.display = 'inline-block';
-                document.getElementById('style-dump-btn').style.display = 'inline-block';
+                document.getElementById('style-ctrl-row').style.display = 'flex';
+                buildBeatDots();
+                var bpm = Math.round(Android.getStyleTempo());
+                document.getElementById('style-tempo-btn').innerText = 'Tempo:' + bpm;
+                // 如果之前在播放, 自动恢复
+                if (wasPlaying) {
+                    Android.startStyle();
+                    var btn = document.getElementById('style-play-btn');
+                    btn.style.background = '#c62828'; btn.innerText = '⏹ Stop';
+                    document.getElementById('style-info').innerText = 'Loaded: ' + name + ' | ▶ ' + scenes[0].name + ' (C chord)';
+                    startStyleTimer();
+                } else {
+                    var btn = document.getElementById('style-play-btn');
+                    btn.style.background = '#2e7d32'; btn.innerText = '▶ Start';
+                }
             } catch(e) { document.getElementById('style-info').innerText = 'Parse error: ' + e.message; }
         }
         function refreshSceneButtons(scenes, selectedIdx) {
@@ -370,7 +405,7 @@
             for (var i = 0; i < scenes.length; i++) {
                 var s = 'font-size:11px; padding:4px 8px;';
                 if (i === selectedIdx) s += 'border:2px solid #fff; box-shadow:0 0 8px rgba(255,255,255,0.5);';
-                html += '<div id="scene-btn-' + i + '" class="glass-btn btn-rect" onclick="selectScene(' + i + ')" style="' + s + '">' + scenes[i].name + '</div>';
+                html += '<div id="scene-btn-' + i + '" class="glass-btn btn-rect" onclick="selectScene(' + i + ')" style="' + s + '">' + scenes[i].name + ':' + scenes[i].measures + '</div>';
             }
             document.getElementById('scene-buttons').innerHTML = html;
         }
@@ -387,7 +422,7 @@
                 clearStyleTimer();
                 var btn = document.getElementById('style-play-btn');
                 btn.style.background = '#2e7d32'; btn.innerText = '▶ Start';
-                document.getElementById('style-info').innerText = 'Stopped';
+                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' (' + window.styleScenes.length + ' scenes) - Stopped';
                 refreshSceneButtons(window.styleScenes, window.styleSelectedScene);
                 refreshTrackRows();
             } else {
@@ -395,7 +430,7 @@
                 Android.startStyle();
                 var btn = document.getElementById('style-play-btn');
                 btn.style.background = '#c62828'; btn.innerText = '⏹ Stop';
-                document.getElementById('style-info').innerText = 'Playing: ' + window.styleScenes[window.styleSelectedScene].name + ' (C chord)';
+                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' | ▶ ' + window.styleScenes[window.styleSelectedScene].name + ' (C chord)';
                 startStyleTimer();
             }
         }
@@ -406,6 +441,8 @@
             if (typeof Android === 'undefined' || !Android.isStylePlaying()) {
                 var btn = document.getElementById('style-play-btn');
                 if (btn) { btn.style.background = '#2e7d32'; btn.innerText = '▶ Start'; }
+                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' (' + window.styleScenes.length + ' scenes) - Stopped';
+                buildBeatDots(); // 重置所有dot为灰色
                 clearStyleTimer(); refreshTrackRows(); return;
             }
             var cur = Android.getCurrentStyleScene(), pend = Android.getPendingStyleScene();
@@ -417,6 +454,8 @@
                 else if (i === pend && pend >= 0) { b.style.border = '2px solid #fff'; b.style.animation = 'style-blink 0.5s ease-in-out infinite alternate'; }
             }
             updateTrackLEDs();
+            updateBeatDots();
+            updateVolDisplay();
         }
         // Track list
         function refreshTrackRows() {
@@ -460,6 +499,32 @@
                 }
             } catch(e) {}
         }
+        // ——— 节拍器 ———
+        function buildBeatDots() {
+            if (typeof Android === 'undefined') return;
+            var ts = Android.getTimeSig ? Android.getTimeSig() : 4;
+            // 2/4 → 4 dots, 3/4 → 3, 6/8 → 6, default 4
+            var count = (ts === 3) ? 3 : (ts === 6) ? 6 : 4;
+            var html = '';
+            for (var i = 0; i < count; i++) {
+                html += '<span id="beat-dot-' + i + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#333;"></span>';
+            }
+            document.getElementById('beat-dots').innerHTML = html;
+            document.getElementById('beat-dots').style.display = 'flex';
+        }
+        function updateBeatDots() {
+            if (typeof Android === 'undefined') return;
+            var ts = Android.getTimeSig ? Android.getTimeSig() : 4;
+            var count = (ts === 3) ? 3 : (ts === 6) ? 6 : 4;
+            var beat = Android.getCurrentBeat ? Android.getCurrentBeat() : 0;
+            for (var i = 0; i < count; i++) {
+                var dot = document.getElementById('beat-dot-' + i);
+                if (!dot) continue;
+                dot.style.background = (i === (beat % count)) ? '#fff' : '#333';
+                dot.style.boxShadow = (i === (beat % count)) ? '0 0 4px #fff' : '';
+            }
+        }
+
         function updateTrackLEDs() {
             if (typeof Android === 'undefined') return;
             var active = Android.getActiveChannels();
@@ -471,10 +536,64 @@
                 led.style.boxShadow = on ? '0 0 4px #fff' : '';
             }
         }
+
+        // Auto-load first style on startup
+        setTimeout(function() { if (typeof Android !== 'undefined') autoLoadFirstStyle(); }, 800);
+
+        function autoLoadFirstStyle() {
+            try {
+                var listJson = Android.getStyleFileList();
+                window.styleFileNames = JSON.parse(listJson);
+                if (window.styleFileNames.length > 0) doLoadStyle(0);
+            } catch(e) {}
+        }
+
+        // ===== (dumpStyleDebug kept but unused) =====
         function dumpStyleDebug() {
             if (typeof Android === 'undefined') return;
             var path = Android.dumpStyleDebug();
             document.getElementById('style-info').innerText = 'Dump -> ' + path;
+        }
+
+        function onReverbChange() {
+            if (typeof Android === 'undefined') return;
+            var r = parseInt(document.getElementById('reverb-room').value);
+            var l = parseInt(document.getElementById('reverb-level').value);
+            Android.setReverb(r / 100.0, l / 100.0);
+            document.getElementById('reverb-val').innerText = 'R:' + r + ' L:' + l;
+        }
+
+        // Volume
+        window.accompVol = 3.6;
+        window.leadVol = 3.6;
+        window.leadOverlay = true;
+        function applyAccompVol() {
+            if (typeof Android !== 'undefined') Android.setAccompVolume(window.accompVol);
+            document.getElementById('style-vol-btn').innerText = 'Vol:' + Math.round(window.accompVol * 100) + '%';
+        }
+        function applyLeadVol() {
+            if (window.leadOverlay) {
+                Android.setLeadVolume(window.cachedLeadVol || 3.6);
+            } else {
+                window.cachedLeadVol = Android.getLeadGain();
+                Android.setLeadVolume(0);
+            }
+        }
+        function onVolBtnClick() {} // no-op: display only, controlled by CC87
+        function updateVolDisplay() {
+            if (typeof Android === 'undefined') return;
+            window.accompVol = Android.getAccompGain();
+            window.leadVol = Android.getLeadGain();
+            document.getElementById('style-vol-btn').innerText = 'Vol:' + Math.round(window.accompVol / 6.0 * 100) + '%';
+            var lo = document.getElementById('lead-overlay-btn');
+            lo.innerText = 'Lead Overlay: ' + Math.round(window.leadVol / 6.0 * 100) + '%';
+        }
+        function toggleLeadOverlay() {
+            window.leadOverlay = !window.leadOverlay;
+            var btn = document.getElementById('lead-overlay-btn');
+            if (window.leadOverlay) { btn.classList.add('btn-active'); }
+            else { btn.classList.remove('btn-active'); }
+            applyLeadVol();
         }
 
         function updateCombinedNotes() {

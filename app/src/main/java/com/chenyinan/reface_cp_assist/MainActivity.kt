@@ -88,12 +88,22 @@ class MainActivity : AppCompatActivity() {
             { isStylePlaying() },
             { getCurrentStyleScene() },
             { getPendingStyleScene() },
+            { nativeGetStyleTempo() },
+            { nativeGetTimeSig() },
+            { nativeGetCurrentBeat() },
             { nativeGetStyleChannels() },
             { channel, bank, prog -> nativeSetStyleChannelInst(channel, bank, prog) },
             { dumpStyleDebug() },
+            { vol -> nativeSetAccompVolume(vol) },
+            { vol -> nativeSetLeadVolume(vol) },
+            { nativeGetAccompGain() },
+            { nativeGetLeadGain() },
             { ch -> toggleMute(ch) },
             { getActiveChannels() },
-            { ch -> isChannelMuted(ch) }
+            { ch -> isChannelMuted(ch) },
+            { room, level -> nativeSetReverb(room, level) },
+            { nativeGetReverbRoomSize() },
+            { nativeGetReverbLevel() }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -352,6 +362,7 @@ class MainActivity : AppCompatActivity() {
                         val ctrl = msg[i + 1].toInt()
                         val value = msg[i + 2].toInt()
                         nativeSendCC(ctrl, value)
+                        if (ctrl == 86 || ctrl == 87) js("updateVolDisplay();")
                         val scc = nativeProcessCC(ctrl, value)
                         if (scc == 127) midiUtil.sendSustainOn()
                         else if (scc == 0) midiUtil.sendSustainOff()
@@ -470,6 +481,13 @@ class MainActivity : AppCompatActivity() {
     external fun nativeIsStylePlaying(): Boolean
     external fun nativeGetCurrentScene(): Int
     external fun nativeGetPendingScene(): Int
+    external fun nativeGetStyleTempo(): Double
+    external fun nativeGetTimeSig(): Int
+    external fun nativeGetCurrentBeat(): Int
+    external fun nativeSetAccompVolume(vol: Double)
+    external fun nativeSetLeadVolume(vol: Double)
+    external fun nativeGetAccompGain(): Double
+    external fun nativeGetLeadGain(): Double
     external fun nativeDumpStyleDebug(styPath: String, outputPath: String): Boolean
     external fun nativeLoadStyleSoundFont(sf2Path: String)
     external fun nativeGetStyleChannels(): String
@@ -477,6 +495,9 @@ class MainActivity : AppCompatActivity() {
     external fun nativeToggleMute(channel: Int)
     external fun nativeGetActiveChannels(): Int
     external fun nativeIsChannelMuted(channel: Int): Boolean
+    external fun nativeSetReverb(roomSize: Double, level: Double)
+    external fun nativeGetReverbRoomSize(): Double
+    external fun nativeGetReverbLevel(): Double
 
     companion object {
         init { System.loadLibrary("cynarranger") }

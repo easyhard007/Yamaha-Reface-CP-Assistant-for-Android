@@ -30,8 +30,10 @@ struct MidiEvent {
 class StyleParser {
 private:
     std::vector<uint8_t> fileData;
-    uint32_t resolution = 1920; // 默认分辨率 (Ticks per quarter note)
-    uint32_t tempo = 500000;    // 默认速度: 500000 us/qn = 120 BPM
+    uint32_t resolution = 1920;
+    uint32_t tempo = 500000;
+    int timeSigNum = 4;   // 拍号分子 (默认 4/4)
+    int timeSigDenom = 4;
 
     // 提取出的数据
     std::vector<SceneMarker> scenes;
@@ -64,6 +66,8 @@ public:
     int getChannelPan(int channel) const { return channelState[channel].pan; }
     int getChannelReverb(int channel) const { return channelState[channel].reverb; }
     int getChannelChorus(int channel) const { return channelState[channel].chorus; }
+    int getTimeSigNum() const { return timeSigNum; }
+    int getTimeSigDenom() const { return timeSigDenom; }
 
     void printSummary() const;
 };

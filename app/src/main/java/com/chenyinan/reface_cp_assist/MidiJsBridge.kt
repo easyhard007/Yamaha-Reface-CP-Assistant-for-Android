@@ -23,12 +23,22 @@ class MidiJsBridge(
     private val onIsStylePlaying: () -> Boolean,
     private val onGetCurrentStyleScene: () -> Int,
     private val onGetPendingStyleScene: () -> Int,
+    private val onGetStyleTempo: () -> Double,
+    private val onGetTimeSig: () -> Int,
+    private val onGetCurrentBeat: () -> Int,
     private val onGetStyleChannels: () -> String,
     private val onSetStyleChannelInst: (Int, Int, Int) -> Unit,
     private val onDumpStyleDebug: () -> String,
+    private val onSetAccompVolume: (Double) -> Unit,
+    private val onSetLeadVolume: (Double) -> Unit,
+    private val onGetAccompGain: () -> Double,
+    private val onGetLeadGain: () -> Double,
     private val onToggleMute: (Int) -> Unit,
     private val onGetActiveChannels: () -> Int,
-    private val onIsChannelMuted: (Int) -> Boolean
+    private val onIsChannelMuted: (Int) -> Boolean,
+    private val onSetReverb: (Double, Double) -> Unit,
+    private val onGetReverbRoomSize: () -> Double,
+    private val onGetReverbLevel: () -> Double
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -57,6 +67,13 @@ class MidiJsBridge(
     @JavascriptInterface fun isStylePlaying(): Boolean = onIsStylePlaying()
     @JavascriptInterface fun getCurrentStyleScene(): Int = onGetCurrentStyleScene()
     @JavascriptInterface fun getPendingStyleScene(): Int = onGetPendingStyleScene()
+    @JavascriptInterface fun getStyleTempo(): Double = onGetStyleTempo()
+    @JavascriptInterface fun getTimeSig(): Int = onGetTimeSig()
+    @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
+    @JavascriptInterface fun setAccompVolume(vol: Double) { onSetAccompVolume(vol) }
+    @JavascriptInterface fun setLeadVolume(vol: Double) { onSetLeadVolume(vol) }
+    @JavascriptInterface fun getAccompGain(): Double = onGetAccompGain()
+    @JavascriptInterface fun getLeadGain(): Double = onGetLeadGain()
     @JavascriptInterface fun getStyleChannels(): String = onGetStyleChannels()
     @JavascriptInterface fun setStyleChannelInst(channel: Int, bank: Int, program: Int) {
         onSetStyleChannelInst(channel, bank, program)
@@ -65,4 +82,7 @@ class MidiJsBridge(
     @JavascriptInterface fun toggleMute(channel: Int) { onToggleMute(channel) }
     @JavascriptInterface fun getActiveChannels(): Int = onGetActiveChannels()
     @JavascriptInterface fun isChannelMuted(channel: Int): Boolean = onIsChannelMuted(channel)
+    @JavascriptInterface fun setReverb(roomSize: Double, level: Double) { onSetReverb(roomSize, level) }
+    @JavascriptInterface fun getReverbRoomSize(): Double = onGetReverbRoomSize()
+    @JavascriptInterface fun getReverbLevel(): Double = onGetReverbLevel()
 }

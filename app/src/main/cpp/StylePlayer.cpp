@@ -59,7 +59,9 @@ void StylePlayer::buildScenes() {
     scenes.clear();
     resolution = parser.getResolution();
     tempo      = parser.getTempo();
-    measureTicks = resolution * 4; // 默认 4/4 → 1小节 = 4拍
+    timeSigNum = parser.getTimeSigNum();
+    beatTicks  = resolution;          // 一拍 = 1 四分音符 (MIDI 标准)
+    measureTicks = beatTicks * timeSigNum; // 一小节
 
     const auto& markers = parser.getScenes();
     const auto& allEvents = parser.getEvents();
@@ -195,7 +197,8 @@ std::string StylePlayer::getScenesJson() const {
         oss << "{\"name\":\"" << escapeJson(scenes[i].name) << "\""
             << ",\"tick\":" << scenes[i].startTick
             << ",\"notes\":" << scenes[i].noteEvents.size()
-            << ",\"duration\":" << scenes[i].durationTicks << "}";
+            << ",\"duration\":" << scenes[i].durationTicks
+            << ",\"measures\":" << (scenes[i].durationTicks / std::max(1, beatTicks)) << "}";
     }
     oss << "]"; return oss.str();
 }
@@ -312,7 +315,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     }
                 }
             }
-            audio->sendProgramChange(target, ch, bank, prog);
+            audio->enqueueProgramChange(target, ch, bank, prog);
         };
 
         // 发送初始 program change (tick=0 的事件, 应用覆盖)
@@ -326,7 +329,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     sendPC(e.channel, b, p);
                     handled.insert((int)e.channel);
                 } else if (e.absoluteTick == 0 && e.eventType == 0xB0) {
-                    audio->sendCC(target, e.channel, e.data1, e.data2);
+                    audio->enqueueCC(target, e.channel, e.data1, e.data2);
                 }
             }
             // 把所有被 override 但 sty 中没有 tick=0 program change 的通道也发一遍
@@ -342,11 +345,11 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     sendPC(ci.channel, ci.bank, ci.program);
                 }
                 // 发送每通道的 Pan/Reverb/Chorus (fluidLite 原生支持)
-                audio->sendCC(target, ci.channel, 10, ci.pan);
-                audio->sendCC(target, ci.channel, 91, ci.reverb);
-                audio->sendCC(target, ci.channel, 93, ci.chorus);
+                audio->enqueueCC(target, ci.channel, 10, ci.pan);
+                audio->enqueueCC(target, ci.channel, 91, ci.reverb);
+                audio->enqueueCC(target, ci.channel, 93, ci.chorus);
                 // CC7 不支持, 用 CC11 (Expression) 代替: sty 的 CC7 值映射到 CC11
-                audio->sendCC(target, ci.channel, 11, ci.volume);
+                audio->enqueueCC(target, ci.channel, 11, ci.volume);
             }
         }
 
@@ -354,11 +357,12 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
         std::vector<PendingOff> pendingOffs;
 
         auto clearNotes = [&]() {
-            for (auto& po : pendingOffs) audio->stopNote(target, po.ch, po.note);
+            for (auto& po : pendingOffs) audio->enqueueNoteOff(target, po.ch, po.note);
             pendingOffs.clear();
         };
 
         // seeking 起始点 (fill 跳转时可能 >0)
+        currentBeat.store(0);
         auto startTimeUs = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
 
@@ -414,21 +418,45 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 }
             }
 
-            // ==== 等待目标时间 ====
+            // ==== 等待目标时间 (带节拍边界唤醒) ====
             uint64_t targetUs = startTimeUs + (uint64_t)(item.tick * usecPerTick);
+            uint64_t beatIntervalUs = (uint64_t)(beatTicks * usecPerTick);
             while (true) {
                 if (needStop.load()) { clearNotes(); return; }
                 uint64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now().time_since_epoch()).count();
                 if (nowUs >= targetUs) break;
-                uint64_t rem = targetUs - nowUs;
+
+                // 检查是否有拍边界在 targetUs 之前
+                uint64_t elapsedUs = nowUs - startTimeUs;
+                uint64_t curBeat = (beatIntervalUs > 0) ? (elapsedUs / beatIntervalUs) : 0;
+                uint64_t nextBeatUs = startTimeUs + (curBeat + 1) * beatIntervalUs;
+                uint64_t wakeTarget = targetUs;
+                if (nextBeatUs > nowUs && nextBeatUs < targetUs)
+                    wakeTarget = nextBeatUs;
+
+                uint64_t rem = wakeTarget - nowUs;
                 if (rem > 1000) std::this_thread::sleep_for(std::chrono::microseconds(rem / 2));
                 else std::this_thread::yield();
+
+                // 如果在拍边界唤醒, 更新 currentBeat (raw beat 号, JS 自行取模)
+                if (wakeTarget == nextBeatUs) {
+                    currentBeat.store((int)(curBeat + 1));
+                }
+            }
+
+            // 每个事件都更新一次拍位 (兜底)
+            {
+                uint64_t elapsedUs = startTimeUs > 0 ? (std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count() - startTimeUs) : 0;
+                uint64_t beatIntervalUs = (uint64_t)(beatTicks * usecPerTick);
+                int beat = (beatIntervalUs > 0) ? (int)(elapsedUs / beatIntervalUs) : 0;
+                currentBeat.store(beat);
             }
 
             // ==== 清理到期的 note-off ====
             while (!pendingOffs.empty() && pendingOffs.front().offTick <= item.tick) {
-                audio->stopNote(target, pendingOffs.front().ch, pendingOffs.front().note);
+                audio->enqueueNoteOff(target, pendingOffs.front().ch, pendingOffs.front().note);
                 pendingOffs.erase(pendingOffs.begin());
             }
 
@@ -441,7 +469,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 if (ne.channel == 10) { vel = (int)(vel * 1.3f); if (vel > 127) vel = 127; }
                 if (parser.getChannelMSB(ne.channel) >= 126)
                     tpNote = remapXGDrumToGM(tpNote);
-                audio->playNote(target, ne.channel, tpNote, vel);
+                audio->enqueueNoteOn(target, ne.channel, tpNote, vel);
                 auto now = std::chrono::steady_clock::now().time_since_epoch();
                 lastNoteMs[ne.channel].store(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
                 pendingOffs.push_back({item.offTick, ne.channel, static_cast<uint8_t>(tpNote)});
@@ -455,7 +483,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     if (it != overrides.end()) { b = it->second.first; p = it->second.second; }
                     sendPC(ce.channel, b, p);
                 } else if (ce.eventType == 0xB0) {
-                    audio->sendCC(target, ce.channel, ce.data1, ce.data2);
+                    audio->enqueueCC(target, ce.channel, ce.data1, ce.data2);
                 }
             }
         } // end for queue

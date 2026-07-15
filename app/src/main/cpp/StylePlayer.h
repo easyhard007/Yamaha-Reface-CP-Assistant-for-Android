@@ -68,6 +68,9 @@ public:
 
     int  getCurrentScene() const { return currentScene.load(); }
     int  getPendingScene() const;   // -1 = 无 pending
+    double getTempoBPM() const { return 60000000.0 / tempo; }
+    int getTimeSigNum() const { return timeSigNum; }
+    int getCurrentBeat() const { return currentBeat.load(); }
     bool isPlaying() const { return playing.load(); }
 
 private:
@@ -78,7 +81,9 @@ private:
 
     uint32_t resolution = 1920;
     uint32_t tempo = 500000;
-    int      measureTicks = 0; // 一小节 tick 数 (4/4 默认)
+    int      measureTicks = 0;
+    int      timeSigNum = 4;
+    int      beatTicks = 0;
 
     std::thread   playbackThread;
     std::atomic<bool> playing{false};
@@ -86,6 +91,7 @@ private:
     std::atomic<int>  currentScene{-1};
     std::atomic<uint16_t> muteMask{0};
     std::atomic<int64_t> lastNoteMs[16]{};
+    std::atomic<int> currentBeat{0};
     std::atomic<int>  pendingScene{-1};
     std::atomic<int>  selectedScene{0};
 

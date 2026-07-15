@@ -48,15 +48,20 @@ bool AudioEngine::init(const char* sf2Path) {
         return false;
     }
 
-    fluid_synth_set_gain(mLeadSynth, 1.0f);
+    mLeadGain = 3.6;
+    mAccompGain = 3.6;
+    fluid_synth_set_gain(mLeadSynth, 3.6f);
     fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
+    fluid_synth_set_reverb(mLeadSynth, 0.85, 0.15, 0.8, 0.70);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
     if (mLeadSoundFontId != -1) {
         scanPresets(mLeadSynth, mLeadInstruments);
-        fluid_synth_cc(mLeadSynth, 0, 91, 64);
+        fluid_synth_program_change(mLeadSynth, 0, 89); // Warm Pad
+        fluid_synth_cc(mLeadSynth, 0, 91, 30);
     }
-    fluid_synth_set_gain(mAccompSynth, 0.4f);
+    fluid_synth_set_gain(mAccompSynth, 3.6f);
     fluid_synth_set_interp_method(mAccompSynth, -1, FLUID_INTERP_LINEAR);
+    fluid_synth_set_reverb(mAccompSynth, 0.85, 0.15, 0.8, 0.70);
     return true;
 }
 
@@ -87,64 +92,135 @@ void AudioEngine::stop() {
     if (mSettings) { delete_fluid_settings(mSettings); mSettings = nullptr; }
 }
 
-// --- channel-0 convenience methods (backward compatible) ---
-void AudioEngine::playNote(int target, int note, int velocity) {
-    std::lock_guard<std::mutex> lock(mLock);
+// ===== MIDI command queue (lock-free from callback perspective) =====
+
+void AudioEngine::enqueueNoteOn(int target, int channel, int note, int velocity) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::NoteOn, target, channel, note, velocity});
+}
+void AudioEngine::enqueueNoteOff(int target, int channel, int note) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::NoteOff, target, channel, note, 0});
+}
+void AudioEngine::enqueueCC(int target, int channel, int controller, int value) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::CC, target, channel, controller, value});
+}
+void AudioEngine::enqueueProgramChange(int target, int channel, int bank, int program) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::ProgramChange, target, channel, bank, program});
+}
+void AudioEngine::enqueueAllNotesOff(int target, int channel) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::AllNotesOff, target, channel, 0, 0});
+}
+void AudioEngine::enqueueAllSoundsOff(int target) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::AllSoundsOff, target, 0, 0, 0});
+}
+void AudioEngine::enqueueSetReverb(int target, double roomSize, double level) {
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::SetReverb, target, 0, 0, 0, roomSize, level});
+}
+
+void AudioEngine::enqueueSetGain(int target, double gain) {
+    // 立即更新缓存值, 让 getGain() 即使播放未启动也能返回正确值
+    if (target == 0) mLeadGain = gain;
+    else mAccompGain = gain;
+    std::lock_guard<std::mutex> lock(mCmdMutex);
+    mCmdQueue.push_back({MidiCmdType::SetGain, target, 0, 0, 0, gain, 0});
+}
+
+double AudioEngine::getGain(int target) {
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteon(synth, 0, note, velocity);
+    if (!synth) return 0.0;
+    // FluidLite doesn't expose gain directly; track separately
+    return (target == 0) ? mLeadGain : mAccompGain;
 }
 
-void AudioEngine::stopNote(int target, int note) {
-    std::lock_guard<std::mutex> lock(mLock);
+double AudioEngine::getReverbRoomSize(int target) {
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteoff(synth, 0, note);
+    return synth ? fluid_synth_get_reverb_roomsize(synth) : 0.0;
 }
 
-void AudioEngine::sendCC(int target, int controller, int value) {
-    std::lock_guard<std::mutex> lock(mLock);
-    if (target == 0 && mLeadSynth) fluid_synth_cc(mLeadSynth, 0, controller, value);
-    else if (target == 1 && mAccompSynth) fluid_synth_cc(mAccompSynth, 0, controller, value);
-}
-
-// --- channel-aware methods (used by StylePlayer) ---
-void AudioEngine::playNote(int target, int channel, int note, int velocity) {
-    std::lock_guard<std::mutex> lock(mLock);
+double AudioEngine::getReverbLevel(int target) {
     fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteon(synth, channel, note, velocity);
+    return synth ? fluid_synth_get_reverb_level(synth) : 0.0;
 }
 
-void AudioEngine::stopNote(int target, int channel, int note) {
-    std::lock_guard<std::mutex> lock(mLock);
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_noteoff(synth, channel, note);
-}
-
-void AudioEngine::sendCC(int target, int channel, int controller, int value) {
-    std::lock_guard<std::mutex> lock(mLock);
-    if (target == 0 && mLeadSynth) fluid_synth_cc(mLeadSynth, channel, controller, value);
-    else if (target == 1 && mAccompSynth) fluid_synth_cc(mAccompSynth, channel, controller, value);
-}
-
-void AudioEngine::sendProgramChange(int target, int channel, int bank, int program) {
-    std::lock_guard<std::mutex> lock(mLock);
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) {
-        fluid_synth_bank_select(synth, channel, bank);
-        fluid_synth_program_change(synth, channel, program);
+void AudioEngine::execCommand(const MidiCmd& cmd) {
+    fluid_synth_t* synth = (cmd.target == 0) ? mLeadSynth : mAccompSynth;
+    if (!synth) return;
+    switch (cmd.type) {
+        case MidiCmdType::NoteOn:
+            fluid_synth_noteon(synth, cmd.channel, cmd.data1, cmd.data2);
+            break;
+        case MidiCmdType::NoteOff:
+            fluid_synth_noteoff(synth, cmd.channel, cmd.data1);
+            break;
+        case MidiCmdType::CC:
+            fluid_synth_cc(synth, cmd.channel, cmd.data1, cmd.data2);
+            break;
+        case MidiCmdType::ProgramChange:
+            fluid_synth_bank_select(synth, cmd.channel, cmd.data1);
+            fluid_synth_program_change(synth, cmd.channel, cmd.data2);
+            break;
+        case MidiCmdType::AllNotesOff:
+            fluid_synth_all_notes_off(synth, cmd.channel);
+            break;
+        case MidiCmdType::AllSoundsOff:
+            for (int ch = 0; ch < 16; ++ch) fluid_synth_all_sounds_off(synth, ch);
+            break;
+        case MidiCmdType::SetReverb:
+            fluid_synth_set_reverb(synth, cmd.fdata1, 0.1, 0.8, cmd.fdata2);
+            break;
+        case MidiCmdType::SetGain:
+            fluid_synth_set_gain(synth, (float)cmd.fdata1);
+            if (cmd.target == 0) mLeadGain = cmd.fdata1;
+            else mAccompGain = cmd.fdata1;
+            break;
     }
 }
 
-void AudioEngine::allNotesOff(int target, int channel) {
-    std::lock_guard<std::mutex> lock(mLock);
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) fluid_synth_all_notes_off(synth, channel);
+void AudioEngine::processPendingCommands() {
+    // Swap queue under lock (microseconds), then process lock-free
+    std::vector<MidiCmd> batch;
+    {
+        std::lock_guard<std::mutex> lock(mCmdMutex);
+        if (mCmdQueue.empty()) return;
+        batch.swap(mCmdQueue);
+    }
+    for (const auto& cmd : batch) execCommand(cmd);
 }
 
-void AudioEngine::allSoundsOff(int target) {
-    std::lock_guard<std::mutex> lock(mLock);
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (synth) for (int ch = 0; ch < 16; ++ch) fluid_synth_all_sounds_off(synth, ch);
+// ===== Oboe callback (no lock) =====
+
+oboe::DataCallbackResult AudioEngine::onAudioReady(
+        oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
+    float *outBuffer = static_cast<float *>(audioData);
+#if defined(__arm__) || defined(__aarch64__)
+    uintptr_t fpscr;
+    asm volatile("mrs %0, fpcr" : "=r"(fpscr));
+    asm volatile("msr fpcr, %0" : : "r" (fpscr | (1U << 24)));
+#endif
+    // Process all pending MIDI commands (swap under µs lock, then render lock-free)
+    processPendingCommands();
+
+    if (mLeadSynth && mAccompSynth) {
+        fluid_synth_write_float(mLeadSynth, numFrames, outBuffer, 0, 2, outBuffer, 1, 2);
+        float* mixPtr = mMixBuffer.data();
+        if (mMixBuffer.size() >= (size_t)numFrames * 2) {
+            fluid_synth_write_float(mAccompSynth, numFrames, mixPtr, 0, 2, mixPtr, 1, 2);
+            for (int i = 0; i < numFrames * 2; ++i)
+                outBuffer[i] = tanhf(outBuffer[i] + mixPtr[i]);
+        }
+    } else {
+        memset(outBuffer, 0, numFrames * 2 * sizeof(float));
+    }
+    return oboe::DataCallbackResult::Continue;
 }
+
+// ===== SoundFont management (uses mLock, direct synth access) =====
 
 bool AudioEngine::loadSoundFont(int target, const char* path) {
     std::lock_guard<std::mutex> lock(mLock);
@@ -199,33 +275,4 @@ void AudioEngine::setMasterVolume(int target, float gain) {
     std::lock_guard<std::mutex> lock(mLock);
     if (target == 0 && mLeadSynth) fluid_synth_set_gain(mLeadSynth, gain);
     else if (target == 1 && mAccompSynth) fluid_synth_set_gain(mAccompSynth, gain);
-}
-
-oboe::DataCallbackResult AudioEngine::onAudioReady(
-        oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
-    float *outBuffer = static_cast<float *>(audioData);
-#if defined(__arm__) || defined(__aarch64__)
-    uintptr_t fpscr;
-    asm volatile("mrs %0, fpcr" : "=r"(fpscr));
-    asm volatile("msr fpcr, %0" : : "r" (fpscr | (1U << 24)));
-#endif
-    // try_lock: never block the audio callback. If a MIDI operation holds the lock,
-    // output silence for this frame (~2.9ms) — imperceptible, and avoids xruns.
-    std::unique_lock<std::mutex> lock(mLock, std::try_to_lock);
-    if (!lock.owns_lock()) {
-        memset(outBuffer, 0, numFrames * 2 * sizeof(float));
-        return oboe::DataCallbackResult::Continue;
-    }
-    if (mLeadSynth && mAccompSynth) {
-        fluid_synth_write_float(mLeadSynth, numFrames, outBuffer, 0, 2, outBuffer, 1, 2);
-        float* mixPtr = mMixBuffer.data();
-        if (mMixBuffer.size() >= (size_t)numFrames * 2) {
-            fluid_synth_write_float(mAccompSynth, numFrames, mixPtr, 0, 2, mixPtr, 1, 2);
-            for (int i = 0; i < numFrames * 2; ++i)
-                outBuffer[i] = tanhf(outBuffer[i] + mixPtr[i]);
-        }
-    } else {
-        memset(outBuffer, 0, numFrames * 2 * sizeof(float));
-    }
-    return oboe::DataCallbackResult::Continue;
 }

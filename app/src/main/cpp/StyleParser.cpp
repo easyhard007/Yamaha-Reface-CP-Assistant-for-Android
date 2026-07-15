@@ -89,11 +89,11 @@ bool StyleParser::loadFromFile(const std::string& filePath) {
                         uint32_t newTempo = (fileData[tCursor] << 16) |
                                             (fileData[tCursor + 1] << 8) |
                                             fileData[tCursor + 2];
-                        if (!firstTempoFound) {
-                            tempo = newTempo;
-                            firstTempoFound = true;
-                        }
-                        // (后续 tempo 变化暂时忽略，仅用第一个)
+                        if (!firstTempoFound) { tempo = newTempo; firstTempoFound = true; }
+                    }
+                    else if (metaType == 0x58 && metaLen == 4) { // Time Signature
+                        timeSigNum = fileData[tCursor];
+                        timeSigDenom = 1 << fileData[tCursor + 1]; // 2^dd
                     }
                     tCursor += metaLen; // 跳过 meta 数据
                 }

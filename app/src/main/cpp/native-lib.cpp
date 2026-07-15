@@ -21,19 +21,22 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOn(
         JNIEnv*, jobject, jint note, jint velocity) {
-    audio.playNote(0, note, velocity);
+    audio.enqueueNoteOn(0, 0, note, velocity);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOff(
         JNIEnv*, jobject, jint note) {
-    audio.stopNote(0, note);
+    audio.enqueueNoteOff(0, 0, note);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         JNIEnv*, jobject, jint controller, jint value) {
-    audio.sendCC(0, controller, value);
+    // CC86 → lead gain (0-6.0), CC87 → accomp gain (0-6.0)
+    if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 6.0); return; }
+    if (controller == 87) { audio.enqueueSetGain(1, value / 127.0 * 6.0); return; }
+    audio.enqueueCC(0, 0, controller, value);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -156,6 +159,8 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStopStyle(
         JNIEnv*, jobject) {
     stylePlayer.stop();
+    // 立即杀死所有 voice, 确保旧的 midi 信号不残留
+    audio.enqueueAllSoundsOff(1);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
@@ -175,6 +180,44 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetPendingScene(
         JNIEnv*, jobject) {
     return stylePlayer.getPendingScene();
 }
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetStyleTempo(
+        JNIEnv*, jobject) {
+    return stylePlayer.getTempoBPM();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTimeSig(
+        JNIEnv*, jobject) {
+    return stylePlayer.getTimeSigNum();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentBeat(
+        JNIEnv*, jobject) {
+    return (jint)stylePlayer.getCurrentBeat();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetAccompVolume(
+        JNIEnv*, jobject, jdouble vol) {
+    audio.enqueueSetGain(1, vol);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetLeadVolume(
+        JNIEnv*, jobject, jdouble vol) {
+    audio.enqueueSetGain(0, vol);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAccompGain(
+        JNIEnv*, jobject) { return audio.getGain(1); }
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetLeadGain(
+        JNIEnv*, jobject) { return audio.getGain(0); }
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDumpStyleDebug(
@@ -205,15 +248,15 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetStyleChannelInst(
         JNIEnv*, jobject, jint channel, jint bank, jint program) {
     stylePlayer.setChannelOverride(channel, bank, program);
-    audio.sendProgramChange(1, (int)channel, (int)bank, (int)program);
-    audio.allNotesOff(1, (int)channel);
+    audio.enqueueProgramChange(1, (int)channel, (int)bank, (int)program);
+    audio.enqueueAllNotesOff(1, (int)channel);
 }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeToggleMute(
         JNIEnv*, jobject, jint channel) {
     stylePlayer.toggleMute(channel);
-    if (stylePlayer.isMuted(channel)) audio.allNotesOff(1, (int)channel);
+    if (stylePlayer.isMuted(channel)) audio.enqueueAllNotesOff(1, (int)channel);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -227,3 +270,18 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsChannelMuted(
         JNIEnv*, jobject, jint channel) {
     return stylePlayer.isMuted((int)channel) ? JNI_TRUE : JNI_FALSE;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetReverb(
+        JNIEnv*, jobject, jdouble roomSize, jdouble level) {
+    audio.enqueueSetReverb(0, roomSize, level);
+    audio.enqueueSetReverb(1, roomSize, level);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetReverbRoomSize(
+        JNIEnv*, jobject) { return audio.getReverbRoomSize(1); }
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetReverbLevel(
+        JNIEnv*, jobject) { return audio.getReverbLevel(1); }
