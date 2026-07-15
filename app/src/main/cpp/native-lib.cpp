@@ -3,10 +3,12 @@
 #include "AudioEngine.h"
 #include "MidiProcessor.h"
 #include "StylePlayer.h"
+#include "LowChordDetector.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
 static StylePlayer stylePlayer;
+static LowChordDetector chordDetector;
 
 // ===== Audio Engine (FluidLite) =====
 extern "C" JNIEXPORT void JNICALL
@@ -79,6 +81,13 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         JNIEnv*, jobject, jint note, jint velocity) {
     auto r = midi.processNoteOn(note, velocity);
+    chordDetector.feedNotes(midi.getLowNotes(), midi.getAllNotes(), midi.getSplitNote());
+    // 和弦根音: 来自 LowChordDetector, 由 feedNotes 内部确定
+    std::string chordName = chordDetector.getChord();
+    if (chordName != "-") {
+        int root = chordDetector.getRootMidi();
+        stylePlayer.setChordRoot(root, chordName);
+    }
     return encodeResult(r.sustainCCToSend, r.bassNote, r.bassVelocity);
 }
 
@@ -86,6 +95,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOff(
         JNIEnv*, jobject, jint note) {
     auto r = midi.processNoteOff(note);
+    // 不在 NoteOff 时触发和弦检测, 防止降级
     return encodeResult(r.sustainCCToSend, r.bassNote, 0);
 }
 
@@ -137,9 +147,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeLoadStyle(
     const char* path = env->GetStringUTFChars(styPath, nullptr);
     bool ok = stylePlayer.loadStyle(path);
     env->ReleaseStringUTFChars(styPath, path);
-    if (!ok) {
+    if (!ok)
         return env->NewStringUTF("{\"error\":\"Failed to load style\"}");
-    }
     return env->NewStringUTF(stylePlayer.getScenesJson().c_str());
 }
 
@@ -197,6 +206,39 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentBeat(
         JNIEnv*, jobject) {
     return (jint)stylePlayer.getCurrentBeat();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChord(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(chordDetector.getChord().c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordTiming(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(chordDetector.getTiming().c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordTones(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(stylePlayer.getChordTonesString().c_str());
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeResetChord(
+        JNIEnv*, jobject) {
+    chordDetector.reset();
+    stylePlayer.setChordRoot(60, "major"); // reset to C
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeUpdateChordRoot(
+        JNIEnv* env, jobject, jint root, jstring chordName) {
+    const char* name = env->GetStringUTFChars(chordName, nullptr);
+    stylePlayer.setChordRoot(root, name);
+    env->ReleaseStringUTFChars(chordName, name);
 }
 
 extern "C" JNIEXPORT void JNICALL

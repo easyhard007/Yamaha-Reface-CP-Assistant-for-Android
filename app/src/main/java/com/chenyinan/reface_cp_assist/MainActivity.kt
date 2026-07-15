@@ -91,6 +91,8 @@ class MainActivity : AppCompatActivity() {
             { nativeGetStyleTempo() },
             { nativeGetTimeSig() },
             { nativeGetCurrentBeat() },
+            { nativeGetChord() },
+            { nativeGetChordTiming() },
             { nativeGetStyleChannels() },
             { channel, bank, prog -> nativeSetStyleChannelInst(channel, bank, prog) },
             { dumpStyleDebug() },
@@ -339,12 +341,14 @@ class MainActivity : AppCompatActivity() {
                         if (velocity > 0) {
                             nativeNoteOn(note, velocity)
                                 handleProcessResult(nativeProcessNoteOn(note, velocity))
+                            js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteon',$note,$velocity,$ch);")
                         } else {
                             nativeNoteOff(note)
                                 handleProcessResult(nativeProcessNoteOff(note))
+                            js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
                             val log = "↓ NoteOff ${midiNoteName(note)}  v0  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
@@ -415,6 +419,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadStyle(index: Int): String {
         if (index < 0 || index >= styleFiles.size) return """{"error":"bad index"}"""
         val file = File(cacheDir, styleFiles[index])
+        nativeResetChord()
         val result = nativeLoadStyle(file.absolutePath)
         // Load sf2 onto accompaniment synth once
         if (!styleSf2Loaded) {
@@ -488,6 +493,10 @@ class MainActivity : AppCompatActivity() {
     external fun nativeSetLeadVolume(vol: Double)
     external fun nativeGetAccompGain(): Double
     external fun nativeGetLeadGain(): Double
+    external fun nativeGetChord(): String
+    external fun nativeGetChordTiming(): String
+    external fun nativeGetChordTones(): String
+    external fun nativeResetChord()
     external fun nativeDumpStyleDebug(styPath: String, outputPath: String): Boolean
     external fun nativeLoadStyleSoundFont(sf2Path: String)
     external fun nativeGetStyleChannels(): String

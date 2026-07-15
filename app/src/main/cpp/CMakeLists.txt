@@ -70,6 +70,8 @@ add_library(
         BassEnhancer.cpp
         StyleParser.cpp
         StylePlayer.cpp
+        LowChordDetector.cpp
+        ChordTransposer.cpp
         ${FLUIDLITE_SOURCES}
 )
 

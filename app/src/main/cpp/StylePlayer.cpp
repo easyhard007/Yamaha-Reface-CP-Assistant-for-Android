@@ -186,6 +186,7 @@ bool StylePlayer::loadStyle(const std::string& filePath) {
     overrides.clear(); // 清空旧覆盖, 使用 sty 原始乐器
     buildScenes();
     extractChannels();
+    mutePianoChannels(); // 默认静音钢琴/电钢
     selectedScene.store(0);
     return true;
 }
@@ -231,6 +232,16 @@ void StylePlayer::toggleMute(int channel) {
 bool StylePlayer::isMuted(int channel) const {
     if (channel < 0 || channel > 15) return false;
     return (muteMask.load() & (1 << channel)) != 0;
+}
+
+void StylePlayer::mutePianoChannels() {
+    for (const auto& ci : channels) {
+        int ch = ci.channel;
+        // bank≠120/128 且 program 0-7 → 钢琴/电钢类
+        if (ci.bank != 120 && ci.bank != 128 && ci.program >= 0 && ci.program <= 7) {
+            if (!isMuted(ch)) toggleMute(ch); // 静音
+        }
+    }
 }
 uint16_t StylePlayer::getActiveChannels() const {
     auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -283,8 +294,7 @@ void StylePlayer::stop() {
 
 // ===== 播放循环 =====
 void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
-    int chordRoot = 60; // 默认 C; 后续从外部注入
-    uint32_t startRelTick = 0; // 放在循环外, 用于 fill seek 跨迭代
+    uint32_t startRelTick = 0;
 
     while (!needStop.load()) {
         int curIdx = currentScene.load();
@@ -353,7 +363,11 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
             }
         }
 
-        struct PendingOff { uint32_t offTick; uint8_t ch; uint8_t note; };
+        struct PendingOff {
+            uint32_t offTick; uint8_t ch; uint8_t note;
+            uint8_t origNote;
+            uint32_t startTick; // note-on tick (用于计算已播放百分比)
+        };
         std::vector<PendingOff> pendingOffs;
 
         auto clearNotes = [&]() {
@@ -418,16 +432,17 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 }
             }
 
-            // ==== 等待目标时间 (带节拍边界唤醒) ====
+            // ==== 等待目标时间 (带节拍边界 + 和弦重触发唤醒) ====
             uint64_t targetUs = startTimeUs + (uint64_t)(item.tick * usecPerTick);
             uint64_t beatIntervalUs = (uint64_t)(beatTicks * usecPerTick);
+        retry_sleep:
             while (true) {
                 if (needStop.load()) { clearNotes(); return; }
+                if (chordRetrigger.load()) break;
                 uint64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::steady_clock::now().time_since_epoch()).count();
                 if (nowUs >= targetUs) break;
 
-                // 检查是否有拍边界在 targetUs 之前
                 uint64_t elapsedUs = nowUs - startTimeUs;
                 uint64_t curBeat = (beatIntervalUs > 0) ? (elapsedUs / beatIntervalUs) : 0;
                 uint64_t nextBeatUs = startTimeUs + (curBeat + 1) * beatIntervalUs;
@@ -439,7 +454,6 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 if (rem > 1000) std::this_thread::sleep_for(std::chrono::microseconds(rem / 2));
                 else std::this_thread::yield();
 
-                // 如果在拍边界唤醒, 更新 currentBeat (raw beat 号, JS 自行取模)
                 if (wakeTarget == nextBeatUs) {
                     currentBeat.store((int)(curBeat + 1));
                 }
@@ -460,11 +474,44 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 pendingOffs.erase(pendingOffs.begin());
             }
 
+            // ==== 和弦重触发: 仅在音符播放不到 10% 时杀死旧音高并重启 ====
+            if (chordRetrigger.exchange(false)) {
+                bool anyRetriggered = false;
+                for (auto& po : pendingOffs) {
+                    uint32_t total = (po.offTick > po.startTick) ? (po.offTick - po.startTick) : 1;
+                    uint32_t elapsed = (item.tick > po.startTick) ? (item.tick - po.startTick) : 0;
+                    if ((double)elapsed / total >= 0.1) continue; // 已播 10%+, 不处理
+                    audio->enqueueNoteOff(target, po.ch, po.note);
+                    int chBank = 0, chProg = 0;
+                    for (const auto& ci : channels) {
+                        if (ci.channel == po.ch) { chBank = ci.bank; chProg = ci.program; break; }
+                    }
+                    int newNote = chordTransposer.transpose(po.ch, po.origNote, chBank, chProg);
+                    if (parser.getChannelMSB(po.ch) >= 126)
+                        newNote = remapXGDrumToGM(newNote);
+                    int vel = 90;
+                    audio->enqueueNoteOn(target, po.ch, newNote, vel);
+                    po.note = static_cast<uint8_t>(newNote);
+                    anyRetriggered = true;
+                }
+                // 如果是因为和弦重触发唤醒的, 且目标时间未到, 回去继续 sleep
+                if (anyRetriggered) {
+                    uint64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                    if (nowUs < targetUs) goto retry_sleep;
+                }
+            }
+
             // ==== 执行事件 ====
             if (item.kind == 0) {
                 const auto& ne = sd.noteEvents[item.idx];
                 if (isMuted(ne.channel)) continue;
-                int tpNote = transposeNote(ne.note, chordRoot, ne.channel);
+                // 查找通道的 bank/program
+                int chBank = 0, chProg = 0;
+                for (const auto& ci : channels) {
+                    if (ci.channel == ne.channel) { chBank = ci.bank; chProg = ci.program; break; }
+                }
+                int tpNote = chordTransposer.transpose(ne.channel, ne.note, chBank, chProg);
                 int vel = ne.velocity;
                 if (ne.channel == 10) { vel = (int)(vel * 1.3f); if (vel > 127) vel = 127; }
                 if (parser.getChannelMSB(ne.channel) >= 126)
@@ -472,7 +519,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 audio->enqueueNoteOn(target, ne.channel, tpNote, vel);
                 auto now = std::chrono::steady_clock::now().time_since_epoch();
                 lastNoteMs[ne.channel].store(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
-                pendingOffs.push_back({item.offTick, ne.channel, static_cast<uint8_t>(tpNote)});
+                pendingOffs.push_back({item.offTick, ne.channel, static_cast<uint8_t>(tpNote), ne.note, ne.startTick});
                 std::sort(pendingOffs.begin(), pendingOffs.end(),
                     [](const PendingOff& a, const PendingOff& b) { return a.offTick < b.offTick; });
             } else if (item.kind == 2) {
@@ -513,6 +560,28 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
         }
         if (!fillJump) startRelTick = 0; // fill 跳转保持 seekTick, 其他从头
     }
+}
+
+void StylePlayer::setChordRoot(int root, const std::string& chordName) {
+    chordTransposer.setChordRoot(root);
+    chordTransposer.setChordName(chordName);
+    if (playing.load()) chordRetrigger.store(true);
+}
+
+std::string StylePlayer::getChordTonesString() const {
+    const auto& tones = chordTransposer.getChordTones();
+    static const char* nn[12] = {"C","C#","D","Eb","E","F","F#","G","G#","A","Bb","B"};
+    std::ostringstream oss;
+    oss << "root=" << chordTransposer.getChordRoot()
+        << " type=" << chordTransposer.getChordType()
+        << " tones:";
+    for (size_t i = 0; i < tones.size(); i++) {
+        int t = tones[i];
+        if (t < 36 || t > 96) continue;
+        if (i > 0) oss << " ";
+        oss << nn[t % 12] << (t / 12 - 1);
+    }
+    return oss.str();
 }
 
 int StylePlayer::transposeNote(int note, int chordRoot, int channel) const {

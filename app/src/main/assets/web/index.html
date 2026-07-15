@@ -112,10 +112,12 @@
                 <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="background:#2e7d32; flex:1; text-align:center;">▶ Start</div>
                 <div class="glass-btn btn-rect" id="style-sync-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">SYNC</div>
             </div>
-            <div id="beat-dots" style="display:none; justify-content:center; gap:6px; margin-bottom:4px;"></div>
             <div id="style-info" style="color:#aaa; font-size:11px; margin-bottom:4px;">点击按钮选择节奏文件并加载</div>
             <div id="scene-list" style="display:none;">
-                <p style="color:#ccc; font-size:12px; margin:4px 0;">场景:</p>
+                <div id="chord-display" style="color:#fff; font-size:20px; font-weight:bold; text-align:center;">-</div>
+                <div id="chord-tones" style="color:#888; font-size:10px; text-align:center; min-height:12px;"></div>
+                <div id="chord-timing" style="color:#555; font-size:9px; text-align:center; min-height:12px;"></div>
+                <div id="beat-dots" style="display:none; justify-content:center; gap:6px; margin:6px 0 16px 0;"></div>
                 <div id="scene-buttons" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;"></div>
                 <p style="color:#ccc; font-size:12px; margin:4px 0;">音轨:</p>
                 <div id="track-rows" style="font-size:10px;"></div>
@@ -580,6 +582,12 @@
             }
         }
         function onVolBtnClick() {} // no-op: display only, controlled by CC87
+        function updateChordDisplay(chord, timing, tones) {
+            document.getElementById('chord-display').innerText = chord || '-';
+            document.getElementById('chord-tones').innerText = tones || '';
+            document.getElementById('chord-timing').innerText = timing || '';
+        }
+
         function updateVolDisplay() {
             if (typeof Android === 'undefined') return;
             window.accompVol = Android.getAccompGain();

@@ -2,6 +2,7 @@
 
 #include "StyleParser.h"
 #include "AudioEngine.h"
+#include "ChordTransposer.h"
 #include <vector>
 #include <string>
 #include <thread>
@@ -54,6 +55,7 @@ public:
     // Mute
     void toggleMute(int channel);
     bool isMuted(int channel) const;
+    void mutePianoChannels(); // 默认静音所有钢琴/电钢通道
 
     // Activity LED: 返回最近 300ms 内有 note-on 的通道 bitmask
     uint16_t getActiveChannels() const;
@@ -62,6 +64,8 @@ public:
     void selectScene(int index);    // 选中场景 (播放中=请求切换)
     void start(AudioEngine* audio, int target);  // 开始播放
     void stop();                    // 停止播放
+    void setChordRoot(int root, const std::string& chordName);
+    std::string getChordTonesString() const; // 和弦内音 (调试用)
 
     /// 调试: 将 sty 的全部信息 dump 到文本文件
     bool dumpDebug(const std::string& styPath, const std::string& outputPath);
@@ -92,6 +96,9 @@ private:
     std::atomic<uint16_t> muteMask{0};
     std::atomic<int64_t> lastNoteMs[16]{};
     std::atomic<int> currentBeat{0};
+    ChordTransposer chordTransposer;
+    std::atomic<bool> chordRetrigger{false}; // 和弦变化时标记, 播放循环检测并重触发
+    std::mutex retriggerMutex;               // 保护 retrigger 状态
     std::atomic<int>  pendingScene{-1};
     std::atomic<int>  selectedScene{0};
 

@@ -26,6 +26,8 @@ class MidiJsBridge(
     private val onGetStyleTempo: () -> Double,
     private val onGetTimeSig: () -> Int,
     private val onGetCurrentBeat: () -> Int,
+    private val onGetChord: () -> String,
+    private val onGetChordTiming: () -> String,
     private val onGetStyleChannels: () -> String,
     private val onSetStyleChannelInst: (Int, Int, Int) -> Unit,
     private val onDumpStyleDebug: () -> String,
@@ -70,6 +72,8 @@ class MidiJsBridge(
     @JavascriptInterface fun getStyleTempo(): Double = onGetStyleTempo()
     @JavascriptInterface fun getTimeSig(): Int = onGetTimeSig()
     @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
+    @JavascriptInterface fun getChord(): String = onGetChord()
+    @JavascriptInterface fun getChordTiming(): String = onGetChordTiming()
     @JavascriptInterface fun setAccompVolume(vol: Double) { onSetAccompVolume(vol) }
     @JavascriptInterface fun setLeadVolume(vol: Double) { onSetLeadVolume(vol) }
     @JavascriptInterface fun getAccompGain(): Double = onGetAccompGain()

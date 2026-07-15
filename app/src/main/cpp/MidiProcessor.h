@@ -93,6 +93,8 @@ private:
     std::string mCachedChordInfo;
 
     // Helpers
-    std::set<int> getLowNotes() const; // Active ∪ PedalHeld ∩ (< splitPoint)
-    std::set<int> getAllNotes() const; // Active ∪ PedalHeld
+public:
+    std::set<int> getLowNotes() const;  // Active ∪ PedalHeld ∩ (< splitPoint)
+    std::set<int> getAllNotes() const;  // Active ∪ PedalHeld
+    int         getSplitNote() const { return mSplitPoint; }
 };
