@@ -36,13 +36,13 @@ function calculateAndInjectDimensions() {
     const h = window.innerHeight;
     const aspectRatio = w / h;
 
-    // 如果宽高比小于 3:4 (0.75)（比如直立的手机屏幕）
-    if (aspectRatio < 0.75) {
-        VISIBLE_WHITE_KEYS = 14; // 2 个八度
-        document.documentElement.style.setProperty('--card-radius', '10px');
+    // 始终显示 3 个八度 (21 白键), 极窄屏才缩到 2 个
+    if (aspectRatio < 0.4) {
+        VISIBLE_WHITE_KEYS = 14;
+        document.documentElement.style.setProperty('--card-radius', '6px');
     } else {
-        VISIBLE_WHITE_KEYS = 21; // 3 个八度
-        document.documentElement.style.setProperty('--card-radius', '20px');
+        VISIBLE_WHITE_KEYS = 21;
+        document.documentElement.style.setProperty('--card-radius', '10px');
     }
 
     const wkWidth = wrapper.clientWidth / VISIBLE_WHITE_KEYS;

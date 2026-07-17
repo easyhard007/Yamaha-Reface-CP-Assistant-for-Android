@@ -46,82 +46,94 @@
         </h2>
         
         <div class="card" id="piano-card">
-            <!-- 用来等分下半部分高度的包裹器 -->
             <div id="piano-lower-half">
-                <!-- 模块2：和弦监控 -->
-                <div id="pressed-notes">
-                    <div style="height:100%; display:flex; justify-content:center; align-items:center; color:#666; font-size:16px;">等待弹奏...</div>
-                </div>
-                
-                <!-- 模块3：钢琴键盘 -->
                 <div id="keyboard-wrapper">
                     <div id="keyboard"></div>
                 </div>
             </div>
         </div>
-
-        <div class="card" id="color-card">
-            <div id="light-panel-wrapper">
-                <!-- 左侧调色盘 -->
-                <div id="color-picker-section">
-                    <div id="color-picker-container"></div>
-				</div>
-				<!-- 右侧 40%：灯光和弦与调性监控 (三行结构) -->
-                <div id="light-info-section">
-                    <div id="light-roman-display">-</div>
-                    <div id="light-function-display">VI</div> <!-- 占位符 -->
-                    <div id="light-key-display">正在识别调性</div>
-                </div>
-            </div>
-        </div>
-
         <div class="card" id="function-card">
         <!-- 上部区域：包含转调和分割点 -->
-            <div class="function-upper-area">
-                <div class="control-unit">
-                    <span class="function-label">Transpose</span>
-                    <div class="glass-btn btn-circle" onclick="changeTranspose(-1)">−</div>
-                    <span id="transpose-display" class="transpose-value">0</span>
-                    <div class="glass-btn btn-circle" onclick="changeTranspose(1)">+</div>
+            <div class="function-upper-area" style="display:flex; flex-direction:row; justify-content:space-around; align-items:center; width:100%;">
+                <div class="control-unit" style="flex-direction:column; align-items:center; flex:1; width:auto;">
+                    <span style="color:#aaa; font-size:10px;">Transpose</span>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <div class="glass-btn btn-circle" onclick="changeTranspose(-1)">−</div>
+                        <span id="transpose-display" class="transpose-value">0</span>
+                        <div class="glass-btn btn-circle" onclick="changeTranspose(1)">+</div>
+                    </div>
                 </div>
-
-                <div class="control-unit">
-                    <span class="function-label">Split</span>
-                    <div class="glass-btn btn-circle" onclick="changeSplitPoint(-1)">−</div>
-                    <span id="split-display" class="transpose-value">E3</span>
-                    <div class="glass-btn btn-circle" onclick="changeSplitPoint(1)">+</div>
+                <div class="control-unit" style="flex-direction:column; align-items:center; flex:1; width:auto;">
+                    <span style="color:#aaa; font-size:10px;">Split</span>
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <div class="glass-btn btn-circle" onclick="changeSplitPoint(-1)">−</div>
+                        <span id="split-display" class="transpose-value">E3</span>
+                        <div class="glass-btn btn-circle" onclick="changeSplitPoint(1)">+</div>
+                    </div>
                 </div>
             </div>
 
             <!-- 下部区域：自动踏板按钮与低音增强按钮 -->
-            <div class="function-lower-area" style="gap: 15px;">
-                <div id="sustain-btn" class="glass-btn btn-rect" onclick="toggleAutoSustain()">AUTO-SUSTAIN</div>
-                <!-- 新增增强按钮，移除 BREAK TEST -->
-                <div id="enhance-btn" class="glass-btn btn-rect" onclick="toggleBassEnhance()">ENHANCE: 50%</div>
-                <div id="lead-overlay-btn" class="glass-btn btn-rect btn-active" onclick="toggleLeadOverlay()">Lead Overlay: 80%</div>
+            <div class="function-lower-area" style="gap: 8px;">
+                <div id="sustain-btn" class="glass-btn btn-rect" onclick="toggleAutoSustain()" style="flex:1;">AUTO SUSTAIN</div>
+                <div id="enhance-btn" class="glass-btn btn-rect" onclick="toggleBassEnhance()" style="flex:1;">BASS ENHANCE 50%</div>
+                <div id="lead-overlay-btn" class="glass-btn btn-rect btn-active" onclick="toggleLeadOverlay()" style="flex:1;">LEAD OVERLAY 80%</div>
             </div>
         </div>
 
-        <!-- 节奏测试卡片 -->
-        <div class="card" id="style-card">
-            <h3>🎵 节奏测试 (Style Test)</h3>
+        <!-- 和弦与节拍 -->
+        <div class="invisible-card" id="chord-beat-card">
+            <div id="chord-display" style="color:#fff; font-size:20px; font-weight:bold; text-align:center; text-shadow:none;">-</div>
+            <div id="chord-detect-notes" style="color:#aaa; font-size:10px; text-align:center; min-height:15px;"></div>
+            <div id="chord-debug-info" style="color:#555; font-size:9px; text-align:center; min-height:15px;">debug info: </div>
+            <div id="beat-dots" style="display:none; justify-content:center; gap:6px; margin:6px 0 24px 0;"></div>
+            <div style="text-align:center; margin:6px 0;">
+                <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:2px;">
+                    <div style="display:flex;flex-direction: column;">
+                        <span style="color:#ddd; font-size:8px;"> RHYTHM  ASSIST </span>
+                        <span style="color:#aaa; font-size:10px;">伴奏辅助</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="assist-toggle" onchange="onAssistToggle()">
+                        <span class="slider"></span>
+                    </label>
+                    <div style="display:flex;flex-direction: column;">
+                        <span style="color:#ddd; font-size:8px;">AUTO ARRANGER</span>
+                        <span style="color:#aaa; font-size:10px;">自动伴奏</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自动伴奏卡片 -->
+        <div class="card" id="style-card" style="display:none;">
+            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">AUTO ARRANGER</div>
+            <h3 style="margin-top:0;">自动伴奏</h3>
             <div class="glass-btn btn-rect" onclick="loadTestStyle()" id="load-style-btn" style="width:100%; box-sizing:border-box; margin-bottom:4px;">📂 Load Style</div>
             <div style="display:none; gap:6px; margin-bottom:4px;" id="style-ctrl-row">
-                <div class="glass-btn btn-rect" id="style-tempo-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Tempo:120</div>
+                <div class="glass-btn btn-rect" id="style-tempo-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Tempo:75</div>
                 <div class="glass-btn btn-rect" onclick="onVolBtnClick()" id="style-vol-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Vol:80%</div>
                 <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="background:#2e7d32; flex:1; text-align:center;">▶ Start</div>
                 <div class="glass-btn btn-rect" id="style-sync-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">SYNC</div>
             </div>
             <div id="style-info" style="color:#aaa; font-size:11px; margin-bottom:4px;">点击按钮选择节奏文件并加载</div>
             <div id="scene-list" style="display:none;">
-                <div id="chord-display" style="color:#fff; font-size:20px; font-weight:bold; text-align:center;">-</div>
-                <div id="chord-tones" style="color:#888; font-size:10px; text-align:center; min-height:12px;"></div>
-                <div id="chord-timing" style="color:#555; font-size:9px; text-align:center; min-height:12px;"></div>
-                <div id="beat-dots" style="display:none; justify-content:center; gap:6px; margin:6px 0 16px 0;"></div>
                 <div id="scene-buttons" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;"></div>
                 <p style="color:#ccc; font-size:12px; margin:4px 0;">音轨:</p>
                 <div id="track-rows" style="font-size:10px;"></div>
             </div>
+        </div>
+
+        <!-- 伴奏辅助卡片 -->
+        <div class="card" id="assist-card">
+            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">RHYTHM ASSISTANT</div>
+            <h3 style="margin-top:0;">伴奏辅助</h3>
+            <div style="text-align:center; margin:8px 0;">
+                <span style="color:#aaa; font-size:10px;">能量</span>
+                <input type="range" id="cajon-energy" class="energy-range" min="0" max="100" value="0" oninput="onCajonEnergy()">
+                <span id="cajon-energy-val" style="color:#aaa; font-size:10px;">0.00</span>
+            </div>
+            <div id="cajon-leds" style="display:grid; grid-template-columns:repeat(8,1fr); gap:2px; max-width:340px; margin:0 auto;"></div>
         </div>
 
 		<div class="card" id="debug-panel-chord" style="display:none;">
@@ -159,11 +171,34 @@
         </div>
 
         <div id="fab-btn" onclick="openSettings()">?</div>
+        <div id="chord-fab-btn" onclick="openChordPanel()"><svg viewBox="0 0 1024 1024" width="28" height="28"><path d="M526.9 89.5C293.3 89.5 104.4 278.4 104.4 512s188.9 422.5 422.5 422.5 422.5-188.9 422.5-422.5-188.9-422.5-422.5-422.5zm323.1 422.5c0 34.8-5 69.6-14.9 104.4-154.1-49.7-243.6-14.9-293.3 19.9s-84.5 124.3-84.5 188.9c-49.7-9.9-99.4-34.8-139.2-69.6 154.1-34.8 233.6-159.1 258.5-268.4 5-19.9 5-34.8 9.9-54.7 69.6-24.9 134.2-69.6 188.9-129.2 44.7 59.7 74.6 129.2 74.6 208.8zm-109.4-243.6c-49.7 54.7-104.4 89.5-159.1 114.3-5-74.6-34.8-144.2-79.5-193.9h24.9c79.5 0 154.1 29.8 213.7 79.5zM442.4 198.8c59.7 49.7 89.5 129.2 89.5 203.8-104.4 29.8-208.8 14.9-298.3-29.8 39.8-84.5 119.3-149.1 208.8-174zm-238.6 313.2c0-29.8 5-64.6 14.9-89.5 64.6 29.8 134.2 44.7 203.8 44.7 39.8 0 74.6-5 109.4-14.9 0 9.9 0 19.9-5 29.8-19.9 99.4-99.4 213.7-248.5 233.6-49.7-54.7-74.6-129.2-74.6-203.8zm323.1 323.1h-24.9c0-54.7 19.9-119.3 69.6-159.1 54.7-44.7 139.2-49.7 243.6-14.9-54.7 104.4-164 174-288.3 174z" fill="#fff"/></svg></div>
+    </div>
+
+    
+    <!-- 和弦设置面板 -->
+    <div id="chord-page">
+        <div id="chord-back-btn" onclick="closeChordPanel()"><svg viewBox="0 0 1024 1024" width="22" height="22"><path d="M970.112 906.304s-9.473 24.385-22.08 0c0 0-140.929-425.344-484.48-318.208v132.032s-5.504 77.632-73.216 27.072L52.544 455.616s-71.616-38.976 4.352-92.288L398.272 70.016s51.327-36.608 63.68 23.424l0.384 142.464c0.064 0.064 640.32 30.72 507.776 670.4z" fill="#fff"/></svg></div>
+        <h2 style="color: #d500f9;">🎹 和弦与 TSD 功能</h2>
+        <div class="card" id="chord-pressed-card" style="margin-top:20px;">
+            <div id="pressed-notes" style="min-height:80px;">
+                <div style="height:100%; display:flex; justify-content:center; align-items:center; color:#666; font-size:16px;">等待弹奏...</div>
+            </div>
+        </div>
+        <div class="card" id="chord-color-card" style="margin-top:12px;">
+            <div id="light-panel-wrapper" style="display:flex; align-items:center; gap:10px;">
+                <div id="color-picker-section"><div id="color-picker-container"></div></div>
+                <div id="light-info-section" style="flex:1;">
+                    <div id="light-roman-display">-</div>
+                    <div id="light-function-display">VI</div>
+                    <div id="light-key-display">正在识别调性</div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 设置页面 -->
    <div id="settings-page">
-        <button id="back-btn" onclick="closeSettings()">⬅ 返回</button>
+        <div id="back-btn" onclick="closeSettings()"><svg viewBox="0 0 1024 1024" width="22" height="22"><path d="M970.112 906.304s-9.473 24.385-22.08 0c0 0-140.929-425.344-484.48-318.208v132.032s-5.504 77.632-73.216 27.072L52.544 455.616s-71.616-38.976 4.352-92.288L398.272 70.016s51.327-36.608 63.68 23.424l0.384 142.464c0.064 0.064 640.32 30.72 507.776 670.4z" fill="#fff"/></svg></div>
         <h2 style="color: #d500f9;">⚙️ 设置</h2>
         <div class="card" id="settings-card" style="margin-top: 30px;">
             <p style="color:#aaa; font-size:11px; margin:0 0 2px 0;">SoundFont</p>
@@ -307,7 +342,7 @@
             window.bass_enhance_ratio = ratio;
             const btn = document.getElementById('enhance-btn');
             if (btn) {
-                btn.innerText = `ENHANCE: ${Math.round(ratio * 100)}%`;
+                btn.innerText = `BASS ENHANCE ${Math.round(ratio * 100)}%`;
             }
             // 重新计算权重字典，否则高度和音量都不会变
             if (typeof updateBassWeightMap === 'function') {
@@ -481,7 +516,7 @@
                         '" style="font-size:9px; padding:2px 5px; min-width:24px; text-align:center;">M</div>' +
                         '<span style="color:#ccc; flex:1;">Ch.' + ch.channel + ' ' + instName + extra +
                         ' (b' + ch.bank + ' p' + ch.program + ')' + volPan + '</span>' +
-                        '<span id="led-' + ch.channel + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#333;"></span>' +
+                        '<span id="led-' + ch.channel + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#666;"></span>' +
                         '</div>';
                 }
                 document.getElementById('track-rows').innerHTML = html;
@@ -503,13 +538,12 @@
         }
         // ——— 节拍器 ———
         function buildBeatDots() {
-            if (typeof Android === 'undefined') return;
-            var ts = Android.getTimeSig ? Android.getTimeSig() : 4;
+            var ts = (typeof Android !== 'undefined' && Android.getTimeSig) ? Android.getTimeSig() : 4;
             // 2/4 → 4 dots, 3/4 → 3, 6/8 → 6, default 4
             var count = (ts === 3) ? 3 : (ts === 6) ? 6 : 4;
             var html = '';
             for (var i = 0; i < count; i++) {
-                html += '<span id="beat-dot-' + i + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#333;"></span>';
+                html += '<span id="beat-dot-' + i + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#666;"></span>';
             }
             document.getElementById('beat-dots').innerHTML = html;
             document.getElementById('beat-dots').style.display = 'flex';
@@ -522,7 +556,8 @@
             for (var i = 0; i < count; i++) {
                 var dot = document.getElementById('beat-dot-' + i);
                 if (!dot) continue;
-                dot.style.background = (i === (beat % count)) ? '#fff' : '#333';
+                dot.style.background = (i === (beat % count)) ? '#fff' : '#666';
+                dot.style.boxShadow = (i === (beat % count)) ? '0 0 10px rgba(255,255,255,0.4)' : '';
                 dot.style.boxShadow = (i === (beat % count)) ? '0 0 4px #fff' : '';
             }
         }
@@ -534,19 +569,36 @@
                 var led = document.getElementById('led-' + ch);
                 if (!led) continue;
                 var on = (active & (1 << ch));
-                led.style.background = on ? '#fff' : '#333';
-                led.style.boxShadow = on ? '0 0 4px #fff' : '';
+                led.style.background = on ? '#fff' : '#666';
+                led.style.boxShadow = on ? '0 0 8px rgba(255,255,255,0.4)' : '';
             }
         }
 
         // Auto-load first style on startup
+        buildBeatDots();
+        // 节拍器常驻更新 (150ms)
+        setInterval(function() {
+            if (typeof Android !== 'undefined') {
+                updateBeatDots();
+                document.getElementById('chord-detect-notes').innerText = Android.getChordNotes ? Android.getChordNotes() : '';
+                document.getElementById('chord-debug-info').innerText = 'debug info: ' + (Android.getDebugInfo ? Android.getDebugInfo() : '');
+            }
+        }, 150);
         setTimeout(function() { if (typeof Android !== 'undefined') autoLoadFirstStyle(); }, 800);
+        // 键盘高度修复: 多次延迟触发 resize 确保布局计算正确
+        [200, 500, 1000].forEach(function(ms) {
+            setTimeout(function() { window.dispatchEvent(new Event('resize')); }, ms);
+        });
 
         function autoLoadFirstStyle() {
             try {
                 var listJson = Android.getStyleFileList();
                 window.styleFileNames = JSON.parse(listJson);
-                if (window.styleFileNames.length > 0) doLoadStyle(0);
+                // 仅在自动伴奏面板可见 (type=1) 时自动加载第一个 style
+                var toggle = document.getElementById('assist-toggle');
+                if (toggle && toggle.checked && window.styleFileNames.length > 0) {
+                    doLoadStyle(0);
+                }
             } catch(e) {}
         }
 
@@ -584,17 +636,77 @@
         function onVolBtnClick() {} // no-op: display only, controlled by CC87
         function updateChordDisplay(chord, timing, tones) {
             document.getElementById('chord-display').innerText = chord || '-';
-            document.getElementById('chord-tones').innerText = tones || '';
-            document.getElementById('chord-timing').innerText = timing || '';
+            document.getElementById('chord-debug-info').innerText = 'debug info: ' + (timing || '');
         }
 
+        
+        // ===== Cajon LEDs =====
+        function buildCajonLeds() {
+            var html = '';
+            for (var i = 0; i < 32; i++) {
+                var w = [4,1,2,1,3,1,2,1,4,1,2,1,3,1,2,1,4,1,2,1,3,1,2,1,4,1,2,1,3,1,2,1][i];
+                var bg = w==4?'#484f58':w==3?'#30363d':w==2?'#21262d':'#161b22';
+                html += '<div id=\"cl-'+i+'\" style=\"aspect-ratio:1; border-radius:2px; background:'+bg+';\"></div>';
+            }
+            document.getElementById('cajon-leds').innerHTML = html;
+        }
+        function updateCajonLeds(step) {
+            for (var i = 0; i < 32; i++) {
+                var led = document.getElementById('cl-'+i);
+                if (led) { led.style.background = i===step?'#58a6ff':''; led.style.boxShadow = i===step?'0 0 8px #58a6ff':''; }
+            }
+        }
+        function onCajonEnergy() {
+            var v = parseInt(document.getElementById('cajon-energy').value) / 100;
+            document.getElementById('cajon-energy-val').innerText = v.toFixed(2);
+            if (typeof Android !== 'undefined') Android.setMinCajonEnergy(v);
+            updateEnergyTrack();
+        }
+        var _smoothEnergy = 0;
+        var _smoothFactor = 0.15; // 每 50ms 向目标移动 15%, 约 0.5s 到 95%
+        function updateEnergyTrack() {
+            var slider = document.getElementById('cajon-energy');
+            if (!slider) return;
+            var targetEnergy = (typeof Android !== 'undefined' && Android.getCajonEnergy) ? Android.getCajonEnergy() : 0;
+            // 指数平滑: 避免突变
+            _smoothEnergy += (targetEnergy - _smoothEnergy) * _smoothFactor;
+            var pct = Math.round(_smoothEnergy * 100);
+            // 彩色渐变从左到右, 只填充 pct%, 其余为灰色底色
+            slider.style.background = 'linear-gradient(to right,' +
+                'rgba(59,173,227,1) 0%,' +
+                'rgba(87,111,230,1) 25%,' +
+                'rgba(152,68,183,1) 51%,' +
+                'rgba(255,53,127,1) 100%) 0 0 / ' + pct + '% 100% no-repeat, #444';
+        }
+        buildCajonLeds();
+        // Update LEDs from Cajon
+        setInterval(function() {
+            if (typeof Android === 'undefined') return;
+            var step = Android.cajonTick ? Android.cajonTick() : 0;
+            updateCajonLeds(step);
+            // 同步轨道填色 (由实际能量决定) 和数值显示
+            updateEnergyTrack();
+            var energy = Android.getCajonEnergy ? Android.getCajonEnergy() : 0;
+            document.getElementById('cajon-energy-val').innerText = energy.toFixed(2);
+        }, 50);
+
+        function onAssistToggle() {
+            var v = document.getElementById('assist-toggle').checked ? 1 : 0;
+            if (typeof Android !== 'undefined') Android.setAssistType(v);
+            document.getElementById('style-card').style.display = v ? 'block' : 'none';
+            document.getElementById('assist-card').style.display = v ? 'none' : 'block';
+            // 切换到自动伴奏模式时, 如果还没加载过 style, 自动加载第一个
+            if (v === 1 && !window.styleLoadedName && window.styleFileNames && window.styleFileNames.length > 0) {
+                doLoadStyle(0);
+            }
+        }
         function updateVolDisplay() {
             if (typeof Android === 'undefined') return;
             window.accompVol = Android.getAccompGain();
             window.leadVol = Android.getLeadGain();
             document.getElementById('style-vol-btn').innerText = 'Vol:' + Math.round(window.accompVol / 6.0 * 100) + '%';
             var lo = document.getElementById('lead-overlay-btn');
-            lo.innerText = 'Lead Overlay: ' + Math.round(window.leadVol / 6.0 * 100) + '%';
+            lo.innerText = 'LEAD OVERLAY  ' + Math.round(window.leadVol / 6.0 * 100) + '%';
         }
         function toggleLeadOverlay() {
             window.leadOverlay = !window.leadOverlay;
@@ -745,6 +857,8 @@
         // ================= 设置与连接 =================
         function openSettings() { document.getElementById('settings-page').classList.add('show'); }
         function closeSettings() { document.getElementById('settings-page').classList.remove('show'); }
+        function openChordPanel() { document.getElementById('chord-page').classList.add('show'); if (window.colorPicker) { window.colorPicker.resize(Math.round(window.innerWidth * 0.2)); setTimeout(function(){ if (typeof initTSDOverlay === 'function') initTSDOverlay(); }, 300); } else { setTimeout(function(){ if (typeof initColorPicker === 'function') initColorPicker(); }, 200); } window.dispatchEvent(new Event('resize')); }
+        function closeChordPanel() { document.getElementById('chord-page').classList.remove('show'); }
         function updateFabState() {
             const fab = document.getElementById('fab-btn');
             if (window.midiOutput && window.isRunning) { fab.innerText = "✓"; fab.classList.add('success'); } 
@@ -1171,7 +1285,7 @@
             }
             // Update ENHANCE button text
             var eb = document.getElementById('enhance-btn');
-            if (eb) eb.innerText = 'ENHANCE: ' + Math.round(window.bass_enhance_ratio * 100) + '%';
+            if (eb) eb.innerText = 'BASS ENHANCE ' + Math.round(window.bass_enhance_ratio * 100) + '%';
             const fmt = (s) => s.size ? [...s].sort((a,b)=>a-b).join(',') : '-';
             const da = document.getElementById('dbg-active');
             const dp = document.getElementById('dbg-pedal');

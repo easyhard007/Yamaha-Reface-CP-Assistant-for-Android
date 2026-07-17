@@ -9,6 +9,10 @@ android {
         version = release(36)
     }
 
+    androidResources {
+        noCompress.addAll(listOf("wav", "mp3", "ogg", "sf2"))
+    }
+
     defaultConfig {
         applicationId = "com.chenyinan.reface_cp_assist"
         minSdk = 27

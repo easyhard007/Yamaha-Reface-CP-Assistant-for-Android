@@ -72,6 +72,11 @@ add_library(
         StylePlayer.cpp
         LowChordDetector.cpp
         ChordTransposer.cpp
+        TempoTracker.cpp
+        Humanizer.cpp
+        BeatTracker.cpp
+        RhythmAudioEngine.cpp
+        CajonAssistant.cpp
         ${FLUIDLITE_SOURCES}
 )
 

@@ -31,7 +31,7 @@ class StyleParser {
 private:
     std::vector<uint8_t> fileData;
     uint32_t resolution = 1920;
-    uint32_t tempo = 500000;
+    uint32_t tempo = 800000; // 75 BPM default
     int timeSigNum = 4;   // 拍号分子 (默认 4/4)
     int timeSigDenom = 4;
 

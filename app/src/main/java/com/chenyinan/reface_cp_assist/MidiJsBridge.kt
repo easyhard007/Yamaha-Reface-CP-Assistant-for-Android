@@ -26,11 +26,21 @@ class MidiJsBridge(
     private val onGetStyleTempo: () -> Double,
     private val onGetTimeSig: () -> Int,
     private val onGetCurrentBeat: () -> Int,
+    private val onSyncBeat: () -> Unit,
     private val onGetChord: () -> String,
+    private val onGetChordNotes: () -> String,
     private val onGetChordTiming: () -> String,
     private val onGetStyleChannels: () -> String,
     private val onSetStyleChannelInst: (Int, Int, Int) -> Unit,
     private val onDumpStyleDebug: () -> String,
+    private val onGetDebugInfo: () -> String,
+    private val onSetAssistType: (Int) -> Unit,
+    private val onCajonTick: () -> Int,
+    private val onSetCajonEnergy: (Float) -> Unit,
+    private val onGetCajonEnergy: () -> Float,
+    private val onSetMinCajonEnergy: (Float) -> Unit,
+    private val onGetMinCajonEnergy: () -> Float,
+    private val onInitRhythmEngine: (String) -> Unit,
     private val onSetAccompVolume: (Double) -> Unit,
     private val onSetLeadVolume: (Double) -> Unit,
     private val onGetAccompGain: () -> Double,
@@ -40,7 +50,10 @@ class MidiJsBridge(
     private val onIsChannelMuted: (Int) -> Boolean,
     private val onSetReverb: (Double, Double) -> Unit,
     private val onGetReverbRoomSize: () -> Double,
-    private val onGetReverbLevel: () -> Double
+    private val onGetReverbLevel: () -> Double,
+    private val onSetHumanize: (Float, Float) -> Unit,
+    private val onGetHumanizeTiming: () -> Float,
+    private val onGetHumanizeVelocity: () -> Float
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -72,7 +85,9 @@ class MidiJsBridge(
     @JavascriptInterface fun getStyleTempo(): Double = onGetStyleTempo()
     @JavascriptInterface fun getTimeSig(): Int = onGetTimeSig()
     @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
+    @JavascriptInterface fun syncBeat() { onSyncBeat() }
     @JavascriptInterface fun getChord(): String = onGetChord()
+    @JavascriptInterface fun getChordNotes(): String = onGetChordNotes()
     @JavascriptInterface fun getChordTiming(): String = onGetChordTiming()
     @JavascriptInterface fun setAccompVolume(vol: Double) { onSetAccompVolume(vol) }
     @JavascriptInterface fun setLeadVolume(vol: Double) { onSetLeadVolume(vol) }
@@ -83,10 +98,21 @@ class MidiJsBridge(
         onSetStyleChannelInst(channel, bank, program)
     }
     @JavascriptInterface fun dumpStyleDebug(): String = onDumpStyleDebug()
+    @JavascriptInterface fun getDebugInfo(): String = onGetDebugInfo()
+    @JavascriptInterface fun setAssistType(v: Int) { onSetAssistType(v) }
+    @JavascriptInterface fun cajonTick(): Int = onCajonTick()
+    @JavascriptInterface fun setCajonEnergy(energy: Float) { onSetCajonEnergy(energy) }
+    @JavascriptInterface fun getCajonEnergy(): Float = onGetCajonEnergy()
+    @JavascriptInterface fun setMinCajonEnergy(v: Float) { onSetMinCajonEnergy(v) }
+    @JavascriptInterface fun getMinCajonEnergy(): Float = onGetMinCajonEnergy()
+    @JavascriptInterface fun initRhythmEngine(dir: String) { onInitRhythmEngine(dir) }
     @JavascriptInterface fun toggleMute(channel: Int) { onToggleMute(channel) }
     @JavascriptInterface fun getActiveChannels(): Int = onGetActiveChannels()
     @JavascriptInterface fun isChannelMuted(channel: Int): Boolean = onIsChannelMuted(channel)
     @JavascriptInterface fun setReverb(roomSize: Double, level: Double) { onSetReverb(roomSize, level) }
     @JavascriptInterface fun getReverbRoomSize(): Double = onGetReverbRoomSize()
     @JavascriptInterface fun getReverbLevel(): Double = onGetReverbLevel()
+    @JavascriptInterface fun setHumanize(timing: Float, velocity: Float) { onSetHumanize(timing, velocity) }
+    @JavascriptInterface fun getHumanizeTiming(): Float = onGetHumanizeTiming()
+    @JavascriptInterface fun getHumanizeVelocity(): Float = onGetHumanizeVelocity()
 }

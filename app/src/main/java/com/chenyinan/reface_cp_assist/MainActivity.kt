@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
     private val soundFontNames = listOf("JJazzLab-SoundFont")
     private val soundFontFiles = listOf("JJazzLab-SoundFont.sf2")
     private val styleFiles = mutableListOf<String>()
+    private val wavDirName = "wav"
     private var currentSf2Index = 0
     private val noteNames = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
 
@@ -91,11 +92,21 @@ class MainActivity : AppCompatActivity() {
             { nativeGetStyleTempo() },
             { nativeGetTimeSig() },
             { nativeGetCurrentBeat() },
+            { syncBeat() },
             { nativeGetChord() },
+            { nativeGetChordNotes() },
             { nativeGetChordTiming() },
             { nativeGetStyleChannels() },
             { channel, bank, prog -> nativeSetStyleChannelInst(channel, bank, prog) },
             { dumpStyleDebug() },
+            { nativeGetDebugInfo() },
+            { v -> nativeSetAssistType(v) },
+            { nativeCajonTick() },
+            { e -> nativeSetCajonEnergy(e) },
+            { nativeGetCajonEnergy() },
+            { v -> nativeSetMinCajonEnergy(v) },
+            { nativeGetMinCajonEnergy() },
+            { dir -> nativeInitRhythmEngine(dir) },
             { vol -> nativeSetAccompVolume(vol) },
             { vol -> nativeSetLeadVolume(vol) },
             { nativeGetAccompGain() },
@@ -105,7 +116,10 @@ class MainActivity : AppCompatActivity() {
             { ch -> isChannelMuted(ch) },
             { room, level -> nativeSetReverb(room, level) },
             { nativeGetReverbRoomSize() },
-            { nativeGetReverbLevel() }
+            { nativeGetReverbLevel() },
+            { t, v -> nativeSetHumanize(t, v) },
+            { nativeGetHumanizeTiming() },
+            { nativeGetHumanizeVelocity() }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -115,6 +129,9 @@ class MainActivity : AppCompatActivity() {
         copyAssets()
         val defaultSf2 = File(cacheDir, soundFontFiles[0])
         nativeInit(defaultSf2.absolutePath)
+        // Init Cajon WAV engine
+        val wavDir = File(cacheDir, wavDirName)
+        nativeInitRhythmEngine(wavDir.absolutePath)
 
         midiManager = getSystemService(Context.MIDI_SERVICE) as MidiManager
         midiManager.registerDeviceCallback(object : MidiManager.DeviceCallback() {
@@ -404,6 +421,20 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } catch (_: Exception) {}
+
+        // also copy WAV files for Cajon rhythm engine
+        try {
+            val wavDir = File(cacheDir, wavDirName)
+            val wavList = assets.list(wavDirName) ?: emptyArray()
+            if (!wavDir.exists()) wavDir.mkdirs()
+            for (name in wavList) {
+                val f = File(wavDir, name)
+                if (!f.exists()) {
+                    try { assets.open("$wavDirName/$name").use { i -> FileOutputStream(f).use { o -> i.copyTo(o) } } }
+                    catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     // 供 JS 调用: 返回可用的 style 文件列表 JSON
@@ -436,6 +467,7 @@ class MainActivity : AppCompatActivity() {
     private fun startStyle() { nativeStyleStart(); jsLog("Style started", false) }
     private fun stopStyle() { nativeStopStyle(); jsLog("Style stopped", false) }
     private fun isStylePlaying(): Boolean = nativeIsStylePlaying()
+    private fun syncBeat() { nativeSyncBeat() }
     private fun dumpStyleDebug(): String {
         if (styleFiles.isEmpty()) return "No style loaded"
         val sty = File(cacheDir, styleFiles[0])
@@ -489,13 +521,25 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetStyleTempo(): Double
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
+    external fun nativeSyncBeat()
+    external fun nativeGetBeatIndex(): Int
     external fun nativeSetAccompVolume(vol: Double)
     external fun nativeSetLeadVolume(vol: Double)
     external fun nativeGetAccompGain(): Double
     external fun nativeGetLeadGain(): Double
     external fun nativeGetChord(): String
+    external fun nativeGetChordNotes(): String
     external fun nativeGetChordTiming(): String
     external fun nativeGetChordTones(): String
+    external fun nativeGetDebugInfo(): String
+    external fun nativeSetAssistType(v: Int)
+    external fun nativeInitRhythmEngine(wavDir: String): Boolean
+    external fun nativeSetCajonEnergy(energy: Float)
+    external fun nativeGetCajonEnergy(): Float
+    external fun nativeSetMinCajonEnergy(v: Float)
+    external fun nativeGetMinCajonEnergy(): Float
+    external fun nativeCajonTick(): Int
+    external fun nativeGetCajonWeights(): FloatArray
     external fun nativeResetChord()
     external fun nativeDumpStyleDebug(styPath: String, outputPath: String): Boolean
     external fun nativeLoadStyleSoundFont(sf2Path: String)
@@ -507,6 +551,9 @@ class MainActivity : AppCompatActivity() {
     external fun nativeSetReverb(roomSize: Double, level: Double)
     external fun nativeGetReverbRoomSize(): Double
     external fun nativeGetReverbLevel(): Double
+    external fun nativeSetHumanize(timing: Float, velocity: Float)
+    external fun nativeGetHumanizeTiming(): Float
+    external fun nativeGetHumanizeVelocity(): Float
 
     companion object {
         init { System.loadLibrary("cynarranger") }

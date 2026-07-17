@@ -23,6 +23,11 @@ bool StylePlayer::isFillScene(const std::string& name) {
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     return lower.find("fill") != std::string::npos;
 }
+bool StylePlayer::isIntroScene(const std::string& name) {
+    std::string lower = name;
+    std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+    return lower.find("intro") != std::string::npos;
+}
 bool StylePlayer::isEndingScene(const std::string& name) {
     std::string lower = name;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
@@ -60,8 +65,8 @@ void StylePlayer::buildScenes() {
     resolution = parser.getResolution();
     tempo      = parser.getTempo();
     timeSigNum = parser.getTimeSigNum();
-    beatTicks  = resolution;          // 一拍 = 1 四分音符 (MIDI 标准)
-    measureTicks = beatTicks * timeSigNum; // 一小节
+    beatTicks  = resolution;
+    measureTicks = beatTicks * timeSigNum;
 
     const auto& markers = parser.getScenes();
     const auto& allEvents = parser.getEvents();
@@ -76,9 +81,8 @@ void StylePlayer::buildScenes() {
             const auto& e = allEvents[i];
             if (e.eventType == 0x90) {
                 uint32_t offTick = findNoteOffTick(allEvents, i + 1, e.channel, e.data1);
-                sd.noteEvents.push_back({e.absoluteTick, e.channel, e.data1, e.data2,
-                    offTick > e.absoluteTick ? offTick - e.absoluteTick : resolution / 4});
-            } else {
+                uint32_t dur = offTick > e.absoluteTick ? offTick - e.absoluteTick : resolution / 4;
+                sd.noteEvents.push_back({e.absoluteTick, e.channel, e.data1, e.data2, dur, 0});
                 MidiEvent relEv = e; relEv.absoluteTick = e.absoluteTick;
                 sd.controlEvents.push_back(relEv);
             }
@@ -118,7 +122,9 @@ void StylePlayer::buildScenes() {
             if (e.eventType == 0x90) {
                 uint32_t offTick = findNoteOffTick(allEvents, j + 1, e.channel, e.data1);
                 uint32_t dur = (offTick > e.absoluteTick) ? (offTick - e.absoluteTick) : (resolution / 4);
-                sd.noteEvents.push_back({relTick, e.channel, e.data1, e.data2, dur});
+                float posInBeats = (float)relTick / resolution;
+                float durInBeats = (float)dur / resolution;
+                sd.noteEvents.push_back({relTick, e.channel, e.data1, e.data2, dur, 0});
             } else if (e.absoluteTick >= sd.startTick) {
                 // Control event 只捕获标记之后的, 不回看
                 MidiEvent relEv = e; relEv.absoluteTick = relTick;
@@ -195,7 +201,23 @@ std::string StylePlayer::getScenesJson() const {
     std::ostringstream oss; oss << "[";
     for (size_t i = 0; i < scenes.size(); ++i) {
         if (i > 0) oss << ",";
+        // 场景类型和标识符
+        std::string type = "Main", id;
+        std::string lower = scenes[i].name;
+        std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
+        if (lower.find("intro") != std::string::npos) { type = "Intro"; }
+        else if (lower.find("fill") != std::string::npos) { type = "Fill"; }
+        else if (lower.find("ending") != std::string::npos || lower.find("end") != std::string::npos) { type = "Ending"; }
+        // 提取标识符: 名字中最后一个字母
+        for (int j = (int)scenes[i].name.size() - 1; j >= 0; j--) {
+            char c = scenes[i].name[j];
+            if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) {
+                id = std::string(1, (char)std::toupper(c)); break;
+            }
+        }
         oss << "{\"name\":\"" << escapeJson(scenes[i].name) << "\""
+            << ",\"type\":\"" << type << "\""
+            << ",\"id\":\"" << (id.empty() ? "A" : id) << "\""
             << ",\"tick\":" << scenes[i].startTick
             << ",\"notes\":" << scenes[i].noteEvents.size()
             << ",\"duration\":" << scenes[i].durationTicks
@@ -268,7 +290,7 @@ void StylePlayer::selectScene(int index) {
     }
 }
 
-void StylePlayer::start(AudioEngine* audio, int target) {
+void StylePlayer::start(AudioEngine* audio, int target, int beatIndex) {
     if (!audio || scenes.empty()) return;
     stop();
 
@@ -281,7 +303,9 @@ void StylePlayer::start(AudioEngine* audio, int target) {
     transition = TransitionType::None;
     needStop.store(false);
     playing.store(true);
-    playbackThread = std::thread(&StylePlayer::playbackLoop, this, audio, target);
+
+    uint32_t startOffset = beatIndex * resolution; // 从指定拍开始
+    playbackThread = std::thread(&StylePlayer::playbackLoop, this, audio, target, startOffset);
 }
 
 void StylePlayer::stop() {
@@ -293,8 +317,7 @@ void StylePlayer::stop() {
 }
 
 // ===== 播放循环 =====
-void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
-    uint32_t startRelTick = 0;
+void StylePlayer::playbackLoop(AudioEngine* audio, int target, uint32_t startRelTick) {
 
     while (!needStop.load()) {
         int curIdx = currentScene.load();
@@ -302,11 +325,27 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
         const auto& sd = scenes[curIdx];
         double usecPerTick = (double)tempo / (double)resolution;
 
-        // 构建当前场景的播放队列 (按 tick 排序)
+        // 构建当前场景的播放队列 (按 tick 排序, 应用 Humanizer timing 偏移)
         struct QItem { uint32_t tick; int kind; size_t idx; uint32_t offTick; };
         std::vector<QItem> q;
-        for (size_t i = 0; i < sd.noteEvents.size(); ++i)
-            q.push_back({sd.noteEvents[i].startTick, 0, i, sd.noteEvents[i].startTick + sd.noteEvents[i].durationTicks});
+        // 人性化力度偏移临时存储 (与队列索引对应)
+        std::vector<int> velOffsets(sd.noteEvents.size(), 0);
+
+        // Fill 偏移: 所有音符减去 fillShiftTicks, 负数丢弃
+        uint32_t fShift = fillShiftTicks;
+        lastFillShift = fShift; // 调试用, 保留值
+        fillShiftTicks = 0;
+
+        for (size_t i = 0; i < sd.noteEvents.size(); ++i) {
+            auto hr = humanizer.humanize();
+            int32_t tickOff = (int32_t)std::round(hr.tickOffset * resolution);
+            int64_t rawTick = (int64_t)sd.noteEvents[i].startTick - (int64_t)fShift + tickOff;
+            if (rawTick < 0) continue; // 负值 = 已过, 丢弃
+            uint32_t adjTick = (uint32_t)rawTick;
+            uint32_t adjOff = adjTick + sd.noteEvents[i].durationTicks;
+            q.push_back({adjTick, 0, i, adjOff});
+            velOffsets[i] = hr.velOffset;
+        }
         for (size_t i = 0; i < sd.controlEvents.size(); ++i)
             q.push_back({sd.controlEvents[i].absoluteTick, 2, i, 0});
         std::sort(q.begin(), q.end(), [](const QItem& a, const QItem& b) { return a.tick < b.tick; });
@@ -380,8 +419,7 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
         auto startTimeUs = std::chrono::duration_cast<std::chrono::microseconds>(
             std::chrono::steady_clock::now().time_since_epoch()).count();
 
-        // 遍历队列
-        bool fillJump = false;
+        bool fillJump = false; // 声明在外层作用域, 供末尾 startRelTick 使用
         for (size_t qi = 0; qi < q.size(); ++qi) {
             if (needStop.load()) { clearNotes(); return; }
 
@@ -394,41 +432,50 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 if (pending >= 0 && pending < (int)scenes.size() && pending != currentScene.load()) {
                     const auto& tgt = scenes[pending];
                     if (isFillScene(tgt.name)) {
-                        // Fill: 立即跳转, 消费 pending
+                        // Fill: 按小节内位置偏移, 设置强制结束时间
                         pendingScene.store(-1);
-                        uint32_t seekTick = (item.tick >= tgt.durationTicks)
-                                            ? (item.tick % tgt.durationTicks) : item.tick;
                         clearNotes();
+                        uint32_t measureTick = item.tick % measureTicks;
+                        uint32_t remainTicks = (tgt.durationTicks > measureTick) ? (tgt.durationTicks - measureTick) : tgt.durationTicks;
                         currentScene.store(pending);
                         transition = TransitionType::None;
-                        startRelTick = seekTick;
+                        fillShiftTicks = measureTick;
+                        fillEndTick = remainTicks; // 还剩这么多 tick 就强制切 Main
+                        startRelTick = 0;
                         fillJump = true;
                         break;
                     }
                     else if (isEndingScene(tgt.name)) {
                         transition = TransitionType::Ending;
                     } else {
-                        transition = TransitionType::Normal;
+                        // Main/Intro: 等小节边界切换 (不等 scene 结束)
+                        transition = TransitionType::Ending;
                     }
                 }
             }
 
-            // ==== 小节边界检查 (Ending transition) ====
-            if (transition == TransitionType::Ending) {
+            // ==== 节拍器第 1 拍信号触发切换 ====
+            if (transition == TransitionType::Ending && beatZeroSignal.exchange(false)) {
                 int endIdx = pendingScene.load();
-                if (endIdx < 0 || endIdx >= (int)scenes.size()) {
-                    transition = TransitionType::None; // pending 已失效
-                } else {
-                    uint32_t curMeasure = item.tick / measureTicks;
-                    if (curMeasure > 0 && (curMeasure % 2 == 0)) {
-                        // 偶数小节边界 → 跳转
-                        clearNotes();
-                        currentScene.store(endIdx);
-                        pendingScene.store(-1); // 消费
-                        transition = TransitionType::None;
-                        startRelTick = 0;
-                        break;
-                    }
+                if (endIdx >= 0 && endIdx < (int)scenes.size()) {
+                    clearNotes();
+                    currentScene.store(endIdx);
+                    pendingScene.store(-1);
+                    transition = TransitionType::None;
+                    startRelTick = 0;
+                    break;
+                }
+            }
+
+            // ==== Fill 强制结束检查 (基于墙钟) ====
+            if (fillEndTick > 0) {
+                uint64_t fillEndUs = startTimeUs + (uint64_t)(fillEndTick * usecPerTick);
+                uint64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count();
+                if (nowUs >= fillEndUs) {
+                    clearNotes();
+                    fillEndTick = 0;
+                    break;
                 }
             }
 
@@ -490,7 +537,8 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     if (parser.getChannelMSB(po.ch) >= 126)
                         newNote = remapXGDrumToGM(newNote);
                     int vel = 90;
-                    audio->enqueueNoteOn(target, po.ch, newNote, vel);
+                    audio->enqueueNoteOn(target, po.ch, newNote,
+                        std::max(1, std::min(127, vel)));
                     po.note = static_cast<uint8_t>(newNote);
                     anyRetriggered = true;
                 }
@@ -512,11 +560,18 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                     if (ci.channel == ne.channel) { chBank = ci.bank; chProg = ci.program; break; }
                 }
                 int tpNote = chordTransposer.transpose(ne.channel, ne.note, chBank, chProg);
-                int vel = ne.velocity;
-                if (ne.channel == 10) { vel = (int)(vel * 1.3f); if (vel > 127) vel = 127; }
+                int vel = ne.velocity + velOffsets[item.idx];
+                if (vel < 1) vel = 1; if (vel > 127) vel = 127;
+                if (ne.channel == 10) { vel = (int)(vel * 1.2f); if (vel > 127) vel = 127; }
                 if (parser.getChannelMSB(ne.channel) >= 126)
                     tpNote = remapXGDrumToGM(tpNote);
                 audio->enqueueNoteOn(target, ne.channel, tpNote, vel);
+                // timeOffset: 墙钟 tick - 场景内 tick (均模 measure, 接近0=对齐)
+                uint64_t nowUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::steady_clock::now().time_since_epoch()).count();
+                uint32_t clockTick = (uint32_t)((nowUs - startTimeUs) / usecPerTick) % measureTicks;
+                uint32_t sceneTick = item.tick % measureTicks;
+                lastTimeOff = (int)clockTick - (int)sceneTick;
                 auto now = std::chrono::steady_clock::now().time_since_epoch();
                 lastNoteMs[ne.channel].store(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
                 pendingOffs.push_back({item.offTick, ne.channel, static_cast<uint8_t>(tpNote), ne.note, ne.startTick});
@@ -555,11 +610,81 @@ void StylePlayer::playbackLoop(AudioEngine* audio, int target) {
                 currentScene.store(pending);
                 pendingScene.store(-1);
             }
+            // Intro/Fill→Main: 仅在自然结束时, 且等待小节边界
+            if (!fillJump) {
+                std::string curName = scenes[currentScene.load()].name;
+                if (isIntroScene(curName) && pending < 0) {
+                    // Intro→Main 直接切换
+                    std::string curLower = curName;
+                    std::transform(curLower.begin(), curLower.end(), curLower.begin(), ::tolower);
+                    char curId = 0;
+                    for (int k = (int)curName.size()-1; k >= 0; k--) {
+                        char c = curName[k];
+                        if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) { curId = std::toupper(c); break; }
+                    }
+                    for (size_t k = 0; k < scenes.size(); k++) {
+                        std::string nLower = scenes[k].name;
+                        std::transform(nLower.begin(), nLower.end(), nLower.begin(), ::tolower);
+                        if (nLower.find("main") != std::string::npos) {
+                            char mId = 0;
+                            for (int j = (int)scenes[k].name.size()-1; j >= 0; j--) {
+                                char c = scenes[k].name[j];
+                                if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) { mId = std::toupper(c); break; }
+                            }
+                            if (curId && mId == curId) {
+                                currentScene.store((int)k); pendingScene.store(-1); break;
+                            }
+                        }
+                    }
+                }
+                if (isFillScene(curName) && pending < 0) {
+                    // Fill→Main: 立即切换 (fillEndTick 已保证正确时长)
+                    std::string curLower = curName;
+                    std::transform(curLower.begin(), curLower.end(), curLower.begin(), ::tolower);
+                    char curId = 0;
+                    for (int k = (int)curName.size()-1; k >= 0; k--) {
+                        char c = curName[k];
+                        if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) { curId = std::toupper(c); break; }
+                    }
+                    for (size_t k = 0; k < scenes.size(); k++) {
+                        std::string nLower = scenes[k].name;
+                        std::transform(nLower.begin(), nLower.end(), nLower.begin(), ::tolower);
+                        if (nLower.find("main") != std::string::npos) {
+                            char mId = 0;
+                            for (int j = (int)scenes[k].name.size()-1; j >= 0; j--) {
+                                char c = scenes[k].name[j];
+                                if ((c >= 'A' && c <= 'D') || (c >= 'a' && c <= 'd')) { mId = std::toupper(c); break; }
+                            }
+                            if (curId && mId == curId) {
+                                currentScene.store((int)k); pendingScene.store(-1); break;
+                            }
+                        }
+                    }
+                }
+            }
             // 否则循环本场景
             transition = TransitionType::None;
         }
         if (!fillJump) startRelTick = 0; // fill 跳转保持 seekTick, 其他从头
     }
+}
+
+std::string StylePlayer::getDebugInfo() const {
+    std::ostringstream oss;
+    oss << "fShift=" << lastFillShift << " off=" << lastTimeOff
+        << " cur=" << currentScene.load() << " pend=" << pendingScene.load()
+        << " tSig=" << timeSigNum << " beatT=" << beatTicks;
+    return oss.str();
+}
+
+void StylePlayer::setTempoBPM(double bpm) {
+    if (bpm < 30 || bpm > 300) return;
+    tempo = (uint32_t)(60000000.0 / bpm); // 更新 us/qn 值
+}
+
+void StylePlayer::setHumanize(float timing, float velocity) {
+    humanizer.timingRandomness = timing;
+    humanizer.velocityRandomness = velocity;
 }
 
 void StylePlayer::setChordRoot(int root, const std::string& chordName) {

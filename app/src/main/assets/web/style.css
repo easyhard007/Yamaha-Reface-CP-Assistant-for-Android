@@ -4,8 +4,8 @@
 }
 
 :root {
-    --wk-width: 40px;
-    --bk-width: 26px;
+    --wk-width: 30px;
+    --bk-width: 20px;
     --bk-margin: -13px;
     --pad-gap: 5px;
 }
@@ -15,7 +15,7 @@ html, body {
     background-color: #050505;
     margin: 0; padding: 0; width: 100vw; max-width: 100vw;
     height: 100dvh; max-height: 100dvh;
-    color: #fff; text-align: center; overflow: hidden;
+    color: #fff; text-align: center;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
@@ -28,8 +28,7 @@ body {
 }
 
 #main-page {
-    flex: 1; display: flex; flex-direction: column; width: 100%; 
-    padding-bottom: 60px; 
+    flex: 1; display: flex; flex-direction: column; width: 100%; padding-top: 30px;
     overflow-y: auto; overflow-x: hidden; scrollbar-width: none; 
 }
 #main-page::-webkit-scrollbar { display: none; }
@@ -51,33 +50,42 @@ h2 {
     width: calc(100% - 20px); max-width: 900px; 
     padding: 2vmin; 
     /* 将圆角改为 CSS 变量，默认 20px，方便 JS 动态修改 */
-    border-radius: var(--card-radius, 20px); 
+    border-radius: var(--card-radius, 10px);
     box-sizing: border-box; position: relative; z-index: 2;
     background: rgba(230, 230, 240, 0.06); 
     backdrop-filter: blur(20px) brightness(95%) saturate(95%); 
     -webkit-backdrop-filter: blur(20px) brightness(95%) saturate(95%);
-    border: 1px solid rgba(255, 255, 255, 0.1); border-top: 1px solid rgba(255, 255, 255, 0.15); border-left: 1px solid rgba(255, 255, 255, 0.12); 
-    box-shadow: 0 20px 60px 10px rgba(0, 0, 0, 0.5), 0 10px 20px 0px rgba(0, 0, 0, 0.05), inset 0 0 20px rgba(0, 0, 0, 0.15);   
+    border: 1px solid rgba(255, 255, 255, 0.1); border-top: 1px solid rgba(255, 255, 255, 0.15); border-left: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 20px 60px 10px rgba(0, 0, 0, 0.5), 0 10px 20px 0px rgba(0, 0, 0, 0.05), inset 0 0 20px rgba(0, 0, 0, 0.15);
 }
+.invisible-card { margin: 4px auto; width: calc(100% - 20px); max-width: 900px; padding: 0; border-radius: 0; box-sizing: border-box; background: none; border: none; box-shadow: none; backdrop-filter: none; z-index: 3; position: relative; }
+
+.switch { font-size: 17px; position: relative; display: inline-block; width: 3.5em; height: 2em; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; inset: 0; border: 2px solid #555; border-radius: 50px; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+.slider:before { position: absolute; content: ""; height: 1.4em; width: 1.4em; left: 0.2em; bottom: 0.2em; background-color: white; border-radius: inherit; transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1); }
+.switch input:checked + .slider:before { transform: translateX(1.5em); }
+
+#cajon-leds > div { transition: background 0.05s, box-shadow 0.05s; }
 
 /* ==========================================
    【核心修复】：为多层嵌套的 Flex 容器注入钢筋骨架
    ========================================== */
 
 #piano-card {
-    /* 不仅要占 4 份，还要给一个最小高度保底，防止内部压缩 */
-    flex: 4;
-    min-height: 35vh; /* 强制钢琴卡片至少占据屏幕的 35% 高度 */
-    display: flex; flex-direction: column; 
+    display: flex; flex-direction: column;
 }
 
-
-/* === 2. 钢琴与和弦的 1:1 等分包裹器 === */
 #piano-lower-half {
-    display: flex; flex-direction: column; 
-    flex: 1; 
-    min-height: 150px; /* 核心修复：必须给包裹器一个最小绝对高度 */
+    height: 80px;
+    flex-shrink: 0;
 }
+#keyboard-wrapper {
+    height: 80px;
+    width: 100%; overflow-x: auto; scrollbar-width: none;
+    display: flex; align-items: flex-end;
+}
+#keyboard { height: 80px; }
 
 #pressed-notes { 
     background: rgba(0,0,0,0.3); border-radius: 8px; margin-bottom: 2vmin; 
@@ -89,19 +97,12 @@ h2 {
 .chord-primary-text { font-size: clamp(24px, 6vh, 48px); font-weight: bold; color: #fff; }
 .chord-secondary-text { font-size: clamp(12px, 3vh, 20px); color: #ccc; font-weight: bold; }
 
-/* === 3. 钢琴键盘区 === */
-#keyboard-wrapper { 
-    flex: 1; /* 占据包裹器另外 50% */
-    min-height: 80px; /* 核心修复：防止键盘被压没 */
-    width: 100%; overflow-x: auto; scrollbar-width: none; 
-    display: flex; align-items: flex-end; 
-}
-#keyboard-wrapper::-webkit-scrollbar { display: none; } 
+#keyboard-wrapper::-webkit-scrollbar { display: none; }
 #keyboard { display: flex; width: max-content; user-select: none; height: 100%; }
 .key { position: relative; box-sizing: border-box; }
 
-.white-key { width: var(--wk-width); min-width: var(--wk-width); height: 100%; background: rgba(240, 240, 240, 0.9); border: 1px solid rgba(0,0,0,0.2); border-radius: 0 0 6px 6px; z-index: 1; backdrop-filter: blur(5px); }
-.black-key { width: var(--bk-width); min-width: var(--bk-width); height: 60%; background: rgba(20, 20, 20, 0.95); border-radius: 0 0 4px 4px; margin-left: var(--bk-margin); margin-right: var(--bk-margin); z-index: 2; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
+.white-key { width: var(--wk-width); height: 100%; background: rgba(240, 240, 240, 0.9); border: 1px solid rgba(0,0,0,0.2); border-radius: 0 0 3px 3px; z-index: 1; backdrop-filter: blur(5px); }
+.black-key { width: var(--bk-width); height: 60%; background: rgba(20, 20, 20, 0.95); border-radius: 0 0 2px 2px; margin-left: var(--bk-margin); margin-right: var(--bk-margin); z-index: 2; box-shadow: 2px 2px 5px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
 
 /* ==========================================
    【核心修复】：钢琴监控点 (红点与粉点)
@@ -184,7 +185,7 @@ pointer-events: none;
 #color-picker-container { display: flex; width: 100%; height: 100%; justify-content: center; align-items: center; }
 
 /* 核心修复 4：取消高度 100% 的死板限制，让 iro.js 自由计算 */
-.IroWheel { max-height: 200px !important; max-width: 100% !important; aspect-ratio: 1/1; }
+.IroWheel { max-width: 100% !important; aspect-ratio: 1/1; }
 
 #light-info-section { width: 40%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 2vmin; box-sizing: border-box; }
 #light-roman-display { font-size: clamp(12px, 2.5vh, 20px); color: rgba(255,255,255,0.7); margin-bottom: 2px; font-weight: bold; font-family: serif;}
@@ -193,10 +194,16 @@ pointer-events: none;
 
 #fab-btn { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: max(20px, env(safe-area-inset-left)); width: 44px; height: 44px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.5); color: #fff; font-size: 20px; font-weight: bold; display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 900; transition: all 0.3s; }
 #fab-btn.success { color: #00e676; border-color: rgba(0, 230, 118, 0.4); }
+#chord-fab-btn { position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: 80px; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 900; transition: all 0.3s; }
 
 #settings-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(5,5,5,0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); z-index: 1000; display: none; flex-direction: column; align-items: center; padding-top: max(60px, env(safe-area-inset-top)); box-sizing: border-box; overflow-y: auto; padding-bottom: 40px; }
 #settings-page.show { display: flex; }
-#back-btn { position: absolute; top: max(20px, env(safe-area-inset-top)); left: max(20px, env(safe-area-inset-left)); background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; padding: 10px 15px; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; backdrop-filter: blur(10px); }
+#chord-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100dvh; background-color: rgba(5,5,5,0.85); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); z-index: 1000; display: none; flex-direction: column; align-items: center; padding-top: max(60px, env(safe-area-inset-top)); box-sizing: border-box; overflow-y: auto; padding-bottom: 40px; }
+#chord-page.show { display: flex; }
+#chord-pressed-card { width: 90%; max-width: 500px; flex-shrink: 0; }
+#chord-color-card { width: 90%; max-width: 500px; margin-top: 12px; flex-shrink: 0; }
+#chord-color-card #color-picker-container { height: 200px; }
+#back-btn, #chord-back-btn { position: absolute; top: max(20px, env(safe-area-inset-top)); left: max(20px, env(safe-area-inset-left)); width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 15px rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; cursor: pointer; z-index: 1001; }
 select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margin-bottom: 20px; background: rgba(0,0,0,0.5); color: white; border: 1px solid rgba(255,255,255,0.2); font-size: 16px; outline: none; }
 .action-btn { padding: 15px 20px; font-size: 16px; font-weight: bold; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; cursor: pointer; margin: 10px 5px; width: 140px; transition: all 0.3s ease; }
 .action-btn.success { background: rgba(170, 0, 255, 0.6); border-color: rgba(170, 0, 255, 0.8); text-shadow: 0 0 10px rgba(255,255,255,0.5); } 
@@ -207,7 +214,6 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 /* --- 新增：功能控制面板 --- */
 /* --- 功能面板核心布局 --- */
 #function-card {
-    flex: 2.5;
     min-height: 20vh;
     display: flex;
     flex-direction: column;
@@ -228,6 +234,7 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     display: flex;
     align-items: center;
     gap: clamp(6px, 1.5vw, 15px); /* 内部元素（按钮和文字）的间距 */
+    margin-bottom: 20px;
 }
 
 .function-lower-area {
@@ -246,7 +253,7 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 
 /* 玻璃按钮样式 */
 .glass-btn {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.2);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -274,8 +281,8 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 }
 
 .btn-rect {
-    padding: 8px 18px;
-    border-radius: 10px;
+    padding: 6px 6px;
+    border-radius: 5px;
     font-size: 14px;
     font-weight: bold;
     letter-spacing: 1px;
@@ -288,10 +295,81 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
 }
 
-input[type=range] { -webkit-appearance: none; appearance: none; height: 4px; background: #444; border-radius: 2px; outline: none; }
-input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #fff; cursor: pointer; }
+/* ===== Energy Range Slider ===== */
+.energy-range {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  width: 160px;
+  height: 3px;
+  border-radius: 2px;
+  outline: none;
+  vertical-align: middle;
+  background: #444;
+}
+.energy-range::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 3px;
+  border-radius: 2px;
+}
+.energy-range::-moz-range-track {
+  -moz-appearance: none;
+  height: 3px;
+  border-radius: 2px;
+  background: #444;
+}
+.energy-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 50%;
+  height: 22px;
+  width: 22px;
+  position: relative;
+  top: -10px;
+  background-color: #1d1c25;
+  cursor: pointer;
+  transition: border 300ms ease;
+}
+.energy-range::-webkit-slider-thumb:active {
+  border-color: rgba(255,255,255,0.9);
+}
+.energy-range::-moz-range-thumb {
+  -moz-appearance: none;
+  border: 2px solid rgba(255,255,255,0.5);
+  border-radius: 50%;
+  height: 22px;
+  width: 22px;
+  position: relative;
+  top: -10px;
+  background-color: #1d1c25;
+  cursor: pointer;
+  transition: border 300ms ease;
+}
+.energy-range::-moz-range-thumb:active {
+  border-color: rgba(255,255,255,0.9);
+}
 
-@keyframes style-blink {
+@keyframes ready-blink {
+    0%, 100% { border: 2px solid rgba(255,255,255,0.3); }
+    50%      { border: 2px solid rgba(255,255,255,0.9); }
+}
+@keyframes loop-spin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+.scene-playing { background: #fff !important; color: #121212 !important; font-weight: bold; }
+.scene-ready  { animation: ready-blink 0.5s ease-in-out infinite; }
+.scene-loop   { border: 2px dashed #f5c542; }
+.scene-loop::after {
+    content: ''; position: absolute; top: -3px; left: -3px; right: -3px; bottom: -3px;
+    border: 2px dashed #f5c542; border-radius: inherit;
+    animation: loop-spin 3s linear infinite; pointer-events: none;
+}
+.scene-grid-btn {
+    position: relative; font-size: 10px; padding: 4px 2px; text-align: center;
+    border: 1px solid #333; border-radius: 4px; cursor: pointer; overflow: hidden;
+    box-sizing: border-box;
+}
     from { box-shadow: 0 0 4px rgba(255,255,255,0.3); }
     to   { box-shadow: 0 0 16px rgba(255,255,255,0.9); }
 }
@@ -378,7 +456,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: 
     }
 
     .btn-rect {
-        padding: 8px 18px; /* 减小 Auto-Sustain 按钮尺寸 */
+        padding: 8px 8px; /* 减小 Auto-Sustain 按钮尺寸 */
         font-size: 13px;
     }
 

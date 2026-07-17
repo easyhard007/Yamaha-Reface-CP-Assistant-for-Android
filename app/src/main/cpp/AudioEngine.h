@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 #include "fluidlite.h"
+#include "RhythmAudioEngine.h"
 
 enum class MidiCmdType { NoteOn, NoteOff, CC, ProgramChange, AllNotesOff, AllSoundsOff, SetReverb, SetGain };
 

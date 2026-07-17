@@ -75,22 +75,25 @@ function interpolateHSL(source, target, progress) {
 // === 核心修复 4：调色盘自适应大小 ===
 function initColorPicker() {
     const container = document.getElementById('color-picker-section');
-    // 根据父级容器当前实际可用宽度，动态算出最合理的尺寸 (留点内边距)
-    const initialWidth = Math.min(container.clientWidth * 0.8, container.clientHeight * 0.8, 180);
+    if (!container) return;
+    // 已初始化则跳过
+    if (window.colorPicker) return;
+    const w = Math.round(window.innerWidth * 0.2);
+    if (w <= 0) return; // 容器不可见, 等面板打开时再初始化
 
-    colorPicker = new iro.ColorPicker("#color-picker-container", {
-        width: initialWidth, 
-        color: "#aa00ff", 
-        layoutDirection: "horizontal", 
+    window.colorPicker = new iro.ColorPicker("#color-picker-container", {
+        width: w,
+        color: "#aa00ff",
+        layoutDirection: "horizontal",
         layout: [ { component: iro.ui.Wheel } ]
     });
 
     // 监听窗口尺寸变化，动态修正 iro 色环的大小！
     window.addEventListener('resize', () => {
-        if (!colorPicker || !container) return;
+        if (!window.colorPicker || !container) return;
         // 算出新的可用尺寸
         const newWidth = Math.min(container.clientWidth * 0.8, container.clientHeight * 0.8, 180);
-        colorPicker.resize(newWidth);
+        window.colorPicker.resize(newWidth);
     });
 
     setTimeout(() => {
@@ -98,7 +101,7 @@ function initColorPicker() {
     }, 100);
     
     // 初始化颜色数组 (代码保留不变)
-    const hsl = colorPicker.color.hsl;
+    const hsl = window.colorPicker.color.hsl;
     window.padLightSources[0].userHSL = { h: hsl.h, s: hsl.s, l: 100 };
     
     requestAnimationFrame(engineLoop);
@@ -139,7 +142,7 @@ function engineLoop(currentTime) {
     if (smoothedVolume < 0.005) smoothedVolume = 0.0;
 
     // 2. 更新全局视觉状态的能量包络
-    window.visualState.envelope = Math.max(0, Math.min(1.0, Math.pow(smoothedVolume, 0.4)));
+    window.visualState.envelope = Math.max(0, Math.min(1.0, Math.pow(smoothedVolume, 1)));
 
     // 3. 修改调用背景引擎的部分
     if (typeof updateBackgroundState === 'function') {

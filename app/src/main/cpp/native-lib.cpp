@@ -1,22 +1,76 @@
 #include <jni.h>
 #include <string>
+#include <algorithm>
+#include <mutex>
 #include "AudioEngine.h"
 #include "MidiProcessor.h"
 #include "StylePlayer.h"
 #include "LowChordDetector.h"
+#include "TempoTracker.h"
+#include "BeatTracker.h"
+#include "RhythmAudioEngine.h"
+#include "CajonAssistant.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
 static StylePlayer stylePlayer;
 static LowChordDetector chordDetector;
+static TempoTracker tempoTracker;
+static BeatTracker beatTracker;
+extern RhythmAudioEngine* g_rhythmEngine;
+static RhythmAudioEngine rhythmEngine;
+static CajonAssistant cajon;
+static int assistType = 0;
+static float g_minCajonEnergy = 0.0f;
+static std::vector<TempoMidiEvent> tempoEvents;
+
+// ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
+static std::vector<double> recentNoteTimestamps;
+static std::mutex energyMutex;
+static void updateCajonEnergy(double nowMs);
+
+static void onBeatStep(int step, double bpm, void*) {
+    cajon.onStep(step, bpm);
+    // 每拍 (step % 8 == 0) 更新一次能量, 让无输入时自然衰减
+    if (step % 8 == 0) {
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+        updateCajonEnergy(ms);
+    }
+}
+
+static void updateCajonEnergy(double nowMs) {
+    std::lock_guard<std::mutex> lock(energyMutex);
+    // 清理超过 2 秒的旧时间戳
+    double cutoff = nowMs - 2000.0;
+    recentNoteTimestamps.erase(
+        std::remove_if(recentNoteTimestamps.begin(), recentNoteTimestamps.end(),
+            [cutoff](double t) { return t < cutoff; }),
+        recentNoteTimestamps.end());
+    // 线性映射: 0 个 → 0.0, 20 个 → 1.0
+    float autoEnergy = std::min(1.0f, (float)recentNoteTimestamps.size() / 24.0f);
+    float energy = std::max(autoEnergy, g_minCajonEnergy);
+    cajon.setEnergy(energy);
+}
 
 // ===== Audio Engine (FluidLite) =====
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
         JNIEnv* env, jobject, jstring sf2Path) {
     const char *path = env->GetStringUTFChars(sf2Path, nullptr);
+    srand((unsigned int)std::chrono::steady_clock::now().time_since_epoch().count());
     audio.init(path);
+    // Init rhythm engine BEFORE audio starts (callback needs g_rhythmEngine set)
+    g_rhythmEngine = &rhythmEngine;
+    cajon.init(&rhythmEngine);
     audio.start();
+    // Beat tracker
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
+    double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    tempoTracker.init(4, 4, 75.0, ms);
+    beatTracker.setBeatZeroSignal(&stylePlayer.beatZeroSignal);
+    beatTracker.setStepCallback(onBeatStep, nullptr);
+    beatTracker.start(4, 75.0);
     env->ReleaseStringUTFChars(sf2Path, path);
 }
 
@@ -80,6 +134,19 @@ static jint encodeResult(int sustainCC, int bassNote, int bassVel) {
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         JNIEnv*, jobject, jint note, jint velocity) {
+    // 记录 tempo 事件 (最多 100 条)
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
+    double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    tempoEvents.push_back({(uint8_t)note, (uint8_t)velocity, ms});
+    if (tempoEvents.size() > 100) tempoEvents.erase(tempoEvents.begin());
+
+    // 统计近 2 秒音符密度 → Cajon 能量
+    {
+        std::lock_guard<std::mutex> lock(energyMutex);
+        recentNoteTimestamps.push_back(ms);
+    }
+    updateCajonEnergy(ms);
+
     auto r = midi.processNoteOn(note, velocity);
     chordDetector.feedNotes(midi.getLowNotes(), midi.getAllNotes(), midi.getSplitNote());
     // 和弦根音: 来自 LowChordDetector, 由 feedNotes 内部确定
@@ -149,6 +216,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeLoadStyle(
     env->ReleaseStringUTFChars(styPath, path);
     if (!ok)
         return env->NewStringUTF("{\"error\":\"Failed to load style\"}");
+    beatTracker.setBeatZeroSignal(&stylePlayer.beatZeroSignal);
+    beatTracker.start(stylePlayer.getTimeSigNum(), stylePlayer.getTempoBPM());
     return env->NewStringUTF(stylePlayer.getScenesJson().c_str());
 }
 
@@ -161,7 +230,9 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStyleSelectScene(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStyleStart(
         JNIEnv*, jobject) {
-    stylePlayer.start(&audio, 1);
+    beatTracker.sync(); // 对齐到第 1 拍
+    tempoEvents.clear();
+    stylePlayer.start(&audio, 1, 0); // 从头播放
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -193,6 +264,17 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetPendingScene(
 extern "C" JNIEXPORT jdouble JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetStyleTempo(
         JNIEnv*, jobject) {
+    if (!tempoEvents.empty()) {
+        stylePlayer.getTempoBPM();
+        double newBpm = tempoTracker.processEvents(tempoEvents);
+        tempoEvents.clear();
+        // 动态更新播放速度
+        if (std::abs(newBpm - stylePlayer.getTempoBPM()) > 0.5) {
+            stylePlayer.setTempoBPM(newBpm);
+            beatTracker.setTempo(newBpm);
+        }
+        return newBpm;
+    }
     return stylePlayer.getTempoBPM();
 }
 
@@ -205,7 +287,32 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTimeSig(
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentBeat(
         JNIEnv*, jobject) {
-    return (jint)stylePlayer.getCurrentBeat();
+    return beatTracker.getCurrentBeat();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
+        JNIEnv*, jobject) {
+    beatTracker.sync();
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBeatIndex(
+        JNIEnv*, jobject) {
+    return tempoTracker.getCurrentBeatIndex();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordNotes(
+        JNIEnv* env, jobject) {
+    static const char* nn[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+    auto notes = midi.getLowNotes();
+    std::string s;
+    for (int n : notes) {
+        if (!s.empty()) s += " ";
+        s += nn[n % 12] + std::to_string(n / 12 - 1);
+    }
+    return env->NewStringUTF(s.c_str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -224,6 +331,58 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordTones(
         JNIEnv* env, jobject) {
     return env->NewStringUTF(stylePlayer.getChordTonesString().c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInitRhythmEngine(
+        JNIEnv* env, jobject, jstring wavDir) {
+    const char* dir = env->GetStringUTFChars(wavDir, nullptr);
+    bool ok = rhythmEngine.loadSamples(dir);
+    env->ReleaseStringUTFChars(wavDir, dir);
+    if (ok) cajon.setEnabled(true);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetCajonEnergy(
+        JNIEnv*, jobject, jfloat energy) { cajon.setEnergy(energy); }
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCajonEnergy(
+        JNIEnv*, jobject) { return cajon.getEnergy(); }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetMinCajonEnergy(
+        JNIEnv*, jobject, jfloat v) {
+    g_minCajonEnergy = (v < 0 ? 0 : (v > 1.0f ? 1.0f : v));
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetMinCajonEnergy(
+        JNIEnv*, jobject) { return g_minCajonEnergy; }
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeCajonTick(
+        JNIEnv*, jobject) {
+    return cajon.getCurrentStep();
+}
+
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCajonWeights(
+        JNIEnv* env, jobject) {
+    jfloatArray arr = env->NewFloatArray(32);
+    env->SetFloatArrayRegion(arr, 0, 32, cajon.getStepWeights());
+    return arr;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetAssistType(
+        JNIEnv*, jobject, jint v) { assistType = v; cajon.setEnabled(v == 0); }
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetDebugInfo(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(stylePlayer.getDebugInfo().c_str());
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -312,6 +471,20 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsChannelMuted(
         JNIEnv*, jobject, jint channel) {
     return stylePlayer.isMuted((int)channel) ? JNI_TRUE : JNI_FALSE;
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetHumanize(
+        JNIEnv*, jobject, jfloat timing, jfloat velocity) {
+    stylePlayer.setHumanize(timing, velocity);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetHumanizeTiming(
+        JNIEnv*, jobject) { return stylePlayer.getHumanizeTiming(); }
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetHumanizeVelocity(
+        JNIEnv*, jobject) { return stylePlayer.getHumanizeVelocity(); }
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetReverb(

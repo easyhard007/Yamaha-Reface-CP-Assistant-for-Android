@@ -1,4 +1,8 @@
 #include "AudioEngine.h"
+#include "RhythmAudioEngine.h"
+
+// Global rhythm engine for WAV playback
+RhythmAudioEngine* g_rhythmEngine = nullptr;
 #include "fluid_sfont.h"
 #include <android/log.h>
 #include <cstring>
@@ -217,6 +221,8 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     } else {
         memset(outBuffer, 0, numFrames * 2 * sizeof(float));
     }
+    // Mix rhythm WAV samples
+    if (g_rhythmEngine) g_rhythmEngine->mixAudio(outBuffer, numFrames);
     return oboe::DataCallbackResult::Continue;
 }
 

@@ -126,10 +126,10 @@ int ChordTransposer::transpose(int channel, int note, int bank, int program) con
     // 规则 1: 鼓 → 不变
     if (isDrumChannel(bank)) return note;
 
-    // 规则 2: 贝斯 → 根音平行移调
+    // 规则 2: 贝斯 → 根音平行移调, 最低不低于 G1 (MIDI 31)
     if (isBassChannel(bank, program)) {
-        int shifted = note + (mChordRoot - 60); // 假设原调 C (根音=60)
-        if (shifted < 0) shifted = 0;
+        int shifted = note + (mChordRoot - 60);
+        while (shifted < 31) shifted += 12; // 低于 G1 加八度
         if (shifted > 127) shifted = 127;
         return shifted;
     }
