@@ -71,7 +71,7 @@ function initBackground() {
     const w = window.innerWidth;
     const h = window.innerHeight;
     const initialScale = calculateOptimalScale();
-    cbRenderer.setSize(w, h, false);
+    cbRenderer.setSize(w, h, true);
     container.appendChild(cbRenderer.domElement);
 
     cbClock = new THREE.Clock();
@@ -236,7 +236,7 @@ window.addEventListener('resize', () => {
         if (!cbRenderer || !container) return;
         const nw = window.innerWidth;
         const nh = window.innerHeight;
-        cbRenderer.setSize(nw, nh, false);
+        cbRenderer.setSize(nw, nh, true);
         // 动态更新 Shader 变量
         cbUniforms.uCanvas.value.set(nw, nh);
         cbUniforms.uScale.value = calculateOptimalScale();

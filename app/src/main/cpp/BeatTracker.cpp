@@ -1,6 +1,7 @@
 #include "BeatTracker.h"
 #include "CajonAssistant.h"
 #include <chrono>
+#include <android/log.h>
 
 BeatTracker::BeatTracker() = default;
 
@@ -43,10 +44,13 @@ void BeatTracker::beatLoop() {
     while (running.load()) {
         // SYNC 请求: 立即跳到第 1 拍
         if (needSync.exchange(false)) {
+            auto syncAt = steady_clock::now();
             beat = 0;
+            stepCounter = 0; // 重置步进计数器, 否则 groove 相位错位
             currentBeat.store(0);
             if (beatZeroSig) beatZeroSig->store(true);
-            nextBeatTime = steady_clock::now() + milliseconds((int64_t)beatIntervalMs);
+            nextBeatTime = syncAt; // 立即开始 beat 0, 不等
+            __android_log_print(ANDROID_LOG_INFO, "BeatTracker", "SYNC: beat 0 starts now, beatIntervalMs=%.0f", beatIntervalMs);
             continue;
         }
 
@@ -83,6 +87,7 @@ void BeatTracker::beatLoop() {
                     cv.wait_until(lock, targetUs);
                 }
                 if (!running.load()) { currentBeat.store(beat); return; }
+                if (needSync.load()) { __android_log_print(ANDROID_LOG_INFO, "BeatTracker", "SYNC break at sub-beat s=%d step=%d", s, step); break; }
                 stepCb(step, bpm, stepCbUser);
                 stepCounter++;
             }

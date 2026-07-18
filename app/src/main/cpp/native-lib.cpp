@@ -6,7 +6,7 @@
 #include "MidiProcessor.h"
 #include "StylePlayer.h"
 #include "LowChordDetector.h"
-#include "TempoTracker.h"
+// #include "TempoTracker.h" — removed, rewriting tempo detection
 #include "BeatTracker.h"
 #include "RhythmAudioEngine.h"
 #include "CajonAssistant.h"
@@ -15,28 +15,75 @@ static AudioEngine audio;
 static MidiProcessor midi;
 static StylePlayer stylePlayer;
 static LowChordDetector chordDetector;
-static TempoTracker tempoTracker;
+// static TempoTracker tempoTracker; — removed, rewriting tempo detection
 static BeatTracker beatTracker;
 extern RhythmAudioEngine* g_rhythmEngine;
 static RhythmAudioEngine rhythmEngine;
 static CajonAssistant cajon;
 static int assistType = 0;
 static float g_minCajonEnergy = 0.0f;
-static std::vector<TempoMidiEvent> tempoEvents;
+static std::atomic<double> g_pendingBpmUpdate{-1.0};
+static std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
+static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
 static std::mutex energyMutex;
+// ===== C++ → Kotlin push 通道 =====
+static JavaVM* g_jvm = nullptr;
+static jobject g_activityObj = nullptr;
+
+static void pushSustainToKotlin(int cc) {
+    if (!g_jvm || !g_activityObj || cc < 0) return;
+    JNIEnv* env;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        g_jvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+    jclass cls = env->GetObjectClass(g_activityObj);
+    jmethodID mid = env->GetMethodID(cls, "onNativeSustainCC", "(I)V");
+    if (mid) env->CallVoidMethod(g_activityObj, mid, cc);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void pushBeatDotUpdate() {
+    if (!g_jvm || !g_activityObj) return;
+    JNIEnv* env;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        g_jvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+    jclass cls = env->GetObjectClass(g_activityObj);
+    jmethodID mid = env->GetMethodID(cls, "onNativeBeatUpdate", "()V");
+    if (mid) env->CallVoidMethod(g_activityObj, mid);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
+static void pushEnergyDisplayUpdate() {
+    if (!g_jvm || !g_activityObj) return;
+    JNIEnv* env;
+    bool attached = false;
+    if (g_jvm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED) {
+        g_jvm->AttachCurrentThread(&env, nullptr);
+        attached = true;
+    }
+    jclass cls = env->GetObjectClass(g_activityObj);
+    jmethodID mid = env->GetMethodID(cls, "onNativeEnergyUpdate", "()V");
+    if (mid) env->CallVoidMethod(g_activityObj, mid);
+    if (attached) g_jvm->DetachCurrentThread();
+}
+
 static void updateCajonEnergy(double nowMs);
 
 static void onBeatStep(int step, double bpm, void*) {
     cajon.onStep(step, bpm);
-    // 每拍 (step % 8 == 0) 更新一次能量, 让无输入时自然衰减
-    if (step % 8 == 0) {
-        auto now = std::chrono::steady_clock::now().time_since_epoch();
-        double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-        updateCajonEnergy(ms);
-    }
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
+    double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    updateCajonEnergy(ms); // 每子步推送能量显示
+    // 每拍首子步推送白点更新
+    if (step % 8 == 0) pushBeatDotUpdate();
 }
 
 static void updateCajonEnergy(double nowMs) {
@@ -51,12 +98,15 @@ static void updateCajonEnergy(double nowMs) {
     float autoEnergy = std::min(1.0f, (float)recentNoteTimestamps.size() / 24.0f);
     float energy = std::max(autoEnergy, g_minCajonEnergy);
     cajon.setEnergy(energy);
+    pushEnergyDisplayUpdate();
 }
 
 // ===== Audio Engine (FluidLite) =====
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
-        JNIEnv* env, jobject, jstring sf2Path) {
+        JNIEnv* env, jobject thiz, jstring sf2Path) {
+    env->GetJavaVM(&g_jvm);
+    g_activityObj = env->NewGlobalRef(thiz);
     const char *path = env->GetStringUTFChars(sf2Path, nullptr);
     srand((unsigned int)std::chrono::steady_clock::now().time_since_epoch().count());
     audio.init(path);
@@ -67,7 +117,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
     // Beat tracker
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    tempoTracker.init(4, 4, 75.0, ms);
+    // tempoTracker.init(4, 4, 75.0, ms); — removed
     beatTracker.setBeatZeroSignal(&stylePlayer.beatZeroSignal);
     beatTracker.setStepCallback(onBeatStep, nullptr);
     beatTracker.start(4, 75.0);
@@ -89,9 +139,44 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOff(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         JNIEnv*, jobject, jint controller, jint value) {
-    // CC86 → lead gain (0-6.0), CC87 → accomp gain (0-6.0)
+    // CC86 → lead gain (0-6.0)
     if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 6.0); return; }
-    if (controller == 87) { audio.enqueueSetGain(1, value / 127.0 * 6.0); return; }
+    // CC87 → 根据模式路由: type=0 控制 Cajon 音量, type=1 控制自动伴奏音量
+    if (controller == 87) {
+        if (assistType == 0 && g_rhythmEngine) {
+            float gain = value / 127.0f * 4.0f;
+            g_rhythmEngine->setMasterGain(gain);
+            g_pendingRhythmGainUpdate.store(gain);
+        } else {
+            audio.enqueueSetGain(1, value / 127.0 * 6.0);
+        }
+        return;
+    }
+    // CC89 → Cajon 能量 (0-127 → 0.0-1.0)
+    if (controller == 89) {
+        g_minCajonEnergy = value / 127.0f;
+        g_pendingMinEnergyUpdate.store(g_minCajonEnergy);
+        return;
+    }
+    // CC90 → BPM 调整 (增量式旋钮)
+    if (controller == 90) {
+        static int lastCC90 = -1;
+        static double lastCC90Time = 0;
+        auto now = std::chrono::steady_clock::now().time_since_epoch();
+        double nowSec = std::chrono::duration<double>(now).count();
+        if (lastCC90 >= 0 && (nowSec - lastCC90Time) <= 1.0) {
+            double delta = (value - lastCC90) / 2.0;
+            double newBpm = beatTracker.getCurrentBpm() + std::round(delta);
+            if (newBpm < 30.0) newBpm = 30.0;
+            if (newBpm > 300.0) newBpm = 300.0;
+            beatTracker.setTempo(newBpm);
+            stylePlayer.setTempoBPM(newBpm);
+            g_pendingBpmUpdate.store(newBpm);
+        }
+        lastCC90 = value;
+        lastCC90Time = nowSec;
+        return;
+    }
     audio.enqueueCC(0, 0, controller, value);
 }
 
@@ -134,13 +219,9 @@ static jint encodeResult(int sustainCC, int bassNote, int bassVel) {
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         JNIEnv*, jobject, jint note, jint velocity) {
-    // 记录 tempo 事件 (最多 100 条)
+    // 统计近 2 秒音符密度 → Cajon 能量
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    tempoEvents.push_back({(uint8_t)note, (uint8_t)velocity, ms});
-    if (tempoEvents.size() > 100) tempoEvents.erase(tempoEvents.begin());
-
-    // 统计近 2 秒音符密度 → Cajon 能量
     {
         std::lock_guard<std::mutex> lock(energyMutex);
         recentNoteTimestamps.push_back(ms);
@@ -173,15 +254,13 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessCC(
     return r.sustainCCToSend;
 }
 
-extern "C" JNIEXPORT void JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetAutoSustain(
         JNIEnv*, jobject, jboolean enabled) {
-    midi.setAutoSustainEnabled(enabled);
+    int cc = midi.setAutoSustainEnabled(enabled);
+    pushSustainToKotlin(cc);
+    return cc;
 }
-
-extern "C" JNIEXPORT jint JNICALL
-Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetPendingSustainCC(
-        JNIEnv*, jobject) { return midi.getPendingSustainCC(); }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetNoteState(
@@ -231,7 +310,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeStyleStart(
         JNIEnv*, jobject) {
     beatTracker.sync(); // 对齐到第 1 拍
-    tempoEvents.clear();
+    // tempoEvents.clear(); — removed
     stylePlayer.start(&audio, 1, 0); // 从头播放
 }
 
@@ -264,18 +343,32 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetPendingScene(
 extern "C" JNIEXPORT jdouble JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetStyleTempo(
         JNIEnv*, jobject) {
-    if (!tempoEvents.empty()) {
-        stylePlayer.getTempoBPM();
-        double newBpm = tempoTracker.processEvents(tempoEvents);
-        tempoEvents.clear();
-        // 动态更新播放速度
-        if (std::abs(newBpm - stylePlayer.getTempoBPM()) > 0.5) {
-            stylePlayer.setTempoBPM(newBpm);
-            beatTracker.setTempo(newBpm);
-        }
-        return newBpm;
-    }
+    // TempoTracker removed — rewriting tempo detection
     return stylePlayer.getTempoBPM();
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentBpm(
+        JNIEnv*, jobject) {
+    return beatTracker.getCurrentBpm();
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingBpm(
+        JNIEnv*, jobject) {
+    return g_pendingBpmUpdate.exchange(-1.0);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingRhythmGain(
+        JNIEnv*, jobject) {
+    return g_pendingRhythmGainUpdate.exchange(-1.0);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingMinEnergy(
+        JNIEnv*, jobject) {
+    return g_pendingMinEnergyUpdate.exchange(-1.0);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -294,12 +387,14 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
         JNIEnv*, jobject) {
     beatTracker.sync();
+    pushBeatDotUpdate(); // 立即推送白点归零
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBeatIndex(
         JNIEnv*, jobject) {
-    return tempoTracker.getCurrentBeatIndex();
+    // TempoTracker removed — rewriting tempo detection
+    return beatTracker.getCurrentBeat();
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -360,6 +455,18 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetMinCajonEnergy(
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetMinCajonEnergy(
         JNIEnv*, jobject) { return g_minCajonEnergy; }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetRhythmGain(
+        JNIEnv*, jobject, jfloat gain) {
+    if (g_rhythmEngine) g_rhythmEngine->setMasterGain(gain);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetRhythmGain(
+        JNIEnv*, jobject) {
+    return g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 4.8f;
+}
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeCajonTick(
@@ -491,6 +598,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetReverb(
         JNIEnv*, jobject, jdouble roomSize, jdouble level) {
     audio.enqueueSetReverb(0, roomSize, level);
     audio.enqueueSetReverb(1, roomSize, level);
+    if (g_rhythmEngine) g_rhythmEngine->setReverb((float)roomSize, (float)level);
 }
 
 extern "C" JNIEXPORT jdouble JNICALL

@@ -52,9 +52,9 @@ bool AudioEngine::init(const char* sf2Path) {
         return false;
     }
 
-    mLeadGain = 3.6;
+    mLeadGain = 1.8;  // 30%
     mAccompGain = 3.6;
-    fluid_synth_set_gain(mLeadSynth, 3.6f);
+    fluid_synth_set_gain(mLeadSynth, 1.8f); // 30%
     fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
     fluid_synth_set_reverb(mLeadSynth, 0.85, 0.15, 0.8, 0.70);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
@@ -221,8 +221,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     } else {
         memset(outBuffer, 0, numFrames * 2 * sizeof(float));
     }
-    // Mix rhythm WAV samples
-    if (g_rhythmEngine) g_rhythmEngine->mixAudio(outBuffer, numFrames);
+    // Mix rhythm WAV samples, then soft-clip to prevent hard clipping
+    if (g_rhythmEngine) {
+        g_rhythmEngine->mixAudio(outBuffer, numFrames);
+        for (int i = 0; i < numFrames * 2; ++i)
+            outBuffer[i] = tanhf(outBuffer[i]);
+    }
     return oboe::DataCallbackResult::Continue;
 }
 

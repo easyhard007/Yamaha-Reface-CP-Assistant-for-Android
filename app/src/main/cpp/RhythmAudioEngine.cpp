@@ -102,12 +102,15 @@ bool RhythmAudioEngine::loadSamples(const std::string& wavDir) {
         }
     }
     __android_log_print(ANDROID_LOG_INFO, TAG, "Loaded %zu samples", samples.size());
+    // 初始化混响, 默认参数与 AudioEngine 一致
+    setReverb(0.85f, 0.70f);
     return true;
 }
 
 void RhythmAudioEngine::trigger(int type, float velocity) {
     // type: 0=bass(L), 1=tone/tip(R), velocity: 0-127 MIDI
-    if (samples.empty()) return;
+    if (samples.empty()) { __android_log_print(ANDROID_LOG_WARN, "RhythmAudio", "trigger: no samples loaded"); return; }
+    __android_log_print(ANDROID_LOG_INFO, "RhythmAudio", "trigger type=%d vel=%.0f", type, velocity);
     int base = type * 8;
     int layerIdx = (velocity <= 64) ? 0 : 1;
     int rrIdx = rand() % 4;
@@ -121,19 +124,83 @@ void RhythmAudioEngine::trigger(int type, float velocity) {
     voices.push_back({samples[idx].pcm.data(), samples[idx].pcm.size(), 0, gain});
 }
 
-void RhythmAudioEngine::mixAudio(float* outBuf, int32_t numFrames) {
-    std::lock_guard<std::mutex> lock(voiceMutex);
-    for (auto& v : voices) {
-        size_t remain = v.length - v.position;
-        size_t n = (size_t)numFrames < remain ? numFrames : remain;
-        for (size_t i = 0; i < n; i++) {
-            float s = v.data[v.position + i] * v.gain * 4.0f; // +6dB gain boost
-            outBuf[i*2]   += s; // left
-            outBuf[i*2+1] += s; // right
-        }
-        v.position += n;
+void RhythmAudioEngine::setReverb(float roomSize, float level) {
+    if (!reverbInited) {
+        reverb.init(44100);
+        reverbInited = true;
     }
-    // Remove finished voices
-    voices.erase(std::remove_if(voices.begin(), voices.end(),
-        [](const ActiveVoice& v) { return v.position >= v.length; }), voices.end());
+    reverb.setRoomSize(roomSize);
+    // 干湿比 ≈ 6:1: UI level 0-1 映射到 wet mix 0-0.20
+    reverb.setMix(level * 0.10f);
+    // 衰减高频, 让混响尾巴更暖
+    reverb.setDamp(0.6f);
+    reverb.setLowDamp(0.2f); // 衰减 0-100Hz 低频混响
+}
+
+void RhythmAudioEngine::mixAudio(float* outBuf, int32_t numFrames) {
+    // 确保 temp buffer 足够大 (音频回调中不分配内存)
+    size_t needed = (size_t)numFrames * 2;
+    if (tempBuf.size() < needed) tempBuf.resize(needed);
+
+    // 先清零 temp buffer
+    std::fill(tempBuf.begin(), tempBuf.begin() + needed, 0.0f);
+
+    {
+        std::lock_guard<std::mutex> lock(voiceMutex);
+        float gain = masterGain.load();
+        for (auto& v : voices) {
+            size_t remain = v.length - v.position;
+            size_t n = (size_t)numFrames < remain ? numFrames : remain;
+            for (size_t i = 0; i < n; i++) {
+                float s = v.data[v.position + i] * v.gain * gain;
+                tempBuf[i*2]   += s;
+                tempBuf[i*2+1] += s;
+            }
+            v.position += n;
+        }
+        // Remove finished voices
+        voices.erase(std::remove_if(voices.begin(), voices.end(),
+            [](const ActiveVoice& v) { return v.position >= v.length; }), voices.end());
+    }
+
+    // 低频 Bell EQ: 60Hz +10dB, Q≈0.375 (20-180Hz)
+    applyLowBellEQ(tempBuf.data(), numFrames);
+
+    // 箱鼓混响 (仅处理 Cajon 干声, 不影响合成器)
+    if (reverbInited) {
+        reverb.process(tempBuf.data(), numFrames);
+    }
+
+    // 将处理后的 Cajon (dry+wet) 混入输出
+    for (int32_t i = 0; i < numFrames * 2; i++) {
+        outBuf[i] += tempBuf[i];
+    }
+}
+
+// Biquad peaking EQ: f0=60Hz, fs=44100, Q=0.375, gain=+10dB
+// Coefficients pre-computed (normalized by a0)
+void RhythmAudioEngine::applyLowBellEQ(float* buf, int32_t numFrames) {
+    const float b0 = 1.01379f;
+    const float b1 = -1.98719f;
+    const float b2 = 0.97352f;
+    const float a1 = -1.98719f;
+    const float a2 = 0.98726f;
+
+    for (int32_t i = 0; i < numFrames; i++) {
+        float xL = buf[i * 2];
+        float xR = buf[i * 2 + 1];
+
+        // Left channel
+        float yL = b0 * xL + b1 * eq_x1L + b2 * eq_x2L - a1 * eq_y1L - a2 * eq_y2L;
+        eq_x2L = eq_x1L; eq_x1L = xL;
+        eq_y2L = eq_y1L; eq_y1L = yL;
+
+        // Right channel
+        float yR = b0 * xR + b1 * eq_x1R + b2 * eq_x2R - a1 * eq_y1R - a2 * eq_y2R;
+        eq_x2R = eq_x1R; eq_x1R = xR;
+        eq_y2R = eq_y1R; eq_y1R = yR;
+
+        buf[i * 2]     = yL;
+        buf[i * 2 + 1] = yR;
+    }
 }

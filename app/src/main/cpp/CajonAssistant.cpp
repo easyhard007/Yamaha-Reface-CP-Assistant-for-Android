@@ -1,6 +1,7 @@
 #include "CajonAssistant.h"
 #include <cmath>
 #include <cstdlib>
+#include <android/log.h>
 
 CajonAssistant::CajonAssistant() {
     for (int i = 0; i < 32; i++) stepWeights[i] = (float)getMetricWeight(i) / 4.0f;
@@ -84,18 +85,23 @@ CajonAssistant::Hit CajonAssistant::grooveTip(int step, float e, int w) {
 
 void CajonAssistant::onStep(int step, double /*bpm*/) {
     currentStep.store(step);
-    if (!enabled.load() || !engine) return;
+    if (!enabled.load()) { __android_log_print(ANDROID_LOG_WARN, "Cajon", "onStep skipped: disabled"); return; }
+    if (!engine) { __android_log_print(ANDROID_LOG_WARN, "Cajon", "onStep skipped: engine null"); return; }
     float e = energy.load();
     int w = getMetricWeight(step);
+    __android_log_print(ANDROID_LOG_INFO, "Cajon", "onStep step=%d energy=%.2f weight=%d", step, e, w);
 
     auto bass = grooveBass(step, e, w);
     auto tone = grooveTone(step, e, w);
+    // 能量为 0 时静音, 防止随机数产生意外声音
+    if (e <= 0.0f) { bass.velocity = 0; tone.velocity = 0; }
     int hands = 0;
-    if (bass.play) { engine->trigger(0, bass.velocity); hands++; }
-    if (tone.play) { engine->trigger(1, tone.velocity); hands++; }
+    if (bass.play && bass.velocity > 0) { engine->trigger(0, bass.velocity); hands++; }
+    if (tone.play && tone.velocity > 0) { engine->trigger(1, tone.velocity); hands++; }
     if (hands < 2) {
         auto tip = grooveTip(step, e, w);
-        if (tip.play) engine->trigger(1, (float)tip.velocity);
+        if (e <= 0.0f) tip.velocity = 0;
+        if (tip.play && tip.velocity > 0) engine->trigger(1, (float)tip.velocity);
     }
 
     // Update step weights for UI

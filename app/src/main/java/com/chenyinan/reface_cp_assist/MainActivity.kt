@@ -90,6 +90,7 @@ class MainActivity : AppCompatActivity() {
             { getCurrentStyleScene() },
             { getPendingStyleScene() },
             { nativeGetStyleTempo() },
+            { nativeGetCurrentBpm() },
             { nativeGetTimeSig() },
             { nativeGetCurrentBeat() },
             { syncBeat() },
@@ -106,6 +107,8 @@ class MainActivity : AppCompatActivity() {
             { nativeGetCajonEnergy() },
             { v -> nativeSetMinCajonEnergy(v) },
             { nativeGetMinCajonEnergy() },
+            { v -> nativeSetRhythmGain(v) },
+            { nativeGetRhythmGain() },
             { dir -> nativeInitRhythmEngine(dir) },
             { vol -> nativeSetAccompVolume(vol) },
             { vol -> nativeSetLeadVolume(vol) },
@@ -190,6 +193,14 @@ class MainActivity : AppCompatActivity() {
     private fun pushDeviceState(connected: Boolean, name: String, idx: Int) {
         js("if(typeof onNativeDeviceState==='function')onNativeDeviceState($connected,'$name',$idx);")
     }
+
+    // C++ push: 由 native 层直接回调
+    fun onNativeSustainCC(cc: Int) {
+        if (cc == 127) midiUtil.sendSustainOn()
+        else if (cc == 0) midiUtil.sendSustainOff()
+    }
+    fun onNativeBeatUpdate() { js("updateBeatDots()") }
+    fun onNativeEnergyUpdate() { js("updateEnergyDisplay()") }
 
     private fun handleProcessResult(result: Int) {
         val sustainCC = result and 0xFF
@@ -331,9 +342,6 @@ class MainActivity : AppCompatActivity() {
                 if (ciParts.size >= 5 && ciParts[0] != "--") {
                     js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('${ciParts[0]}','${ciParts[1]}','${ciParts[2]}','${ciParts[3]}','${ciParts[4]}');")
                 }
-                // 自动踏板 CC64 发送
-                val cc = nativeGetPendingSustainCC()
-                if (cc == 127) midiUtil.sendSustainOn() else if (cc == 0) midiUtil.sendSustainOff()
                 pushAudioDevices()
                 chordHandler.postDelayed(this, 150)
             }
@@ -384,6 +392,12 @@ class MainActivity : AppCompatActivity() {
                         val value = msg[i + 2].toInt()
                         nativeSendCC(ctrl, value)
                         if (ctrl == 86 || ctrl == 87) js("updateVolDisplay();")
+                        val pendingBpm = nativeGetAndClearPendingBpm()
+                        if (pendingBpm >= 0) js("updateBpmDisplay(${Math.round(pendingBpm)})")
+                        val pendingGain = nativeGetAndClearPendingRhythmGain()
+                        if (pendingGain >= 0) js("updateRhythmVolSlider(${pendingGain})")
+                        val pendingMinE = nativeGetAndClearPendingMinEnergy()
+                        if (pendingMinE >= 0) js("updateEnergySlider(${pendingMinE})")
                         val scc = nativeProcessCC(ctrl, value)
                         if (scc == 127) midiUtil.sendSustainOn()
                         else if (scc == 0) midiUtil.sendSustainOff()
@@ -501,9 +515,8 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetNoteState(): String
     external fun nativeChangeSplitPoint(delta: Int): Int
     external fun nativeChangeTranspose(delta: Int): Int
-    external fun nativeSetAutoSustain(enabled: Boolean)
+    external fun nativeSetAutoSustain(enabled: Boolean): Int
     external fun nativeSetBassEnhance(enabled: Boolean)
-    external fun nativeGetPendingSustainCC(): Int
     external fun nativeLoadSoundFont(path: String)
     external fun nativeGetInstrumentCount(): Int
     external fun nativeGetInstrumentName(index: Int): String
@@ -519,6 +532,10 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetCurrentScene(): Int
     external fun nativeGetPendingScene(): Int
     external fun nativeGetStyleTempo(): Double
+    external fun nativeGetCurrentBpm(): Double
+    external fun nativeGetAndClearPendingBpm(): Double
+    external fun nativeGetAndClearPendingRhythmGain(): Double
+    external fun nativeGetAndClearPendingMinEnergy(): Double
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()
@@ -538,6 +555,8 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetCajonEnergy(): Float
     external fun nativeSetMinCajonEnergy(v: Float)
     external fun nativeGetMinCajonEnergy(): Float
+    external fun nativeSetRhythmGain(gain: Float)
+    external fun nativeGetRhythmGain(): Float
     external fun nativeCajonTick(): Int
     external fun nativeGetCajonWeights(): FloatArray
     external fun nativeResetChord()

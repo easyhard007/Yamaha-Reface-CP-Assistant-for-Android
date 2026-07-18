@@ -9,14 +9,22 @@ private:
         std::vector<float> buffer;
         size_t index = 0;
         float feedback;
-        // 初始化：设置长度和反馈量
+        float damp = 0.7f;       // 高频衰减: 0=不衰减, 1=最大
+        float lowDamp = 0.4f;    // 低频衰减: 0=不衰减, 1=最大
+        float lpState = 0.0f;    // 单极低通状态
+        float hpState = 0.0f;    // 单极高通状态
+        float prevLp = 0.0f;     // 低通前一帧 (高通差分用)
         void resize(size_t size) { buffer.resize(size, 0); }
-        // 处理：带有低通滤波反馈，模拟空气对高频的吸收（让声音更暖）
         float process(float input) {
             float output = buffer[index];
-            // 简单的低通滤波反馈：current = input + (output * feedback)
-            // 这里没加专门的低通滤波器，靠反馈衰减模拟
-            buffer[index] = input + output * feedback;
+            // 单极低通: 衰减高频
+            lpState = output * (1.0f - damp) + lpState * damp;
+            // 单极高通: 衰减低频 (y[n] = a*(y[n-1] + x[n] - x[n-1]))
+            float a_hp = 1.0f - lowDamp;
+            float hpOut = a_hp * (hpState + lpState - prevLp);
+            hpState = hpOut;
+            prevLp = lpState;
+            buffer[index] = input + hpOut * feedback;
             index = (index + 1) % buffer.size();
             return output;
         }
@@ -80,6 +88,14 @@ public:
 
     void setMix(float mix) {
         wetLevel = mix;
+    }
+
+    void setDamp(float d) {
+        for (auto& c : combs) c.damp = d;
+    }
+
+    void setLowDamp(float d) {
+        for (auto& c : combs) c.lowDamp = d;
     }
 
     void process(float* buffer, int numFrames) {

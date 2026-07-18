@@ -24,6 +24,7 @@ class MidiJsBridge(
     private val onGetCurrentStyleScene: () -> Int,
     private val onGetPendingStyleScene: () -> Int,
     private val onGetStyleTempo: () -> Double,
+    private val onGetCurrentBpm: () -> Double,
     private val onGetTimeSig: () -> Int,
     private val onGetCurrentBeat: () -> Int,
     private val onSyncBeat: () -> Unit,
@@ -40,6 +41,8 @@ class MidiJsBridge(
     private val onGetCajonEnergy: () -> Float,
     private val onSetMinCajonEnergy: (Float) -> Unit,
     private val onGetMinCajonEnergy: () -> Float,
+    private val onSetRhythmGain: (Float) -> Unit,
+    private val onGetRhythmGain: () -> Float,
     private val onInitRhythmEngine: (String) -> Unit,
     private val onSetAccompVolume: (Double) -> Unit,
     private val onSetLeadVolume: (Double) -> Unit,
@@ -83,6 +86,7 @@ class MidiJsBridge(
     @JavascriptInterface fun getCurrentStyleScene(): Int = onGetCurrentStyleScene()
     @JavascriptInterface fun getPendingStyleScene(): Int = onGetPendingStyleScene()
     @JavascriptInterface fun getStyleTempo(): Double = onGetStyleTempo()
+    @JavascriptInterface fun getCurrentBpm(): Double = onGetCurrentBpm()
     @JavascriptInterface fun getTimeSig(): Int = onGetTimeSig()
     @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
     @JavascriptInterface fun syncBeat() { onSyncBeat() }
@@ -105,6 +109,8 @@ class MidiJsBridge(
     @JavascriptInterface fun getCajonEnergy(): Float = onGetCajonEnergy()
     @JavascriptInterface fun setMinCajonEnergy(v: Float) { onSetMinCajonEnergy(v) }
     @JavascriptInterface fun getMinCajonEnergy(): Float = onGetMinCajonEnergy()
+    @JavascriptInterface fun setRhythmGain(v: Float) { onSetRhythmGain(v) }
+    @JavascriptInterface fun getRhythmGain(): Float = onGetRhythmGain()
     @JavascriptInterface fun initRhythmEngine(dir: String) { onInitRhythmEngine(dir) }
     @JavascriptInterface fun toggleMute(channel: Int) { onToggleMute(channel) }
     @JavascriptInterface fun getActiveChannels(): Int = onGetActiveChannels()
