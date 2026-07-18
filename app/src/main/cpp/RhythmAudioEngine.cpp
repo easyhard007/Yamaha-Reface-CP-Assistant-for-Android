@@ -84,11 +84,11 @@ WavSample RhythmAudioEngine::loadWav(const std::string& path) {
 }
 
 bool RhythmAudioEngine::loadSamples(const std::string& wavDir) {
-    // Load 4 round-robin samples each for bass (L) and tone/tip (R)
+    // Load 8 round-robin samples each for bass (L) and tone/tip (R)
     // filenames: front_lhlow_c3_64_rr1.wav etc.
     const char* types[] = {"front_lhlow_c3", "front_rhmid_d4"};
     int layers[] = {64, 127};
-    int rrCount = 4;
+    int rrCount = 8;
 
     for (auto t : types) {
         for (auto l : layers) {
@@ -110,11 +110,10 @@ bool RhythmAudioEngine::loadSamples(const std::string& wavDir) {
 void RhythmAudioEngine::trigger(int type, float velocity) {
     // type: 0=bass(L), 1=tone/tip(R), velocity: 0-127 MIDI
     if (samples.empty()) { __android_log_print(ANDROID_LOG_WARN, "RhythmAudio", "trigger: no samples loaded"); return; }
-    __android_log_print(ANDROID_LOG_INFO, "RhythmAudio", "trigger type=%d vel=%.0f", type, velocity);
-    int base = type * 8;
+    int base = type * 16;  // 2 layers × 8 rr
     int layerIdx = (velocity <= 64) ? 0 : 1;
-    int rrIdx = rand() % 4;
-    int idx = base + layerIdx * 4 + rrIdx;
+    int rrIdx = rand() % 8;
+    int idx = base + layerIdx * 8 + rrIdx;
     if (idx < 0 || idx >= (int)samples.size()) return;
 
     float gain = velocity / 127.0f;

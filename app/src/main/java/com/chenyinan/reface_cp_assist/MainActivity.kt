@@ -308,6 +308,7 @@ class MainActivity : AppCompatActivity() {
     // ==========================================
     private val chordHandler = Handler(Looper.getMainLooper())
     private var chordRunnable: Runnable? = null
+    private val tempoRestoreRunnable = Runnable { js("tempoRestore()") }
 
     private fun pushSf2List() {
         val arr = JSONArray()
@@ -398,6 +399,12 @@ class MainActivity : AppCompatActivity() {
                         if (pendingGain >= 0) js("updateRhythmVolSlider(${pendingGain})")
                         val pendingMinE = nativeGetAndClearPendingMinEnergy()
                         if (pendingMinE >= 0) js("updateEnergySlider(${pendingMinE})")
+                        val th = nativeGetAndClearPendingTempoHighlight()
+                        if (th == 1) {
+                            js("tempoHighlight()")
+                            chordHandler.removeCallbacks(tempoRestoreRunnable)
+                            chordHandler.postDelayed(tempoRestoreRunnable, 3000)
+                        }
                         val scc = nativeProcessCC(ctrl, value)
                         if (scc == 127) midiUtil.sendSustainOn()
                         else if (scc == 0) midiUtil.sendSustainOff()
@@ -536,6 +543,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingBpm(): Double
     external fun nativeGetAndClearPendingRhythmGain(): Double
     external fun nativeGetAndClearPendingMinEnergy(): Double
+    external fun nativeGetAndClearPendingTempoHighlight(): Int
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()

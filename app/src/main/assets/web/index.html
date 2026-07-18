@@ -679,6 +679,16 @@
         function updateBpmDisplay(bpm) {
             document.getElementById('bpm-display').innerText = '♪=' + bpm;
         }
+        function tempoHighlight() {
+            var el = document.getElementById('bpm-display');
+            el.style.color = '#ffd700';
+            el.style.transform = 'scale(1.2)';
+        }
+        function tempoRestore() {
+            var el = document.getElementById('bpm-display');
+            el.style.color = '';
+            el.style.transform = '';
+        }
         function updateEnergyDisplay() {
             updateEnergyTrack();
             var energy = (typeof Android !== 'undefined' && Android.getCajonEnergy) ? Android.getCajonEnergy() : 0;

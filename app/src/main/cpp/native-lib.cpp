@@ -2,6 +2,7 @@
 #include <string>
 #include <algorithm>
 #include <mutex>
+#include <android/log.h>
 #include "AudioEngine.h"
 #include "MidiProcessor.h"
 #include "StylePlayer.h"
@@ -25,6 +26,7 @@ static float g_minCajonEnergy = 0.0f;
 static std::atomic<double> g_pendingBpmUpdate{-1.0};
 static std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
 static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
+static std::atomic<int> g_pendingTempoHighlight{0}; // 1=highlight, 2=restore, 0=none
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
@@ -158,23 +160,42 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         g_pendingMinEnergyUpdate.store(g_minCajonEnergy);
         return;
     }
-    // CC90 → BPM 调整 (增量式旋钮)
+    // CC90 → BPM 调整 (锚点比例式, 3s 超时, 倍率固定 0.5x–2.0x)
     if (controller == 90) {
-        static int lastCC90 = -1;
-        static double lastCC90Time = 0;
+        static int anchor = -1;
+        static double baseBpm = 75.0;
+        static double lastTouch = 0;
         auto now = std::chrono::steady_clock::now().time_since_epoch();
         double nowSec = std::chrono::duration<double>(now).count();
-        if (lastCC90 >= 0 && (nowSec - lastCC90Time) <= 1.0) {
-            double delta = (value - lastCC90) / 2.0;
-            double newBpm = beatTracker.getCurrentBpm() + std::round(delta);
+        __android_log_print(ANDROID_LOG_INFO, "CC90", "value=%d anchor=%d baseBpm=%.0f", value, anchor, baseBpm);
+
+        // 超过 3 秒未收到 CC90 → 复位锚点, 恢复 UI
+        if (anchor >= 0 && (nowSec - lastTouch) > 3.0) {
+            anchor = -1;
+            // UI restore handled by Kotlin postDelayed
+        }
+
+        if (anchor < 0) {
+            anchor = value;
+            baseBpm = beatTracker.getCurrentBpm();
+        } else if (value != anchor) {
+            // 平方曲线: x ∈ [-1, 1], ratio = 1.5^(x*|x|)
+            double x;
+            if (value >= anchor) {
+                x = (127 - anchor > 0) ? (double)(value - anchor) / (127 - anchor) : 0.0;
+            } else {
+                x = (anchor - 1 > 0) ? -(double)(anchor - value) / (anchor - 1) : 0.0;
+            }
+            double ratio = std::pow(1.5, std::copysign(std::pow(std::abs(x), 1.4), x));
+            double newBpm = std::round(baseBpm * ratio);
             if (newBpm < 30.0) newBpm = 30.0;
             if (newBpm > 300.0) newBpm = 300.0;
             beatTracker.setTempo(newBpm);
             stylePlayer.setTempoBPM(newBpm);
             g_pendingBpmUpdate.store(newBpm);
         }
-        lastCC90 = value;
-        lastCC90Time = nowSec;
+        lastTouch = nowSec;
+        g_pendingTempoHighlight.store(1); // 每次 CC90 都重置 Kotlin 计时器
         return;
     }
     audio.enqueueCC(0, 0, controller, value);
@@ -369,6 +390,12 @@ extern "C" JNIEXPORT jdouble JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingMinEnergy(
         JNIEnv*, jobject) {
     return g_pendingMinEnergyUpdate.exchange(-1.0);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempoHighlight(
+        JNIEnv*, jobject) {
+    return g_pendingTempoHighlight.exchange(0);
 }
 
 extern "C" JNIEXPORT jint JNICALL
