@@ -463,4 +463,11 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     #color-picker-section {
             border-right: none !important; /* 竖屏下移除右侧分割线 */
     }
+
+/* ===== Scatter Chart Dots ===== */
+#scatter-plot .dot {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+}
 }

@@ -76,6 +76,7 @@ add_library(
         BeatTracker.cpp
         RhythmAudioEngine.cpp
         CajonAssistant.cpp
+        TempoDetector.cpp
         ${FLUIDLITE_SOURCES}
 )
 

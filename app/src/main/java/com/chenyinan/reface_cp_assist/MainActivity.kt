@@ -109,6 +109,7 @@ class MainActivity : AppCompatActivity() {
             { nativeGetMinCajonEnergy() },
             { v -> nativeSetRhythmGain(v) },
             { nativeGetRhythmGain() },
+            { nativeGetTempoDetectorData() },
             { dir -> nativeInitRhythmEngine(dir) },
             { vol -> nativeSetAccompVolume(vol) },
             { vol -> nativeSetLeadVolume(vol) },
@@ -367,6 +368,7 @@ class MainActivity : AppCompatActivity() {
                         if (velocity > 0) {
                             nativeNoteOn(note, velocity)
                                 handleProcessResult(nativeProcessNoteOn(note, velocity))
+                            if (nativeGetAndClearPendingScatter() != 0) js("renderScatterChart()")
                             js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             midiLogRx(log)
@@ -544,6 +546,8 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingRhythmGain(): Double
     external fun nativeGetAndClearPendingMinEnergy(): Double
     external fun nativeGetAndClearPendingTempoHighlight(): Int
+    external fun nativeGetAndClearPendingScatter(): Int
+    external fun nativeGetTempoDetectorData(): String
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()

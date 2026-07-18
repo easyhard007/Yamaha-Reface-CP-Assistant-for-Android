@@ -11,6 +11,7 @@
 #include "BeatTracker.h"
 #include "RhythmAudioEngine.h"
 #include "CajonAssistant.h"
+#include "TempoDetector.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
@@ -21,12 +22,14 @@ static BeatTracker beatTracker;
 extern RhythmAudioEngine* g_rhythmEngine;
 static RhythmAudioEngine rhythmEngine;
 static CajonAssistant cajon;
+static TempoDetector tempoDetector;
 static int assistType = 0;
 static float g_minCajonEnergy = 0.0f;
 static std::atomic<double> g_pendingBpmUpdate{-1.0};
 static std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
 static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
-static std::atomic<int> g_pendingTempoHighlight{0}; // 1=highlight, 2=restore, 0=none
+static std::atomic<int> g_pendingTempoHighlight{0};
+static std::atomic<int> g_pendingScatterUpdate{0};
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
@@ -249,6 +252,22 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
     }
     updateCajonEnergy(ms);
 
+    tempoDetector.setSplitPoint(midi.getSplitNote());
+    bool measureChange = tempoDetector.feedNoteOn(note, velocity, ms);
+    g_pendingScatterUpdate.store(1);
+    if (measureChange) {
+        // 仅在 Cajon 音量为 0 时更新全局 Tempo
+        float rhythmGain = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+        if (rhythmGain <= 0.0f) {
+            double newBpm = tempoDetector.getBestBPM();
+            if (std::abs(newBpm - beatTracker.getCurrentBpm()) > 0.5) {
+                beatTracker.setTempo(newBpm);
+                stylePlayer.setTempoBPM(newBpm);
+                g_pendingBpmUpdate.store(newBpm);
+            }
+        }
+    }
+
     auto r = midi.processNoteOn(note, velocity);
     chordDetector.feedNotes(midi.getLowNotes(), midi.getAllNotes(), midi.getSplitNote());
     // 和弦根音: 来自 LowChordDetector, 由 feedNotes 内部确定
@@ -396,6 +415,39 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempoHighlight(
         JNIEnv*, jobject) {
     return g_pendingTempoHighlight.exchange(0);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingScatter(
+        JNIEnv*, jobject) {
+    return g_pendingScatterUpdate.exchange(0);
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTempoDetectorData(
+        JNIEnv* env, jobject) {
+    tempoDetector.pruneNoteEvents(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    const auto& events = tempoDetector.getNoteEvents();
+    const auto& bpmList = tempoDetector.getBpmList();
+    std::string json = "{\"bpm\":" + std::to_string(tempoDetector.getBestBPM()) +
+        ",\"offset\":" + std::to_string(tempoDetector.getPhaseOffset()) +
+        ",\"split\":" + std::to_string(midi.getSplitNote()) +
+        ",\"bpmList\":[";
+    for (size_t i = 0; i < bpmList.size(); i++) {
+        if (i > 0) json += ",";
+        json += std::to_string(bpmList[i]);
+    }
+    json += "],\"events\":[";
+    for (size_t i = 0; i < events.size(); i++) {
+        if (i > 0) json += ",";
+        json += "[" + std::to_string((int)events[i].pitch) + "," +
+            std::to_string((int)events[i].velocity) + "," +
+            std::to_string((int64_t)(events[i].timeMs)) + "]";
+    }
+    json += "]}";
+    return env->NewStringUTF(json.c_str());
 }
 
 extern "C" JNIEXPORT jint JNICALL
