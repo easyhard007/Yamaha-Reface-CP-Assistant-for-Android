@@ -15,6 +15,15 @@ bool TempoDetector::feedNoteOn(int pitch, int velocity, double timeMs) {
     // 记录所有音符事件 (图表用)
     mNoteEvents.push_back({pitch, velocity, timeMs});
 
+    // 10 秒无输入 → 清空 BPM 列表
+    if (mLastNoteTime > 0 && (timeMs - mLastNoteTime) > 10000.0) {
+        mBpmList.clear();
+        mMeasureTimestamps.clear();
+        mAnomalyCount = 0;
+        mPhaseOffset = 0.0;
+    }
+    mLastNoteTime = timeMs;
+
     if (pitch > mSplitPoint) return false;
 
     bool triggered = false;

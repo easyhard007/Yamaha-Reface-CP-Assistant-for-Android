@@ -34,6 +34,8 @@ public:
     /// 获取 BPM 列表 (调试用)
     const std::vector<double>& getBpmList() const { return mBpmList; }
 
+    int getAnomalyCount() const { return mAnomalyCount; }
+
     /// 清理近 10 秒以外的旧音符事件
     void pruneNoteEvents(double nowMs);
 
@@ -47,6 +49,7 @@ private:
 
     double mBestBPM = 75.0;
     double mPhaseOffset = 0.0;
+    double mLastNoteTime = 0.0;
     int mAnomalyCount = 0;
 
     static constexpr double BPM_MIN = 50.0;

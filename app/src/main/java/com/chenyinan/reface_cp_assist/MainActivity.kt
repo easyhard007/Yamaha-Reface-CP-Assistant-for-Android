@@ -369,6 +369,9 @@ class MainActivity : AppCompatActivity() {
                             nativeNoteOn(note, velocity)
                                 handleProcessResult(nativeProcessNoteOn(note, velocity))
                             if (nativeGetAndClearPendingScatter() != 0) js("renderScatterChart()")
+                            if (nativeGetAndClearPendingTempoFlash() != 0) js("tempoFlash()")
+                            val pendingBpm2 = nativeGetAndClearPendingBpm()
+                            if (pendingBpm2 >= 0) js("updateBpmDisplay(${Math.round(pendingBpm2)})")
                             js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             midiLogRx(log)
@@ -547,6 +550,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingMinEnergy(): Double
     external fun nativeGetAndClearPendingTempoHighlight(): Int
     external fun nativeGetAndClearPendingScatter(): Int
+    external fun nativeGetAndClearPendingTempoFlash(): Int
     external fun nativeGetTempoDetectorData(): String
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int

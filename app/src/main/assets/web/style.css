@@ -464,6 +464,16 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
             border-right: none !important; /* 竖屏下移除右侧分割线 */
     }
 
+/* ===== BPM Flash ===== */
+@keyframes bpmFlash {
+    0%   { color: #ffd700; text-shadow: 0 0 12px #ffd700; }
+    50%  { color: #ffd700; text-shadow: 0 0 12px #ffd700; }
+    100% { color: #eee; text-shadow: none; }
+}
+#bpm-display.flash {
+    animation: bpmFlash 0.6s ease-in-out 2;
+}
+
 /* ===== Scatter Chart Dots ===== */
 #scatter-plot .dot {
     position: absolute;

@@ -682,7 +682,9 @@
         var _lastGridBpm = 0;
 
         // 轻量渐隐循环: 只更新 opacity, 不调 JNI, 不重绘位置
+        var _fadeRunning = false;
         function scatterFadeLoop() {
+            _fadeRunning = true;
             var now = performance.now();
             for (var i = _scatterDots.length - 1; i >= 0; i--) {
                 var d = _scatterDots[i];
@@ -691,9 +693,9 @@
                 d.el.style.opacity = d.maxOpacity * fade;
                 if (age > 5.5) { d.el.remove(); _scatterDots.splice(i, 1); }
             }
-            requestAnimationFrame(scatterFadeLoop);
+            if (_scatterDots.length > 0) setTimeout(scatterFadeLoop, 16); // ~60fps
+            else _fadeRunning = false;
         }
-        requestAnimationFrame(scatterFadeLoop);
 
         function renderScatterChart() {
             if (typeof Android === 'undefined') return;
@@ -705,14 +707,17 @@
             var split = data.split || 52;
             var cppEvents = data.events || [];
             var bpmList = data.bpmList || [];
+            var anomalyCount = data.anomaly || 0;
             var measureMs = 240000 / bpm;
 
             // BPM 显示
             var gain = Android.getRhythmGain ? Android.getRhythmGain() : 0;
             var topLine = 'Detected: ♪=' + bpm.toFixed(1);
             if (gain > 0) topLine += ' (locked)';
+            if (anomalyCount > 0) topLine += ' ⚠' + anomalyCount;
+            var listColor = anomalyCount > 0 ? '#ff8c00' : '#888';
             document.getElementById('detected-bpm').innerHTML = topLine +
-                '<br><span style="color:#555">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>';
+                '<br><span style="color:' + listColor + '">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>';
 
             // 网格 (仅 BPM 变化时重绘)
             if (bpm !== _lastGridBpm) {
@@ -758,15 +763,22 @@
                 var bg = isLast ? 'white' : (pitch < split) ? 'rgb(168,85,247)' : 'rgb(52,152,219)';
                 var size = Math.max(3, 10 - (pitch - 10) / 100 * 6);
                 var opac = Math.min(1, Math.max(0.3, velocity / 127));
-                var d = document.createElement('div');
-                d.style.cssText = 'position:absolute;left:' + px.toFixed(0) + 'px;top:' + py.toFixed(0) + 'px;' +
-                    'width:' + size + 'px;height:' + size + 'px;background:' + bg + ';border-radius:50%;' +
-                    'opacity:' + opac.toFixed(2) + ';z-index:99;';
-                d.setAttribute('data-cppms', cppMs);
-                d.setAttribute('data-pitch', pitch);
-                plot2.appendChild(d);
-                _scatterDots.push({el: d, jsTime: performance.now(), maxOpacity: opac, cppMs: cppMs, pitch: pitch});
+                // 三倍展开: ±measure 各一份副本
+                [-measureMs, 0, measureMs].forEach(function(shift) {
+                    var sx = ((phaseMs + shift - xMin2) / (xMax2 - xMin2)) * pw;
+                    var d = document.createElement('div');
+                    d.style.cssText = 'position:absolute;left:' + sx.toFixed(0) + 'px;top:' + py.toFixed(0) + 'px;' +
+                        'width:' + size + 'px;height:' + size + 'px;background:' + bg + ';border-radius:50%;' +
+                        'opacity:' + opac.toFixed(2) + ';z-index:99;';
+                    d.setAttribute('data-cppms', cppMs);
+                    d.setAttribute('data-pitch', pitch);
+                    d.setAttribute('data-shift', shift);
+                    plot2.appendChild(d);
+                    _scatterDots.push({el: d, jsTime: performance.now(), maxOpacity: opac});
+                });
             }
+            // 有新散点时启动渐隐循环
+            if (_scatterDots.length > 0 && !_fadeRunning) setTimeout(scatterFadeLoop, 16);
 
             // 重排所有散点X坐标 (BPM变化时网格已更新)
             if (_lastGridBpm && bpm !== _lastGridBpm) {
@@ -774,10 +786,10 @@
                 for (var di = 0; di < dots.length; di++) {
                     var dt = dots[di];
                     var cms = parseInt(dt.getAttribute('data-cppms'));
-                    var pt = parseInt(dt.getAttribute('data-pitch'));
+                    var sh = parseFloat(dt.getAttribute('data-shift')) || 0;
                     if (isNaN(cms)) continue;
                     var ph = ((cms - offset) % measureMs + measureMs) % measureMs;
-                    var nx = ((ph - xMin2) / (xMax2 - xMin2)) * pw;
+                    var nx = ((ph + sh - xMin2) / (xMax2 - xMin2)) * pw;
                     dt.style.left = nx.toFixed(0) + 'px';
                 }
             }
@@ -805,8 +817,8 @@
                 // 大小: pitch 10→10px, 110→4px
                 var size = Math.max(4, 10 - (pitch - 10) / 100 * 6);
 
-                // 不透明度
-                var velOpac = Math.min(1, Math.max(0.3, velocity / 127));
+                // 不透明度: velocity 0→0.3, 80→1.0
+                var velOpac = Math.min(1, 0.3 + (velocity / 80) * 0.7);
 
                 // 位置
                 var px = ((phaseMs - xMin2) / (xMax2 - xMin2)) * pw;
@@ -840,6 +852,12 @@
             el.style.color = '#ffd700';
             el.style.transform = 'scale(1.2)';
         }
+        function tempoFlash() {
+            var el = document.getElementById('bpm-display');
+            el.classList.remove('flash');
+            void el.offsetWidth; // trigger reflow to restart animation
+            el.classList.add('flash');
+        }
         function tempoRestore() {
             var el = document.getElementById('bpm-display');
             el.style.color = '';
@@ -852,7 +870,11 @@
         }
         function updateRhythmVolSlider(gain) {
             var s = document.getElementById('rhythm-vol');
-            if (s && document.activeElement !== s) s.value = Math.round(gain / 4.0 * 100);
+            if (s) {
+                var pct = Math.round(gain / 4.0 * 100);
+                if (document.activeElement !== s) s.value = pct;
+                document.getElementById('rhythm-vol-val').innerText = pct + '%';
+            }
         }
         function updateEnergySlider(minE) {
             var s = document.getElementById('cajon-energy');

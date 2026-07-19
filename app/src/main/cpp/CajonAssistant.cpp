@@ -85,11 +85,9 @@ CajonAssistant::Hit CajonAssistant::grooveTip(int step, float e, int w) {
 
 void CajonAssistant::onStep(int step, double /*bpm*/) {
     currentStep.store(step);
-    if (!enabled.load()) { __android_log_print(ANDROID_LOG_WARN, "Cajon", "onStep skipped: disabled"); return; }
-    if (!engine) { __android_log_print(ANDROID_LOG_WARN, "Cajon", "onStep skipped: engine null"); return; }
+    if (!enabled.load() || !engine) return;
     float e = energy.load();
     int w = getMetricWeight(step);
-    __android_log_print(ANDROID_LOG_INFO, "Cajon", "onStep step=%d energy=%.2f weight=%d", step, e, w);
 
     auto bass = grooveBass(step, e, w);
     auto tone = grooveTone(step, e, w);

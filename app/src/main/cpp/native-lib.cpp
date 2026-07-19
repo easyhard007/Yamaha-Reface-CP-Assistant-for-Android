@@ -30,6 +30,7 @@ static std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
 static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
 static std::atomic<int> g_pendingTempoHighlight{0};
 static std::atomic<int> g_pendingScatterUpdate{0};
+static std::atomic<int> g_pendingTempoFlash{0};
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
@@ -100,7 +101,10 @@ static void updateCajonEnergy(double nowMs) {
             [cutoff](double t) { return t < cutoff; }),
         recentNoteTimestamps.end());
     // 线性映射: 0 个 → 0.0, 20 个 → 1.0
-    float autoEnergy = std::min(1.0f, (float)recentNoteTimestamps.size() / 24.0f);
+    // BPM 归一化: 基准 70 BPM, 除数 = 24 * (bpm/70)
+    double bpmFactor = beatTracker.getCurrentBpm() / 70.0;
+    if (bpmFactor < 0.5) bpmFactor = 0.5;
+    float autoEnergy = std::min(1.0f, (float)(recentNoteTimestamps.size() / (24.0 * bpmFactor)));
     float energy = std::max(autoEnergy, g_minCajonEnergy);
     cajon.setEnergy(energy);
     pushEnergyDisplayUpdate();
@@ -260,10 +264,13 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         float rhythmGain = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
         if (rhythmGain <= 0.0f) {
             double newBpm = tempoDetector.getBestBPM();
-            if (std::abs(newBpm - beatTracker.getCurrentBpm()) > 0.5) {
+            int newRounded = (int)std::round(newBpm);
+            int curRounded = (int)std::round(beatTracker.getCurrentBpm());
+            if (newRounded != curRounded) {
                 beatTracker.setTempo(newBpm);
                 stylePlayer.setTempoBPM(newBpm);
                 g_pendingBpmUpdate.store(newBpm);
+                g_pendingTempoFlash.store(1);
             }
         }
     }
@@ -423,6 +430,12 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingScatt
     return g_pendingScatterUpdate.exchange(0);
 }
 
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempoFlash(
+        JNIEnv*, jobject) {
+    return g_pendingTempoFlash.exchange(0);
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTempoDetectorData(
         JNIEnv* env, jobject) {
@@ -434,6 +447,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTempoDetectorData(
     std::string json = "{\"bpm\":" + std::to_string(tempoDetector.getBestBPM()) +
         ",\"offset\":" + std::to_string(tempoDetector.getPhaseOffset()) +
         ",\"split\":" + std::to_string(midi.getSplitNote()) +
+        ",\"anomaly\":" + std::to_string(tempoDetector.getAnomalyCount()) +
         ",\"bpmList\":[";
     for (size_t i = 0; i < bpmList.size(); i++) {
         if (i > 0) json += ",";
