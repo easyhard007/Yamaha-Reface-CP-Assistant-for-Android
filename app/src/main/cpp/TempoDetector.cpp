@@ -16,7 +16,7 @@ bool TempoDetector::feedNoteOn(int pitch, int velocity, double timeMs) {
     mNoteEvents.push_back({pitch, velocity, timeMs});
 
     // 10 秒无输入 → 清空 BPM 列表
-    if (mLastNoteTime > 0 && (timeMs - mLastNoteTime) > 10000.0) {
+    if (mLastNoteTime > 0 && (timeMs - mLastNoteTime) > 6000.0) {
         mBpmList.clear();
         mMeasureTimestamps.clear();
         mAnomalyCount = 0;
