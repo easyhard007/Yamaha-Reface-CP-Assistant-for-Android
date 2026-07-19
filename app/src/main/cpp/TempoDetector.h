@@ -36,6 +36,15 @@ public:
 
     int getAnomalyCount() const { return mAnomalyCount; }
 
+    double getSyncOffset() const { return mSyncOffset; }
+    void setSyncOffset(double v) { mSyncOffset = v; }
+
+    double getSyncError() const { return mSyncError; }
+    void setSyncError(double v) { mSyncError = v; }
+
+    double getSyncMean() const { return mSyncMean; }
+    void setSyncMean(double v) { mSyncMean = v; }
+
     /// 清理近 10 秒以外的旧音符事件
     void pruneNoteEvents(double nowMs);
 
@@ -50,6 +59,9 @@ private:
     double mBestBPM = 75.0;
     double mPhaseOffset = 0.0;
     double mLastNoteTime = 0.0;
+    double mSyncOffset = 0.0;
+    double mSyncError = 0.0;
+    double mSyncMean = 0.0;
     int mAnomalyCount = 0;
 
     static constexpr double BPM_MIN = 50.0;

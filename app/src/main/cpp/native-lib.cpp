@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <algorithm>
+#include <cmath>
 #include <mutex>
 #include <android/log.h>
 #include "AudioEngine.h"
@@ -31,6 +32,12 @@ static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
 static std::atomic<int> g_pendingTempoHighlight{0};
 static std::atomic<int> g_pendingScatterUpdate{0};
 static std::atomic<int> g_pendingTempoFlash{0};
+
+// 相位调试
+static std::atomic<double> g_measureStartMs{0};
+static bool g_syncJustTriggered = false;
+static bool g_syncResetting = false;
+static std::vector<double> g_recentSyncErrs;
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
@@ -90,6 +97,8 @@ static void onBeatStep(int step, double bpm, void*) {
     updateCajonEnergy(ms); // 每子步推送能量显示
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
+    // beat 0 开始时重置计时器
+    if (step % 32 == 0) g_measureStartMs.store(ms);
 }
 
 static void updateCajonEnergy(double nowMs) {
@@ -259,6 +268,59 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
     tempoDetector.setSplitPoint(midi.getSplitNote());
     bool measureChange = tempoDetector.feedNoteOn(note, velocity, ms);
     g_pendingScatterUpdate.store(1);
+
+    // 相位微调 + 调试输出
+    // 相位微调
+    double beatMs = 240000.0 / beatTracker.getCurrentBpm();
+    double phaseOff = tempoDetector.getPhaseOffset();
+    // offset: 从上次 beat 0 到当前音符的时间
+    double startMs = g_measureStartMs.load();
+    double syncOffset = (startMs > 0) ? (ms - startMs) : 0;
+    tempoDetector.setSyncOffset(syncOffset);
+    double chartMs = 240000.0 / tempoDetector.getBestBPM();
+    double phaseMs = fmod(ms - phaseOff, chartMs);
+    if (phaseMs < 0) phaseMs += chartMs;
+    double syncErr = phaseMs - syncOffset;
+    tempoDetector.setSyncError(syncErr);
+    // 散点与节拍器偏差 → 连续 3 次稳定 → 对齐
+    double measureMs = 240000.0 / beatTracker.getCurrentBpm();
+    if (!g_syncResetting) {
+        double normErr = fmod(syncErr, measureMs);
+        if (normErr < 0) normErr += measureMs;
+        g_recentSyncErrs.push_back(normErr);
+        __android_log_print(ANDROID_LOG_INFO, "TempoDetector", "push err=%.0f size=%zu", normErr, g_recentSyncErrs.size());
+        if (g_recentSyncErrs.size() > 3) g_recentSyncErrs.erase(g_recentSyncErrs.begin());
+        double mean = 0;
+        if (g_recentSyncErrs.size() == 3) {
+            mean = (g_recentSyncErrs[0] + g_recentSyncErrs[1] + g_recentSyncErrs[2]) / 3.0;
+            bool stable = true;
+            for (double v : g_recentSyncErrs) {
+                if (std::abs(v - mean) > 150.0) { stable = false; break; }
+            }
+            if (stable) {
+                float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+                if (rg <= 0.0f) {
+                    g_syncResetting = true;
+                    g_syncJustTriggered = true;
+                    double delay = measureMs - syncOffset - mean;
+                    while (delay < 0) delay += measureMs;
+                    while (delay >= measureMs) delay -= measureMs;
+                    int delayMs = (int)delay;
+                    __android_log_print(ANDROID_LOG_INFO, "TempoDetector", "sync: mean=%.0f sweep=%.0f delay=%dms", mean, syncOffset, delayMs);
+                    std::thread([delayMs]() {
+                        std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+                        float gNow = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+                        if (gNow <= 0.0f) beatTracker.sync();
+                        g_syncResetting = false;
+                    }).detach();
+                }
+                g_recentSyncErrs.clear();
+            }
+        }
+        tempoDetector.setSyncMean(mean);
+    }
+
+    // nudge 暂时禁用 — getPhaseMs() 与真实拍位不对齐, 待重写
     if (measureChange) {
         // 仅在 Cajon 音量为 0 时更新全局 Tempo
         float rhythmGain = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
@@ -453,7 +515,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTempoDetectorData(
         if (i > 0) json += ",";
         json += std::to_string(bpmList[i]);
     }
-    json += "],\"events\":[";
+    json += "],\"syncOff\":" + std::to_string(tempoDetector.getSyncOffset()) + ",\"syncErr\":" + std::to_string(tempoDetector.getSyncError()) + ",\"syncMean\":" + std::to_string(tempoDetector.getSyncMean()) + ",\"synced\":" + std::to_string(g_syncJustTriggered ? 1 : 0) + ",\"err1\":" + std::to_string(g_recentSyncErrs.size()>=1?(int)g_recentSyncErrs[0]:0) + ",\"err2\":" + std::to_string(g_recentSyncErrs.size()>=2?(int)g_recentSyncErrs[1]:0) + ",\"err3\":" + std::to_string(g_recentSyncErrs.size()>=3?(int)g_recentSyncErrs[2]:0) + ",\"events\":[";
     for (size_t i = 0; i < events.size(); i++) {
         if (i > 0) json += ",";
         json += "[" + std::to_string((int)events[i].pitch) + "," +

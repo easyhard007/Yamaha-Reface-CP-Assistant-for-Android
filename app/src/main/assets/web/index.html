@@ -591,6 +591,15 @@
                 ctx.lineWidth = 1;
                 ctx.stroke();
             }
+            // X 轴刻度标签 (0, 0.25, 0.5, 0.75, 1.0 小节)
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            var labels = [0, 0.25, 0.5, 0.75, 1.0];
+            for (var li = 0; li < labels.length; li++) {
+                var lx = toX(labels[li] * _gridMeasureMs);
+                ctx.fillText((labels[li] * _gridMeasureMs).toFixed(0) + 'ms', lx, _gridH - 3);
+            }
         }
 
         function updateBeatDots() {
@@ -764,8 +773,17 @@
             if (gain > 0) topLine += ' (locked)';
             if (anomalyCount > 0) topLine += ' ⚠' + anomalyCount;
             var listColor = anomalyCount > 0 ? '#ff8c00' : '#888';
+            // 最新点的 phaseMs
+            var lastPhase = 0;
+            if (cppEvents.length > 0) {
+                var le = cppEvents[cppEvents.length - 1];
+                lastPhase = (((le[2] - offset) % measureMs) + measureMs) % measureMs;
+            }
+            var synced = data.synced || 0;
+            var dbgColor = synced ? '#ff8c00' : '#888';
             document.getElementById('detected-bpm').innerHTML = topLine +
-                '<br><span style="color:' + listColor + '">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>';
+                '<br><span style="color:' + listColor + '">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>' +
+                '<br><span style="color:' + dbgColor + ';font-size:9px;">' + (data.err1||0) + ' ' + (data.err2||0) + ' ' + (data.err3||0) + ' mean:' + (data.syncMean||0).toFixed(0) + 'ms err:' + (data.syncErr||0).toFixed(0) + 'ms' + (synced ? ' SYNC!' : '') + '</span>';
 
             // 网格参数缓存
             _gridMeasureMs = measureMs;

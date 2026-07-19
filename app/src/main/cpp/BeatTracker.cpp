@@ -28,7 +28,6 @@ void BeatTracker::setTempo(double newBpm) {
     if (newBpm < 30 || newBpm > 300) return;
     bpm = newBpm;
     beatIntervalMs = 60000.0 / bpm;
-    cv.notify_one(); // 唤醒 beatLoop 重算
 }
 
 void BeatTracker::sync() {
