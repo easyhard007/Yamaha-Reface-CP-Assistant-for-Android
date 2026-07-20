@@ -43,6 +43,10 @@ class MidiJsBridge(
     private val onGetMinCajonEnergy: () -> Float,
     private val onSetRhythmGain: (Float) -> Unit,
     private val onGetRhythmGain: () -> Float,
+    private val onSetBassAssist: (Boolean) -> Unit,
+    private val onIsBassAssistEnabled: () -> Boolean,
+    private val onSetBassAssistVolume: (Float) -> Unit,
+    private val onGetBassAssistVolume: () -> Float,
     private val onGetTempoDetectorData: () -> String,
     private val onInitRhythmEngine: (String) -> Unit,
     private val onSetAccompVolume: (Double) -> Unit,
@@ -112,6 +116,10 @@ class MidiJsBridge(
     @JavascriptInterface fun getMinCajonEnergy(): Float = onGetMinCajonEnergy()
     @JavascriptInterface fun setRhythmGain(v: Float) { onSetRhythmGain(v) }
     @JavascriptInterface fun getRhythmGain(): Float = onGetRhythmGain()
+    @JavascriptInterface fun setBassAssist(v: Boolean) { onSetBassAssist(v) }
+    @JavascriptInterface fun isBassAssistEnabled(): Boolean = onIsBassAssistEnabled()
+    @JavascriptInterface fun setBassAssistVolume(v: Float) { onSetBassAssistVolume(v) }
+    @JavascriptInterface fun getBassAssistVolume(): Float = onGetBassAssistVolume()
     @JavascriptInterface fun getTempoDetectorData(): String = onGetTempoDetectorData()
     @JavascriptInterface fun initRhythmEngine(dir: String) { onInitRhythmEngine(dir) }
     @JavascriptInterface fun toggleMute(channel: Int) { onToggleMute(channel) }

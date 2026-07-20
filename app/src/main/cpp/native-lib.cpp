@@ -13,6 +13,7 @@
 #include "RhythmAudioEngine.h"
 #include "CajonAssistant.h"
 #include "TempoDetector.h"
+#include "BassAssist.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
@@ -24,6 +25,7 @@ extern RhythmAudioEngine* g_rhythmEngine;
 static RhythmAudioEngine rhythmEngine;
 static CajonAssistant cajon;
 static TempoDetector tempoDetector;
+static BassAssist bassAssist;
 static int assistType = 0;
 static float g_minCajonEnergy = 0.0f;
 static std::atomic<double> g_pendingBpmUpdate{-1.0};
@@ -38,6 +40,11 @@ static std::atomic<double> g_measureStartMs{0};
 static bool g_syncJustTriggered = false;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
+
+// BassAssist debug
+static int g_bassLowPitch = -1;
+static int g_bassLowVel = 0;
+static double g_bassLowTime = 0;
 
 // ===== Cajon 能量: 根据近 2 秒 MIDI 音符密度自动计算 =====
 static std::vector<double> recentNoteTimestamps;
@@ -91,9 +98,72 @@ static void pushEnergyDisplayUpdate() {
 static void updateCajonEnergy(double nowMs);
 
 static void onBeatStep(int step, double bpm, void*) {
-    cajon.onStep(step, bpm);
+    int bassVel = cajon.onStep(step, bpm);
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
+    // 贝斯助手
+    static int bassNoteOn = -1;
+    static double bassNoteTime = 0;
+    static int prevLowPitch = -1;
+    static double prevLowTime = 0;
+    // 找最低音
+    auto lowMap = midi.getLowNotes();
+    int lowPitch = -1, lowVel = 0;
+    double lowTime = 0;
+    for (const auto& kv : lowMap) {
+        if (lowPitch < 0 || kv.first < lowPitch) {
+            lowPitch = kv.first; lowVel = kv.second.velocity; lowTime = kv.second.timestampMs;
+        }
+    }
+    g_bassLowPitch = lowPitch; g_bassLowVel = lowVel; g_bassLowTime = lowTime;
+
+    auto playBass = [&](int pitch, int vel) {
+        int bp = pitch;
+        while (bp > 42) bp -= 12;
+        while (bp < 31) bp += 12;
+        if (bassNoteOn >= 0) audio.enqueueNoteOff(2, 0, bassNoteOn);
+        audio.enqueueNoteOn(2, 0, bp, vel);
+        bassNoteOn = bp;
+        bassNoteTime = ms;
+    };
+
+    if (bassAssist.isEnabled()) {
+        // 场景 1: Cajon bass 触发 (>45)
+        if (bassVel > 45 && lowPitch > 0) {
+            float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+            float curve = std::pow(bassVel / 127.0f, 0.6f);
+            int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume() * rg / 4.0f);
+            if (vel < 1) vel = 1; if (vel > 127) vel = 127;
+            playBass(lowPitch, vel);
+        }
+        // 场景 2: 无低音 → 有低音, 且 100ms 内有 Cajon bass
+        if (prevLowPitch < 0 && lowPitch > 0 && bassVel <= 45) {
+            double lastBassT = cajon.getLastBassTime();
+            if ((ms - lastBassT) < 100.0) {
+                float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+                float curve = std::pow(cajon.getLastBassVel() / 127.0f, 0.6f);
+                int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume() * rg / 4.0f);
+                if (vel < 1) vel = 1; if (vel > 127) vel = 127;
+                playBass(lowPitch, vel);
+            }
+        }
+        // 场景 3: 最低音变低了
+        if (prevLowPitch > 0 && lowPitch > 0 && lowPitch < prevLowPitch && bassNoteOn >= 0) {
+            double elapsed = ms - prevLowTime;
+            if (elapsed < 3200.0) {
+                int vel = (int)((3200.0 - elapsed) / 3200.0 * 127.0);
+                if (vel > 0) playBass(lowPitch, vel);
+            }
+        }
+    }
+    prevLowPitch = lowPitch;
+    prevLowTime = lowTime;
+
+    // 10 秒超时自动 note-off
+    if (bassNoteOn >= 0 && (ms - bassNoteTime) > 10000.0) {
+        audio.enqueueNoteOff(2, 0, bassNoteOn);
+        bassNoteOn = -1;
+    }
     updateCajonEnergy(ms); // 每子步推送能量显示
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
@@ -152,6 +222,28 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOff(
         JNIEnv*, jobject, jint note) {
     audio.enqueueNoteOff(0, 0, note);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOnBass(
+        JNIEnv*, jobject, jint note, jint velocity) {
+    audio.enqueueNoteOn(2, 0, note, velocity);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeNoteOffBass(
+        JNIEnv*, jobject, jint note) {
+    audio.enqueueNoteOff(2, 0, note);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeLoadBassSoundFont(
+        JNIEnv* env, jobject, jstring sf2Path) {
+    const char* path = env->GetStringUTFChars(sf2Path, nullptr);
+    audio.loadSoundFont(2, path);
+    env->ReleaseStringUTFChars(sf2Path, path);
+    // 确保 Bass 音色: Bank 0, Program 33
+    audio.enqueueProgramChange(2, 0, 0, 33);
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -337,8 +429,11 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
         }
     }
 
-    auto r = midi.processNoteOn(note, velocity);
-    chordDetector.feedNotes(midi.getLowNotes(), midi.getAllNotes(), midi.getSplitNote());
+    auto r = midi.processNoteOn(note, velocity, ms);
+    auto lowMap = midi.getLowNotes();
+    std::set<int> lowSet;
+    for (const auto& kv : lowMap) lowSet.insert(kv.first);
+    chordDetector.feedNotes(lowSet, midi.getAllNotes(), midi.getSplitNote());
     // 和弦根音: 来自 LowChordDetector, 由 feedNotes 内部确定
     std::string chordName = chordDetector.getChord();
     if (chordName != "-") {
@@ -385,7 +480,10 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordInfo(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassEnhance(
-        JNIEnv*, jobject, jboolean enabled) { midi.setBassEnhanceEnabled(enabled); }
+        JNIEnv*, jobject, jboolean enabled) {
+    midi.setBassEnhanceEnabled(enabled);
+    if (enabled) bassAssist.setEnabled(false); // 互斥
+}
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeTranspose(
@@ -486,6 +584,26 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempo
     return g_pendingTempoHighlight.exchange(0);
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassAssist(
+        JNIEnv*, jobject, jboolean enabled) {
+    bassAssist.setEnabled(enabled);
+    if (enabled) {
+        midi.setBassEnhanceEnabled(false); // 互斥
+        audio.enqueueProgramChange(0, 1, 0, 33); // lead synth ch1 = Fingered Bass
+    }
+}
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsBassAssistEnabled(
+        JNIEnv*, jobject) { return bassAssist.isEnabled() ? JNI_TRUE : JNI_FALSE; }
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassAssistVolume(
+        JNIEnv*, jobject, jfloat volume) { bassAssist.setVolume(volume); }
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBassAssistVolume(
+        JNIEnv*, jobject) { return bassAssist.getVolume(); }
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingScatter(
         JNIEnv*, jobject) {
@@ -515,7 +633,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetTempoDetectorData(
         if (i > 0) json += ",";
         json += std::to_string(bpmList[i]);
     }
-    json += "],\"syncOff\":" + std::to_string(tempoDetector.getSyncOffset()) + ",\"syncErr\":" + std::to_string(tempoDetector.getSyncError()) + ",\"syncMean\":" + std::to_string(tempoDetector.getSyncMean()) + ",\"synced\":" + std::to_string(g_syncJustTriggered ? 1 : 0) + ",\"err1\":" + std::to_string(g_recentSyncErrs.size()>=1?(int)g_recentSyncErrs[0]:0) + ",\"err2\":" + std::to_string(g_recentSyncErrs.size()>=2?(int)g_recentSyncErrs[1]:0) + ",\"err3\":" + std::to_string(g_recentSyncErrs.size()>=3?(int)g_recentSyncErrs[2]:0) + ",\"events\":[";
+    json += "],\"syncOff\":" + std::to_string(tempoDetector.getSyncOffset()) + ",\"syncErr\":" + std::to_string(tempoDetector.getSyncError()) + ",\"syncMean\":" + std::to_string(tempoDetector.getSyncMean()) + ",\"synced\":" + std::to_string(g_syncJustTriggered ? 1 : 0) + ",\"err1\":" + std::to_string(g_recentSyncErrs.size()>=1?(int)g_recentSyncErrs[0]:0) + ",\"err2\":" + std::to_string(g_recentSyncErrs.size()>=2?(int)g_recentSyncErrs[1]:0) + ",\"err3\":" + std::to_string(g_recentSyncErrs.size()>=3?(int)g_recentSyncErrs[2]:0) + ",\"lowP\":" + std::to_string(g_bassLowPitch) + ",\"lowV\":" + std::to_string(g_bassLowVel) + ",\"lowT\":" + std::to_string((int64_t)g_bassLowTime) + ",\"events\":[";
     for (size_t i = 0; i < events.size(); i++) {
         if (i > 0) json += ",";
         json += "[" + std::to_string((int)events[i].pitch) + "," +
@@ -558,7 +676,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordNotes(
     static const char* nn[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
     auto notes = midi.getLowNotes();
     std::string s;
-    for (int n : notes) {
+    for (const auto& kv : notes) {
+        int n = kv.first;
         if (!s.empty()) s += " ";
         s += nn[n % 12] + std::to_string(n / 12 - 1);
     }

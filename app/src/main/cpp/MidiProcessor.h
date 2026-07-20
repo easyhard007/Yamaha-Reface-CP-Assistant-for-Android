@@ -1,5 +1,5 @@
 #pragma once
-#include <set>
+#include <map>
 #include <string>
 #include <mutex>
 #include <vector>
@@ -7,6 +7,12 @@
 #include "BassEnhancer.h"
 #include "ScaleDetector.h"
 #include "AutoSustainManager.h"
+
+struct NoteInfo {
+    int pitch;
+    int velocity;
+    double timestampMs;
+};
 
 /// Returned by processNoteOn — tells the caller what to do
 struct NoteOnResult {
@@ -33,7 +39,7 @@ public:
     MidiProcessor();
 
     // ---- MIDI event processing ----
-    NoteOnResult processNoteOn(int note, int velocity);
+    NoteOnResult processNoteOn(int note, int velocity, double timestampMs = 0);
     NoteOffResult processNoteOff(int note);
     CCResult      processCC(int controller, int value);
 
@@ -58,9 +64,9 @@ public:
 private:
     mutable std::mutex mLock;
 
-    // Note state
-    std::set<int> mActiveNotes;
-    std::set<int> mPedalHeldNotes;
+    // Note state (pitch -> NoteInfo)
+    std::map<int, NoteInfo> mActiveNotes;
+    std::map<int, NoteInfo> mPedalHeldNotes;
 
     // Pedal
     bool mIsPedalDown = false;
@@ -94,7 +100,7 @@ private:
 
     // Helpers
 public:
-    std::set<int> getLowNotes() const;  // Active ∪ PedalHeld ∩ (< splitPoint)
+    std::map<int, NoteInfo> getLowNotes() const;  // Active ∪ PedalHeld ∩ (< splitPoint)
     std::set<int> getAllNotes() const;  // Active ∪ PedalHeld
     int         getSplitNote() const { return mSplitPoint; }
 };

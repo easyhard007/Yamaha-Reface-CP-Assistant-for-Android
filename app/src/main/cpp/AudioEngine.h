@@ -12,7 +12,7 @@ enum class MidiCmdType { NoteOn, NoteOff, CC, ProgramChange, AllNotesOff, AllSou
 
 struct MidiCmd {
     MidiCmdType type;
-    int target;   // 0=lead, 1=accomp
+    int target;   // 0=lead, 1=accomp, 2=bass assist
     int channel;
     int data1;    // note / controller / bank
     int data2;    // velocity / value / program
@@ -68,9 +68,11 @@ private:
     fluid_settings_t* mSettings = nullptr;
     fluid_synth_t* mLeadSynth = nullptr;
     fluid_synth_t* mAccompSynth = nullptr;
+    fluid_synth_t* mBassSynth = nullptr;
 
     int mLeadSoundFontId = -1;
     int mAccompSoundFontId = -1;
+    int mBassSoundFontId = -1;
 
     std::vector<InstrumentInfo> mLeadInstruments;
     std::vector<InstrumentInfo> mAccompInstruments;
@@ -81,4 +83,5 @@ private:
     std::vector<MidiCmd> mCmdQueue;
     double mLeadGain = 0.8;
     double mAccompGain = 0.8;
+    double mBassGain = 0.8;
 };

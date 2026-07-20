@@ -40,6 +40,7 @@ bool AudioEngine::init(const char* sf2Path) {
     std::lock_guard<std::mutex> lock(mLock);
     if (mLeadSynth) { delete_fluid_synth(mLeadSynth); mLeadSynth = nullptr; }
     if (mAccompSynth) { delete_fluid_synth(mAccompSynth); mAccompSynth = nullptr; }
+    if (mBassSynth) { delete_fluid_synth(mBassSynth); mBassSynth = nullptr; }
     if (mSettings) { delete_fluid_settings(mSettings); mSettings = nullptr; }
     mLeadInstruments.clear(); mAccompInstruments.clear();
 
@@ -47,7 +48,8 @@ bool AudioEngine::init(const char* sf2Path) {
     fluid_settings_setint(mSettings, "synth.polyphony", 128);
     mLeadSynth = new_fluid_synth(mSettings);
     mAccompSynth = new_fluid_synth(mSettings);
-    if (!mLeadSynth || !mAccompSynth) {
+    mBassSynth = new_fluid_synth(mSettings);
+    if (!mLeadSynth || !mAccompSynth || !mBassSynth) {
         __android_log_print(ANDROID_LOG_ERROR, TAG, "Failed to create synths");
         return false;
     }
@@ -66,6 +68,11 @@ bool AudioEngine::init(const char* sf2Path) {
     fluid_synth_set_gain(mAccompSynth, 3.6f);
     fluid_synth_set_interp_method(mAccompSynth, -1, FLUID_INTERP_LINEAR);
     fluid_synth_set_reverb(mAccompSynth, 0.85, 0.15, 0.8, 0.70);
+    fluid_synth_set_gain(mBassSynth, 0.8f);
+    fluid_synth_set_interp_method(mBassSynth, -1, FLUID_INTERP_LINEAR);
+    fluid_synth_set_reverb(mBassSynth, 0.85, 0.15, 0.8, 0.70);
+    // Bass synth 默认: Finger Bass, Bank 0, Program 33
+    fluid_synth_program_change(mBassSynth, 0, 33);
     return true;
 }
 
@@ -93,6 +100,7 @@ void AudioEngine::stop() {
     std::lock_guard<std::mutex> lock(mLock);
     if (mLeadSynth) { delete_fluid_synth(mLeadSynth); mLeadSynth = nullptr; }
     if (mAccompSynth) { delete_fluid_synth(mAccompSynth); mAccompSynth = nullptr; }
+    if (mBassSynth) { delete_fluid_synth(mBassSynth); mBassSynth = nullptr; }
     if (mSettings) { delete_fluid_settings(mSettings); mSettings = nullptr; }
 }
 
@@ -128,32 +136,31 @@ void AudioEngine::enqueueSetReverb(int target, double roomSize, double level) {
 }
 
 void AudioEngine::enqueueSetGain(int target, double gain) {
-    // 立即更新缓存值, 让 getGain() 即使播放未启动也能返回正确值
     if (target == 0) mLeadGain = gain;
-    else mAccompGain = gain;
+    else if (target == 1) mAccompGain = gain;
+    else mBassGain = gain;
     std::lock_guard<std::mutex> lock(mCmdMutex);
     mCmdQueue.push_back({MidiCmdType::SetGain, target, 0, 0, 0, gain, 0});
 }
 
 double AudioEngine::getGain(int target) {
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    if (!synth) return 0.0;
-    // FluidLite doesn't expose gain directly; track separately
-    return (target == 0) ? mLeadGain : mAccompGain;
+    if (target == 0) return mLeadGain;
+    else if (target == 1) return mAccompGain;
+    else return mBassGain;
 }
 
 double AudioEngine::getReverbRoomSize(int target) {
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : (target == 1) ? mAccompSynth : mBassSynth;
     return synth ? fluid_synth_get_reverb_roomsize(synth) : 0.0;
 }
 
 double AudioEngine::getReverbLevel(int target) {
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : (target == 1) ? mAccompSynth : mBassSynth;
     return synth ? fluid_synth_get_reverb_level(synth) : 0.0;
 }
 
 void AudioEngine::execCommand(const MidiCmd& cmd) {
-    fluid_synth_t* synth = (cmd.target == 0) ? mLeadSynth : mAccompSynth;
+    fluid_synth_t* synth = (cmd.target == 0) ? mLeadSynth : (cmd.target == 1) ? mAccompSynth : mBassSynth;
     if (!synth) return;
     switch (cmd.type) {
         case MidiCmdType::NoteOn:
@@ -181,7 +188,8 @@ void AudioEngine::execCommand(const MidiCmd& cmd) {
         case MidiCmdType::SetGain:
             fluid_synth_set_gain(synth, (float)cmd.fdata1);
             if (cmd.target == 0) mLeadGain = cmd.fdata1;
-            else mAccompGain = cmd.fdata1;
+            else if (cmd.target == 1) mAccompGain = cmd.fdata1;
+            else mBassGain = cmd.fdata1;
             break;
     }
 }
@@ -221,6 +229,17 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     } else {
         memset(outBuffer, 0, numFrames * 2 * sizeof(float));
     }
+    // Bass synth → RhythmAudioEngine reverb → mix
+    if (mBassSynth && g_rhythmEngine) {
+        float* bassBuf = mMixBuffer.data();
+        if (mMixBuffer.size() >= (size_t)numFrames * 2) {
+            memset(bassBuf, 0, numFrames * 2 * sizeof(float));
+            fluid_synth_write_float(mBassSynth, numFrames, bassBuf, 0, 2, bassBuf, 1, 2);
+            g_rhythmEngine->processBassReverb(bassBuf, numFrames);
+            for (int i = 0; i < numFrames * 2; ++i)
+                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f;
+        }
+    }
     // Mix rhythm WAV samples, then soft-clip to prevent hard clipping
     if (g_rhythmEngine) {
         g_rhythmEngine->mixAudio(outBuffer, numFrames);
@@ -234,13 +253,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
 
 bool AudioEngine::loadSoundFont(int target, const char* path) {
     std::lock_guard<std::mutex> lock(mLock);
-    fluid_synth_t* synth = (target == 0) ? mLeadSynth : mAccompSynth;
-    int* sfId = (target == 0) ? &mLeadSoundFontId : &mAccompSoundFontId;
-    auto* list = (target == 0) ? &mLeadInstruments : &mAccompInstruments;
+    fluid_synth_t* synth = (target == 0) ? mLeadSynth : (target == 1) ? mAccompSynth : mBassSynth;
+    int* sfId = (target == 0) ? &mLeadSoundFontId : (target == 1) ? &mAccompSoundFontId : &mBassSoundFontId;
     if (!synth) return false;
     if (*sfId != -1) { fluid_synth_sfunload(synth, *sfId, 1); *sfId = -1; }
     *sfId = fluid_synth_sfload(synth, path, 1);
     if (*sfId == -1) return false;
+    if (target == 2) return true; // Bass synth: 不需要 scan preset 列表
+    auto* list = (target == 0) ? &mLeadInstruments : &mAccompInstruments;
     scanPresets(synth, *list);
     if (!list->empty()) {
         fluid_synth_bank_select(synth, 0, (*list)[0].bank);

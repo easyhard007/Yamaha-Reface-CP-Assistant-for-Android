@@ -27,6 +27,9 @@ public:
     /// numFrames: 帧数
     void mixAudio(float* outBuf, int32_t numFrames);
 
+    /// 仅过混响 (供 BassSynth 使用, 独立 reverb 实例)
+    void processBassReverb(float* buf, int32_t numFrames);
+
     /// 设置主音量增益 (0-4.0, 默认 3.2 = 80%)
     void setMasterGain(float g) { masterGain.store(g); }
     float getMasterGain() const { return masterGain.load(); }
@@ -48,6 +51,8 @@ private:
     std::atomic<float> masterGain{0.0f}; // 0-4.0, 默认 0%
 
     SimpleReverb reverb;
+    SimpleReverb bassReverb;
+    bool bassReverbInited = false;
     std::vector<float> tempBuf; // 混响临时 buffer
     bool reverbInited = false;
 
@@ -55,7 +60,13 @@ private:
     // Biquad 状态 (stereo: L/R 各一组 x1/x2/y1/y2)
     float eq_x1L = 0, eq_x2L = 0, eq_y1L = 0, eq_y2L = 0;
     float eq_x1R = 0, eq_x2R = 0, eq_y1R = 0, eq_y2R = 0;
+    float bassEq_x1L = 0, bassEq_x2L = 0, bassEq_y1L = 0, bassEq_y2L = 0;
+    float bassEq_x1R = 0, bassEq_x2R = 0, bassEq_y1R = 0, bassEq_y2R = 0;
+    float bassHiEq_x1L = 0, bassHiEq_x2L = 0, bassHiEq_y1L = 0, bassHiEq_y2L = 0;
+    float bassHiEq_x1R = 0, bassHiEq_x2R = 0, bassHiEq_y1R = 0, bassHiEq_y2R = 0;
     void applyLowBellEQ(float* buf, int32_t numFrames);
+    void applyBassEQ(float* buf, int32_t numFrames);
+    void applyBassHiCutEQ(float* buf, int32_t numFrames);
 
     WavSample loadWav(const std::string& path);
 };

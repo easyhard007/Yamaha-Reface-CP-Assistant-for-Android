@@ -34,31 +34,33 @@ MidiProcessor::MidiProcessor() {}
 
 // ---- Helpers ----
 
-std::set<int> MidiProcessor::getLowNotes() const {
-    std::set<int> low;
-    for (int n : mActiveNotes)    if (n < mSplitPoint) low.insert(n);
-    for (int n : mPedalHeldNotes) if (n < mSplitPoint) low.insert(n);
+std::map<int, NoteInfo> MidiProcessor::getLowNotes() const {
+    std::map<int, NoteInfo> low;
+    for (const auto& kv : mActiveNotes) if (kv.first < mSplitPoint) low.insert(kv);
+    for (const auto& kv : mPedalHeldNotes) if (kv.first < mSplitPoint) low.insert(kv);
     return low;
 }
 
 std::set<int> MidiProcessor::getAllNotes() const {
-    std::set<int> all = mActiveNotes;
-    for (int n : mPedalHeldNotes) all.insert(n);
+    std::set<int> all;
+    for (const auto& kv : mActiveNotes) all.insert(kv.first);
+    for (const auto& kv : mPedalHeldNotes) all.insert(kv.first);
     return all;
 }
 
 // ---- MIDI Event Processing ----
 
-NoteOnResult MidiProcessor::processNoteOn(int note, int velocity) {
+NoteOnResult MidiProcessor::processNoteOn(int note, int velocity, double timestampMs) {
     std::lock_guard<std::mutex> lock(mLock);
     NoteOnResult r;
 
-    // Auto-sustain collision detection — use lowNotes WITHOUT current note
     auto lowNotes = getLowNotes();
-    auto asa = mAutoSustain.onNoteOn(note, lowNotes);
+    std::set<int> lowPitches;
+    for (const auto& kv : lowNotes) lowPitches.insert(kv.first);
+    auto asa = mAutoSustain.onNoteOn(note, lowPitches);
 
-    mActiveNotes.insert(note);
-    if (mIsPedalDown) mPedalHeldNotes.insert(note);
+    mActiveNotes[note] = {note, velocity, timestampMs};
+    if (mIsPedalDown) mPedalHeldNotes[note] = {note, velocity, timestampMs};
     mScaleDetector.feedNote(note);
     if (asa == AutoSustainManager::CC64_OFF) {
         mIsPedalDown = false;
@@ -68,7 +70,6 @@ NoteOnResult MidiProcessor::processNoteOn(int note, int velocity) {
         __android_log_print(ANDROID_LOG_INFO, TAG, "[AutoSustain] BREAK → CC64=0");
     }
 
-    // Bass enhance
     if (mBassWeightsDirty) recomputeBassWeights();
     BassNote bn = mBassEnhancer.processNoteOn(note, velocity, mBassWeights);
     if (bn.noteOn) { r.bassNote = bn.note; r.bassVelocity = bn.velocity; }
@@ -80,11 +81,10 @@ NoteOffResult MidiProcessor::processNoteOff(int note) {
     std::lock_guard<std::mutex> lock(mLock);
     NoteOffResult r;
 
-    // Auto-sustain try_repress — BEFORE erasing from ActiveNotes (so note can be re-held)
     auto asa = mAutoSustain.onNoteOff(note);
     if (asa == AutoSustainManager::REHOLD) {
         mIsPedalDown = true;
-        for (int n : mActiveNotes) mPedalHeldNotes.insert(n);
+        for (const auto& kv : mActiveNotes) mPedalHeldNotes.insert(kv);
         mPendingSustainCC = 127;
         r.sustainCCToSend = 127;
         __android_log_print(ANDROID_LOG_INFO, TAG, "[AutoSustain] REHOLD → CC64=127");
@@ -92,7 +92,6 @@ NoteOffResult MidiProcessor::processNoteOff(int note) {
 
     mActiveNotes.erase(note);
 
-    // Bass enhance note-off
     BassNote bnOff = mBassEnhancer.processNoteOff(note);
     if (mBassEnhancer.isEnabled()) { r.bassNote = bnOff.note; }
 
@@ -106,21 +105,20 @@ CCResult MidiProcessor::processCC(int controller, int value) {
     if (controller == 64 && !mAutoSustain.isEnabled()) {
         if (value >= 64) {
             mIsPedalDown = true;
-            for (int n : mActiveNotes) mPedalHeldNotes.insert(n);
+            for (const auto& kv : mActiveNotes) mPedalHeldNotes.insert(kv);
         } else {
             mIsPedalDown = false;
             mPedalHeldNotes.clear();
         }
     }
 
-    // Bass enhance CCs (Reface CP knobs)
-    if (controller == 81) { // Drive knob → ratio
+    if (controller == 81) {
         mBassEnhanceRatio = value / 127.0f;
         mBassWeightsDirty = true;
-    } else if (controller == 18) { // Tremolo Depth → center
+    } else if (controller == 18) {
         mBassEnhanceCenter = 36 + (int)(value / 127.0f * 24);
         mBassWeightsDirty = true;
-    } else if (controller == 19) { // Tremolo Rate → spread
+    } else if (controller == 19) {
         mBassEnhanceSpread = 5 + (int)(value / 127.0f * 43);
         mBassWeightsDirty = true;
     }
@@ -135,7 +133,7 @@ int MidiProcessor::setAutoSustainEnabled(bool enabled) {
     auto asa = mAutoSustain.setEnabled(enabled);
     if (asa == AutoSustainManager::CC64_ON) {
         mIsPedalDown = true;
-        for (int n : mActiveNotes) mPedalHeldNotes.insert(n);
+        for (const auto& kv : mActiveNotes) mPedalHeldNotes.insert(kv);
         mPendingSustainCC = 127;
         __android_log_print(ANDROID_LOG_INFO, TAG, "[AutoSustain] ON → CC64=127");
         return 127;
@@ -183,30 +181,35 @@ std::string MidiProcessor::getNoteStateJson() {
     auto lowNotes = getLowNotes();
     auto allNotes = getAllNotes();
 
-    auto toJson = [](const std::set<int>& s) -> std::string {
-        std::string j;
-        bool first = true;
-        for (int n : s) {
+    auto setJson = [](const std::set<int>& s) -> std::string {
+        std::string j; bool first = true;
+        for (int n : s) { if (!first) j += ","; first = false; j += std::to_string(n); }
+        return j;
+    };
+    auto mapJson = [](const std::map<int, NoteInfo>& m) -> std::string {
+        std::string j; bool first = true;
+        for (const auto& kv : m) {
             if (!first) j += ","; first = false;
-            j += std::to_string(n);
+            j += "{\"p\":" + std::to_string(kv.first) + ",\"v\":" + std::to_string(kv.second.velocity) + ",\"t\":" + std::to_string((int64_t)kv.second.timestampMs) + "}";
         }
         return j;
     };
+    std::set<int> lowSet; for (const auto& kv : lowNotes) lowSet.insert(kv.first);
 
-    std::string json = "{\"active\":[" + toJson(mActiveNotes) +
-           "],\"pedal\":[" + toJson(mPedalHeldNotes) +
-           "],\"low\":[" + toJson(lowNotes) +
-           "],\"all\":[" + toJson(allNotes) +
-           "],\"pedalDown\":" + std::string(mIsPedalDown ? "true" : "false") +
-           ",\"split\":" + std::to_string(mSplitPoint) +
-           ",\"autoSustain\":" + std::string(mAutoSustain.isEnabled() ? "true" : "false") +
-           ",\"isBreaking\":" + std::string(mAutoSustain.isBreaking() ? "true" : "false") +
-           ",\"bassEnhance\":" + std::string(mBassEnhanceEnabled ? "true" : "false") +
-           ",\"bassRatio\":" + std::to_string(mBassEnhanceRatio).substr(0, 4) +
-           ",\"transpose\":" + std::to_string(mTranspose) +
-           ",\"bassCenter\":" + std::to_string(mBassEnhanceCenter) +
-           ",\"bassSpread\":" + std::to_string(mBassEnhanceSpread) +
-           ",\"bassWeights\":[";
+    std::string json = "{\"active\":[" + mapJson(mActiveNotes) +
+               "],\"pedal\":[" + mapJson(mPedalHeldNotes) +
+               "],\"low\":[" + setJson(lowSet) +
+               "],\"all\":[" + setJson(allNotes) +
+               "],\"pedalDown\":" + std::string(mIsPedalDown ? "true" : "false") +
+               ",\"split\":" + std::to_string(mSplitPoint) +
+               ",\"autoSustain\":" + std::string(mAutoSustain.isEnabled() ? "true" : "false") +
+               ",\"isBreaking\":" + std::string(mAutoSustain.isBreaking() ? "true" : "false") +
+               ",\"bassEnhance\":" + std::string(mBassEnhanceEnabled ? "true" : "false") +
+               ",\"bassRatio\":" + std::to_string(mBassEnhanceRatio).substr(0, 4) +
+               ",\"transpose\":" + std::to_string(mTranspose) +
+               ",\"bassCenter\":" + std::to_string(mBassEnhanceCenter) +
+               ",\"bassSpread\":" + std::to_string(mBassEnhanceSpread) +
+               ",\"bassWeights\":[";
     if (mBassWeightsDirty) const_cast<MidiProcessor*>(this)->recomputeBassWeights();
     bool firstW = true;
     for (int i = 0; i < 128; i++) {
@@ -222,63 +225,38 @@ std::string MidiProcessor::getNoteStateJson() {
 std::string MidiProcessor::getChordInfo() {
     std::lock_guard<std::mutex> lock(mLock);
     auto allNotes = getAllNotes();
-
-    // Run chord_detect
     std::vector<int> notes(allNotes.begin(), allNotes.end());
     auto chords = detect_chord(notes);
-
-    // Store primary & secondary
     mPrimaryChord = chords.empty() ? "--" : chords[0];
     mSecondaryChord = chords.size() > 1 ? chords[1] : "";
-
-    // Scale detection
     int scaleRoot = mScaleDetector.getScaleRootPc();
     mKeyName = mScaleDetector.getKeyName();
-
-    // Roman numeral from primary chord root
     if (mPrimaryChord != "--" && scaleRoot >= 0) {
-        // Extract root pitch class from chord name
         int rootPc = -1;
         std::string rootStr;
         if (mPrimaryChord.size() >= 1) {
             for (int i = 0; i < 12; i++) {
                 std::string pn(pitchNames[i]);
-                if (mPrimaryChord.compare(0, pn.size(), pn) == 0) {
-                    rootPc = i; rootStr = pn; break;
-                }
+                if (mPrimaryChord.compare(0, pn.size(), pn) == 0) { rootPc = i; rootStr = pn; break; }
             }
-            // Handle two-character names like C#
             if (rootPc < 0 && mPrimaryChord.size() >= 2) {
                 for (int i = 0; i < 12; i++) {
                     std::string pn(pitchNames[i]);
-                    if (pn.size() == 2 && mPrimaryChord.compare(0, 2, pn) == 0) {
-                        rootPc = i; rootStr = pn; break;
-                    }
+                    if (pn.size() == 2 && mPrimaryChord.compare(0, 2, pn) == 0) { rootPc = i; rootStr = pn; break; }
                 }
             }
         }
-
         if (rootPc >= 0) {
             static const char* romanMajor[] = {"I","","ii","","iii","IV","","V","","vi","","viidim"};
             static const char* romanMinor[] = {"i","","iidim","III","","iv","","v","","VI","","viidim"};
             int degree = (rootPc - scaleRoot + 12) % 12;
             mTsdDegree = mScaleDetector.isMinor() ? romanMinor[degree] : romanMajor[degree];
             if (mTsdDegree.empty()) mTsdDegree = mPrimaryChord;
-
-            // Append chord suffix
             std::string suffix = mPrimaryChord.substr(rootStr.size());
             size_t slash = suffix.find('/');
             if (slash != std::string::npos) suffix = suffix.substr(0, slash);
             mRomanNumeral = mTsdDegree + suffix;
-        } else {
-            mRomanNumeral = mPrimaryChord;
-            mTsdDegree = mPrimaryChord;
-        }
-    } else {
-        mRomanNumeral = "--";
-        mTsdDegree = "--";
-    }
-
-    return mPrimaryChord + "|" + mRomanNumeral + "|" + mKeyName + "|" + mTsdDegree
-           + "|" + mSecondaryChord;
+        } else { mRomanNumeral = mPrimaryChord; mTsdDegree = mPrimaryChord; }
+    } else { mRomanNumeral = "--"; mTsdDegree = "--"; }
+    return mPrimaryChord + "|" + mRomanNumeral + "|" + mKeyName + "|" + mTsdDegree + "|" + mSecondaryChord;
 }

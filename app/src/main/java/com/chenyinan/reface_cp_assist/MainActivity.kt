@@ -38,6 +38,7 @@ class MainActivity : AppCompatActivity() {
 
     private val soundFontNames = listOf("JJazzLab-SoundFont")
     private val soundFontFiles = listOf("JJazzLab-SoundFont.sf2")
+    private val bassSf2 = "033FingerBass-LiveHQNaturalGM.sf2"
     private val styleFiles = mutableListOf<String>()
     private val wavDirName = "wav"
     private var currentSf2Index = 0
@@ -109,6 +110,10 @@ class MainActivity : AppCompatActivity() {
             { nativeGetMinCajonEnergy() },
             { v -> nativeSetRhythmGain(v) },
             { nativeGetRhythmGain() },
+            { v -> nativeSetBassAssist(v) },
+            { nativeIsBassAssistEnabled() },
+            { v -> nativeSetBassAssistVolume(v) },
+            { nativeGetBassAssistVolume() },
             { nativeGetTempoDetectorData() },
             { dir -> nativeInitRhythmEngine(dir) },
             { vol -> nativeSetAccompVolume(vol) },
@@ -133,6 +138,9 @@ class MainActivity : AppCompatActivity() {
         copyAssets()
         val defaultSf2 = File(cacheDir, soundFontFiles[0])
         nativeInit(defaultSf2.absolutePath)
+        // Load bass SF2 onto Bass synth (target=2)
+        val bassSf2File = File(cacheDir, bassSf2)
+        nativeLoadBassSoundFont(bassSf2File.absolutePath)
         // Init Cajon WAV engine
         val wavDir = File(cacheDir, wavDirName)
         nativeInitRhythmEngine(wavDir.absolutePath)
@@ -398,6 +406,9 @@ class MainActivity : AppCompatActivity() {
                         val value = msg[i + 2].toInt()
                         nativeSendCC(ctrl, value)
                         if (ctrl == 86 || ctrl == 87) js("updateVolDisplay();")
+                        if (ctrl == 17 && value != 0) midiUtil.sendCC(17, 0)
+                        if (ctrl == 85 && value != 0) midiUtil.sendCC(85, 0)
+                        if (ctrl == 88 && value != 0) midiUtil.sendCC(88, 0)
                         val pendingBpm = nativeGetAndClearPendingBpm()
                         if (pendingBpm >= 0) js("updateBpmDisplay(${Math.round(pendingBpm)})")
                         val pendingGain = nativeGetAndClearPendingRhythmGain()
@@ -433,6 +444,12 @@ class MainActivity : AppCompatActivity() {
                 try { assets.open(name).use { i -> FileOutputStream(f).use { o -> i.copyTo(o) } } }
                 catch (_: Exception) {}
             }
+        }
+        // Bass SF2
+        val bassFile = File(cacheDir, bassSf2)
+        if (!bassFile.exists()) {
+            try { assets.open(bassSf2).use { i -> FileOutputStream(bassFile).use { o -> i.copyTo(o) } } }
+            catch (_: Exception) {}
         }
         // also copy style files from assets/styles/ to cacheDir
         try {
@@ -519,6 +536,9 @@ class MainActivity : AppCompatActivity() {
     external fun nativeInit(sf2Path: String)
     external fun nativeNoteOn(note: Int, velocity: Int)
     external fun nativeNoteOff(note: Int)
+    external fun nativeNoteOnBass(note: Int, velocity: Int)
+    external fun nativeNoteOffBass(note: Int)
+    external fun nativeLoadBassSoundFont(path: String)
     external fun nativeProcessNoteOn(note: Int, velocity: Int): Int
     external fun nativeProcessNoteOff(note: Int): Int
     external fun nativeProcessCC(controller: Int, value: Int): Int
@@ -548,6 +568,10 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingBpm(): Double
     external fun nativeGetAndClearPendingRhythmGain(): Double
     external fun nativeGetAndClearPendingMinEnergy(): Double
+    external fun nativeSetBassAssist(enabled: Boolean)
+    external fun nativeIsBassAssistEnabled(): Boolean
+    external fun nativeSetBassAssistVolume(volume: Float)
+    external fun nativeGetBassAssistVolume(): Float
     external fun nativeGetAndClearPendingTempoHighlight(): Int
     external fun nativeGetAndClearPendingScatter(): Int
     external fun nativeGetAndClearPendingTempoFlash(): Int

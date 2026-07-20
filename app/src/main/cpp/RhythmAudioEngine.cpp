@@ -123,6 +123,50 @@ void RhythmAudioEngine::trigger(int type, float velocity) {
     voices.push_back({samples[idx].pcm.data(), samples[idx].pcm.size(), 0, gain});
 }
 
+void RhythmAudioEngine::applyBassEQ(float* buf, int32_t numFrames) {
+    // 35Hz +6dB, Q=0.375 (bass only)
+    const float b0 = 1.00467f, b1 = -1.99060f, b2 = 0.98593f, a1 = -1.99060f, a2 = 0.99063f;
+    for (int32_t i = 0; i < numFrames; i++) {
+        float xL = buf[i * 2], xR = buf[i * 2 + 1];
+        float yL = b0 * xL + b1 * bassEq_x1L + b2 * bassEq_x2L - a1 * bassEq_y1L - a2 * bassEq_y2L;
+        bassEq_x2L = bassEq_x1L; bassEq_x1L = xL;
+        bassEq_y2L = bassEq_y1L; bassEq_y1L = yL;
+        float yR = b0 * xR + b1 * bassEq_x1R + b2 * bassEq_x2R - a1 * bassEq_y1R - a2 * bassEq_y2R;
+        bassEq_x2R = bassEq_x1R; bassEq_x1R = xR;
+        bassEq_y2R = bassEq_y1R; bassEq_y1R = yR;
+        buf[i * 2] = yL; buf[i * 2 + 1] = yR;
+    }
+}
+
+void RhythmAudioEngine::applyBassHiCutEQ(float* buf, int32_t numFrames) {
+    // Bell EQ: f0=4kHz, Q=1.0, gain=-6dB
+    const float b0 = 0.8622f, b1 = -1.2188f, b2 = 0.5857f, a1 = -1.2188f, a2 = 0.4479f;
+    for (int32_t i = 0; i < numFrames; i++) {
+        float xL = buf[i * 2], xR = buf[i * 2 + 1];
+        float yL = b0 * xL + b1 * bassHiEq_x1L + b2 * bassHiEq_x2L - a1 * bassHiEq_y1L - a2 * bassHiEq_y2L;
+        bassHiEq_x2L = bassHiEq_x1L; bassHiEq_x1L = xL;
+        bassHiEq_y2L = bassHiEq_y1L; bassHiEq_y1L = yL;
+        float yR = b0 * xR + b1 * bassHiEq_x1R + b2 * bassHiEq_x2R - a1 * bassHiEq_y1R - a2 * bassHiEq_y2R;
+        bassHiEq_x2R = bassHiEq_x1R; bassHiEq_x1R = xR;
+        bassHiEq_y2R = bassHiEq_y1R; bassHiEq_y1R = yR;
+        buf[i * 2] = yL; buf[i * 2 + 1] = yR;
+    }
+}
+
+void RhythmAudioEngine::processBassReverb(float* buf, int32_t numFrames) {
+    applyBassEQ(buf, numFrames);     // +10dB @ 60Hz
+    applyBassHiCutEQ(buf, numFrames); // -10dB @ 4kHz
+    if (!bassReverbInited) {
+        bassReverb.init(44100);
+        bassReverb.setRoomSize(0.85f);
+        bassReverb.setMix(0.07f);
+        bassReverb.setDamp(0.6f);
+        bassReverb.setLowDamp(0.2f);
+        bassReverbInited = true;
+    }
+    bassReverb.process(buf, numFrames);
+}
+
 void RhythmAudioEngine::setReverb(float roomSize, float level) {
     if (!reverbInited) {
         reverb.init(44100);
@@ -176,8 +220,7 @@ void RhythmAudioEngine::mixAudio(float* outBuf, int32_t numFrames) {
     }
 }
 
-// Biquad peaking EQ: f0=60Hz, fs=44100, Q=0.375, gain=+10dB
-// Coefficients pre-computed (normalized by a0)
+// Biquad peaking EQ: f0=60Hz, fs=44100, Q=0.375, gain=+10dB (Cajon)
 void RhythmAudioEngine::applyLowBellEQ(float* buf, int32_t numFrames) {
     const float b0 = 1.01379f;
     const float b1 = -1.98719f;

@@ -349,6 +349,13 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
   border-color: rgba(255,255,255,0.9);
 }
 
+.energy-range.glow::-webkit-slider-runnable-track {
+  background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.5);
+}
+.energy-range.glow::-moz-range-track {
+  background: #fff; box-shadow: 0 0 6px rgba(255,255,255,0.5);
+}
+
 @keyframes ready-blink {
     0%, 100% { border: 2px solid rgba(255,255,255,0.3); }
     50%      { border: 2px solid rgba(255,255,255,0.9); }

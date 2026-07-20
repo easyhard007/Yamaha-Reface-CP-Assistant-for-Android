@@ -84,7 +84,7 @@
         <!-- 和弦与节拍 -->
         <div class="invisible-card" id="chord-beat-card">
             <div id="chord-display" style="color:#fff; font-size:20px; font-weight:bold; text-align:center; text-shadow:none;">-</div>
-            <div id="chord-detect-notes" style="color:#aaa; font-size:10px; text-align:center; min-height:15px;"></div>
+            <div id="chord-detect-notes" style="color:#aaa; font-size:10px; text-align:center; min-height:30px; max-height:60px; overflow-y:auto;"></div>
             <div id="chord-debug-info" style="color:#555; font-size:9px; text-align:center; min-height:15px;">debug info: </div>
             <div id="sync-zone" onclick="syncBeat()" style="cursor:pointer;">
                 <div id="bpm-display" style="color:#eee; font-weight:bold; font-size:clamp(10px,5vh,20px); text-align:center; min-height:30px;">♪ = 75</div>
@@ -133,7 +133,12 @@
             <div style="text-align:center; margin:8px 0;">
                 <span style="color:#aaa; font-size:10px;">音量</span>
                 <input type="range" id="rhythm-vol" class="energy-range" min="0" max="100" value="0" oninput="onRhythmVol()">
-                <span id="rhythm-vol-val" style="color:#aaa; font-size:10px;">80%</span>
+                <span id="rhythm-vol-val" style="color:#aaa; font-size:10px;">0%</span>
+            </div>
+            <div style="text-align:center; margin:8px 0;">
+                <span style="color:#aaa; font-size:10px;">贝斯</span>
+                <input type="range" id="bass-assist-vol" class="energy-range" min="0" max="100" value="80" oninput="onBassAssistVol()">
+                <span id="bass-assist-vol-val" style="color:#aaa; font-size:10px;">50%</span>
             </div>
             <div style="text-align:center; margin:8px 0;">
                 <span style="color:#aaa; font-size:10px;">能量</span>
@@ -367,10 +372,12 @@
             const btn = document.getElementById('enhance-btn');
             if (window.bassEnhanceEnabled) {
                 btn.classList.add('btn-active');
+                // 互斥: 将贝斯音量归零 (归零会自动关闭 BassAssist)
+                document.getElementById('bass-assist-vol').value = 0;
+                onBassAssistVol();
             } else {
                 btn.classList.remove('btn-active');
             }
-            // 【新增】：切换时立即刷新键盘
             if (typeof refreshKeyboardUI === 'function') refreshKeyboardUI();
             if (typeof updateBassWeightMap === 'function')  updateBassWeightMap();
         }
@@ -644,7 +651,13 @@
         // 节拍器常驻更新 (150ms)
         setInterval(function() {
             if (typeof Android !== 'undefined') {
-                document.getElementById('chord-detect-notes').innerText = Android.getChordNotes ? Android.getChordNotes() : '';
+                // 显示 Active/Pedal 的 pitch + vel
+                var ad = window._activeData || [];
+                var pd = window._pedalData || [];
+                var lines = [];
+                if (ad.length > 0) lines.push('Active: ' + ad.map(function(x){return x.p+'('+x.v+','+(x.t||0)+'ms)';}).join(' '));
+                if (pd.length > 0) lines.push('Pedal: ' + pd.map(function(x){return x.p+'('+x.v+','+(x.t||0)+'ms)';}).join(' '));
+                document.getElementById('chord-detect-notes').innerText = lines.join('\n');
                 document.getElementById('chord-debug-info').innerText = 'debug info: ' + (Android.getDebugInfo ? Android.getDebugInfo() : '');
             }
         }, 150);
@@ -704,10 +717,52 @@
         }
 
         
+        function syncBassVolSlider() {
+            var slider = document.getElementById('bass-assist-vol');
+            var v = parseInt(slider.value);
+            document.getElementById('bass-assist-vol-val').innerText = v + '%';
+            updateSliderGlow();
+        }
+        function onBassAssistVol() {
+            var v = parseInt(document.getElementById('bass-assist-vol').value);
+            syncBassVolSlider();
+            if (typeof Android !== 'undefined') {
+                Android.setBassAssistVolume(v / 100);
+                Android.setBassAssist(v > 0);
+            }
+            if (v > 0) {
+                var eb = document.getElementById('enhance-btn');
+                if (eb && eb.classList.contains('btn-active')) toggleBassEnhance();
+            }
+        }
+        // 平滑滑动: 用 JS 动画, 恒定速度 (每 1% = 5ms, 50% = 250ms)
+        function smoothSlide(sliderId, targetPct, onDone) {
+            var s = document.getElementById(sliderId);
+            if (!s) return;
+            var cur = parseInt(s.value);
+            if (cur === targetPct) { if (onDone) onDone(); return; }
+            var step = cur < targetPct ? 1 : -1;
+            var totalSteps = Math.abs(targetPct - cur);
+            var interval = 5;
+            var i = 0;
+            var timer = setInterval(function() {
+                cur += step; i++;
+                s.value = cur;
+                if (i >= totalSteps) { clearInterval(timer); s.value = targetPct; if (onDone) onDone(); }
+            }, interval);
+        }
+
+        function updateSliderGlow() {
+            var rv = parseInt(document.getElementById('rhythm-vol').value);
+            var bv = parseInt(document.getElementById('bass-assist-vol').value);
+            document.getElementById('rhythm-vol').classList.toggle('glow', rv > 0);
+            document.getElementById('bass-assist-vol').classList.toggle('glow', bv > 0);
+        }
         function onRhythmVol() {
             var v = parseInt(document.getElementById('rhythm-vol').value);
             document.getElementById('rhythm-vol-val').innerText = v + '%';
             if (typeof Android !== 'undefined') Android.setRhythmGain(v / 100 * 4.0);
+            updateSliderGlow();
         }
         function onCajonEnergy() {
             var v = parseInt(document.getElementById('cajon-energy').value) / 100;
@@ -781,9 +836,11 @@
             }
             var synced = data.synced || 0;
             var dbgColor = synced ? '#ff8c00' : '#888';
+            var lowP = data.lowP || -1;
+            var lowInfo = lowP > 0 ? (' low: ' + lowP + '(' + (data.lowV||0) + ')') : ' low: none';
             document.getElementById('detected-bpm').innerHTML = topLine +
                 '<br><span style="color:' + listColor + '">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>' +
-                '<br><span style="color:' + dbgColor + ';font-size:9px;">' + (data.err1||0) + ' ' + (data.err2||0) + ' ' + (data.err3||0) + ' mean:' + (data.syncMean||0).toFixed(0) + 'ms err:' + (data.syncErr||0).toFixed(0) + 'ms' + (synced ? ' SYNC!' : '') + '</span>';
+                '<br><span style="color:' + dbgColor + ';font-size:9px;">' + (data.err1||0) + ' ' + (data.err2||0) + ' ' + (data.err3||0) + ' mean:' + (data.syncMean||0).toFixed(0) + 'ms err:' + (data.syncErr||0).toFixed(0) + 'ms' + lowInfo + (synced ? ' SYNC!' : '') + '</span>';
 
             // 网格参数缓存
             _gridMeasureMs = measureMs;
@@ -896,8 +953,10 @@
             }
         }
 
-        // 初始化网格
+        // 初始化网格 + 滑轨发光
         setTimeout(function() { _lastGridBpm = 0; renderScatterChart(); }, 500);
+        setTimeout(syncBassVolSlider, 100);
+        setTimeout(updateSliderGlow, 120);
 
         // ===== Push-based UI updates (从 C++/Kotlin 推送到 JS) =====
         function syncBeat() {
@@ -934,8 +993,9 @@
             var s = document.getElementById('rhythm-vol');
             if (s) {
                 var pct = Math.round(gain / 4.0 * 100);
-                if (document.activeElement !== s) s.value = pct;
+                if (document.activeElement !== s) smoothSlide('rhythm-vol', pct);
                 document.getElementById('rhythm-vol-val').innerText = pct + '%';
+                updateSliderGlow();
             }
         }
         function updateEnergySlider(minE) {
@@ -1497,8 +1557,19 @@
     function onNativeNoteState(json) {
         try {
             const state = JSON.parse(json);
-            window.activeNotes = new Set(state.active || []);
-            window.pedalHeldNotes = new Set(state.pedal || []);
+            // 新格式: active/pedal 是 [{p:n,v:n},...], 提取 pitch 给 Set
+            var toPitchSet = function(arr) {
+                var s = new Set();
+                if (arr && arr.length && typeof arr[0] === 'object') {
+                    for (var i = 0; i < arr.length; i++) s.add(arr[i].p);
+                } else if (arr) { for (var i = 0; i < arr.length; i++) s.add(arr[i]); }
+                return s;
+            };
+            window.activeNotes = toPitchSet(state.active || []);
+            window.pedalHeldNotes = toPitchSet(state.pedal || []);
+            // 保留原始数据用于显示
+            window._activeData = state.active || [];
+            window._pedalData = state.pedal || [];
             window.lowNotes = new Set(state.low || []);
             window.allActiveNotes = new Set(state.all || []);
             window.isPedalDown = state.pedalDown || false;
@@ -1582,8 +1653,11 @@
     toggleBassEnhance = function() {
         window.bassEnhanceEnabled = !window.bassEnhanceEnabled;
         var btn = document.getElementById('enhance-btn');
-        if (window.bassEnhanceEnabled) btn.classList.add('btn-active');
-        else btn.classList.remove('btn-active');
+        if (window.bassEnhanceEnabled) {
+            btn.classList.add('btn-active');
+            // 互斥: 将贝斯音量平滑归零
+            smoothSlide('bass-assist-vol', 0, onBassAssistVol);
+        } else btn.classList.remove('btn-active');
         if (typeof Android !== 'undefined') Android.toggleBassEnhance(window.bassEnhanceEnabled);
     };
     // Override changeTranspose → use C++ backend + SysEx
