@@ -2,6 +2,7 @@ package com.chenyinan.reface_cp_assist
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.midi.MidiDevice
@@ -47,6 +48,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
 
         webView = findViewById(R.id.webView)
@@ -144,6 +146,17 @@ class MainActivity : AppCompatActivity() {
         // Init Cajon WAV engine
         val wavDir = File(cacheDir, wavDirName)
         nativeInitRhythmEngine(wavDir.absolutePath)
+
+        // Audio 设备热插拔回调
+        val audioMgr = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioMgr.registerAudioDeviceCallback(object : AudioDeviceCallback() {
+            override fun onAudioDevicesAdded(added: Array<out AudioDeviceInfo>?) {
+                chordHandler.postDelayed({ nativeRestartAudio() }, 3000)
+            }
+            override fun onAudioDevicesRemoved(removed: Array<out AudioDeviceInfo>?) {
+                chordHandler.postDelayed({ nativeRestartAudio() }, 3000)
+            }
+        }, Handler(Looper.getMainLooper()))
 
         midiManager = getSystemService(Context.MIDI_SERVICE) as MidiManager
         midiManager.registerDeviceCallback(object : MidiManager.DeviceCallback() {
@@ -346,11 +359,15 @@ class MainActivity : AppCompatActivity() {
                 // 音符状态 → JS
                 val noteState = nativeGetNoteState()
                 js("if(typeof onNativeNoteState==='function')onNativeNoteState('$noteState');")
-                // 和弦信息 → JS (C++ chord_detect)
-                val ci = nativeGetChordInfo()
-                val ciParts = ci.split("|")
-                if (ciParts.size >= 5 && ciParts[0] != "--") {
-                    js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('${ciParts[0]}','${ciParts[1]}','${ciParts[2]}','${ciParts[3]}','${ciParts[4]}');")
+                // 和弦页: chord 来自 ChordDetector, roman/key/tsd 来自 ScaleDetector
+                val chord = nativeGetChord()
+                if (chord.isNotEmpty() && chord != "-") {
+                    val romanInfo = nativeGetRomanFromChord(chord)
+                    val riParts = romanInfo.split("|")
+                    val roman = if (riParts.size >= 1) riParts[0] else "--"
+                    val key   = if (riParts.size >= 2) riParts[1] else "--"
+                    val tsd   = if (riParts.size >= 3) riParts[2] else "--"
+                    js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chord','$roman','$key','$tsd','')")
                 }
                 pushAudioDevices()
                 chordHandler.postDelayed(this, 150)
@@ -380,14 +397,18 @@ class MainActivity : AppCompatActivity() {
                             if (nativeGetAndClearPendingTempoFlash() != 0) js("tempoFlash()")
                             val pendingBpm2 = nativeGetAndClearPendingBpm()
                             if (pendingBpm2 >= 0) js("updateBpmDisplay(${Math.round(pendingBpm2)})")
-                            js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
+                            val chordStr = nativeGetAndClearPendingChord()
+                            if (chordStr.isNotEmpty()) {
+                                js("updateChordDisplay('$chordStr')")
+                                js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chordStr','--','--','--','')")
+                            }
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteon',$note,$velocity,$ch);")
                         } else {
                             nativeNoteOff(note)
                                 handleProcessResult(nativeProcessNoteOff(note))
-                            js("updateChordDisplay('${nativeGetChord()}','${nativeGetChordTiming()}','${nativeGetChordTones()}');")
+                            js("updateChordDisplay('${nativeGetChord()}')")
                             val log = "↓ NoteOff ${midiNoteName(note)}  v0  ch$ch"
                             midiLogRx(log)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
@@ -397,6 +418,11 @@ class MainActivity : AppCompatActivity() {
                         val note = msg[i + 1].toInt()
                         nativeNoteOff(note)
                                 handleProcessResult(nativeProcessNoteOff(note))
+                        val chordStr2 = nativeGetAndClearPendingChord()
+                        if (chordStr2.isNotEmpty()) {
+                            js("updateChordDisplay('$chordStr2')")
+                            js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chordStr2','--','--','--','')")
+                        }
                         val log = "↓ NoteOff ${midiNoteName(note)}  ch$ch"
                         midiLogRx(log)
                         js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
@@ -534,6 +560,7 @@ class MainActivity : AppCompatActivity() {
     // JNI
     // ==========================================
     external fun nativeInit(sf2Path: String)
+    external fun nativeRestartAudio()
     external fun nativeNoteOn(note: Int, velocity: Int)
     external fun nativeNoteOff(note: Int)
     external fun nativeNoteOnBass(note: Int, velocity: Int)
@@ -575,6 +602,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingTempoHighlight(): Int
     external fun nativeGetAndClearPendingScatter(): Int
     external fun nativeGetAndClearPendingTempoFlash(): Int
+    external fun nativeGetAndClearPendingChord(): String
     external fun nativeGetTempoDetectorData(): String
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
@@ -585,6 +613,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAccompGain(): Double
     external fun nativeGetLeadGain(): Double
     external fun nativeGetChord(): String
+    external fun nativeGetRomanFromChord(chordName: String): String
     external fun nativeGetChordNotes(): String
     external fun nativeGetChordTiming(): String
     external fun nativeGetChordTones(): String

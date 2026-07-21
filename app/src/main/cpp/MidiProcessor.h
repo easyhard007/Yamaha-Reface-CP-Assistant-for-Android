@@ -56,6 +56,7 @@ public:
     // ---- State accessors (for polling/JNI) ----
     std::string getNoteStateJson();
     std::string getChordInfo();
+    std::string getRomanFromChord(const std::string& chordName, int rootPc);
     int  changeSplitPoint(int delta);
     int  getSplitPoint() const { return mSplitPoint; }
     int  changeTranspose(int delta);  // returns new value

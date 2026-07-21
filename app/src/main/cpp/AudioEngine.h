@@ -29,6 +29,7 @@ public:
     bool init(const char* sf2Path);
     void start();
     void stop();
+    void restartStream();  // 仅重启 Oboe, 不销毁 synth
 
     // Enqueue MIDI commands (lock-free from callback perspective)
     void enqueueNoteOn(int target, int channel, int note, int velocity);

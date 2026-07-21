@@ -260,3 +260,26 @@ std::string MidiProcessor::getChordInfo() {
     } else { mRomanNumeral = "--"; mTsdDegree = "--"; }
     return mPrimaryChord + "|" + mRomanNumeral + "|" + mKeyName + "|" + mTsdDegree + "|" + mSecondaryChord;
 }
+
+std::string MidiProcessor::getRomanFromChord(const std::string& chordName, int rootPc) {
+    std::lock_guard<std::mutex> lock(mLock);
+    if (chordName.empty() || chordName == "-" || rootPc < 0)
+        return "--|--|--";
+    int scaleRoot = mScaleDetector.getScaleRootPc();
+    std::string keyName = mScaleDetector.getKeyName();
+    if (scaleRoot < 0) return chordName + "|--|" + keyName;
+    int degree = (rootPc - scaleRoot + 12) % 12;
+    static const char* romanMajor[] = {"I","","ii","","iii","IV","","V","","vi","","viidim"};
+    static const char* romanMinor[] = {"i","","iidim","III","","iv","","v","","VI","","viidim"};
+    const char* tsd = mScaleDetector.isMinor() ? romanMinor[degree] : romanMajor[degree];
+    if (!tsd || tsd[0] == 0) tsd = chordName.c_str();
+    // Extract suffix from chord name (remove root prefix)
+    const char* nn[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+    std::string rootStr = nn[rootPc];
+    std::string suffix = chordName.substr(rootStr.size());
+    // Remove bass (slash) from suffix
+    size_t slash = suffix.find('/');
+    if (slash != std::string::npos) suffix = suffix.substr(0, slash);
+    std::string roman = std::string(tsd) + suffix;
+    return roman + "|" + keyName + "|" + tsd;
+}

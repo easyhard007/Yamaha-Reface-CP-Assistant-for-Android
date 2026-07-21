@@ -70,7 +70,7 @@ add_library(
         BassEnhancer.cpp
         StyleParser.cpp
         StylePlayer.cpp
-        LowChordDetector.cpp
+        ChordDetector.cpp
         ChordTransposer.cpp
         Humanizer.cpp
         BeatTracker.cpp

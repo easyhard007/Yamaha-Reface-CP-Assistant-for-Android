@@ -54,9 +54,9 @@ bool AudioEngine::init(const char* sf2Path) {
         return false;
     }
 
-    mLeadGain = 1.8;  // 30%
+    mLeadGain = 1.5;  // 30% of 5.0
     mAccompGain = 3.6;
-    fluid_synth_set_gain(mLeadSynth, 1.8f); // 30%
+    fluid_synth_set_gain(mLeadSynth, 1.5f); // 30% of 5.0
     fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
     fluid_synth_set_reverb(mLeadSynth, 0.85, 0.15, 0.8, 0.70);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
@@ -71,8 +71,8 @@ bool AudioEngine::init(const char* sf2Path) {
     fluid_synth_set_gain(mBassSynth, 0.8f);
     fluid_synth_set_interp_method(mBassSynth, -1, FLUID_INTERP_LINEAR);
     fluid_synth_set_reverb(mBassSynth, 0.85, 0.15, 0.8, 0.70);
-    // Bass synth 默认: Finger Bass, Bank 0, Program 33
-    fluid_synth_program_change(mBassSynth, 0, 33);
+    // 预加载默认 SF2 防止回调 crash, 后续 nativeLoadBassSoundFont 会覆盖
+    mBassSoundFontId = fluid_synth_sfload(mBassSynth, sf2Path, 1);
     return true;
 }
 
@@ -93,6 +93,12 @@ void AudioEngine::start() {
     stream->setBufferSizeInFrames(bufferSize);
     { std::lock_guard<std::mutex> lock(mLock); mMixBuffer.assign(bufferSize * 2, 0.0f); }
     stream->requestStart();
+}
+
+void AudioEngine::restartStream() {
+    // 仅关闭和重开 Oboe 流, 不碰 FluidSynth
+    if (stream) { stream->stop(); stream->close(); stream.reset(); }
+    start();
 }
 
 void AudioEngine::stop() {
@@ -236,8 +242,9 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
             memset(bassBuf, 0, numFrames * 2 * sizeof(float));
             fluid_synth_write_float(mBassSynth, numFrames, bassBuf, 0, 2, bassBuf, 1, 2);
             g_rhythmEngine->processBassReverb(bassBuf, numFrames);
+            float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
             for (int i = 0; i < numFrames * 2; ++i)
-                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f;
+                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f * rg / 4.0f;
         }
     }
     // Mix rhythm WAV samples, then soft-clip to prevent hard clipping

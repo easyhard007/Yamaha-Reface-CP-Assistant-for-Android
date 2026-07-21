@@ -651,13 +651,6 @@
         // 节拍器常驻更新 (150ms)
         setInterval(function() {
             if (typeof Android !== 'undefined') {
-                // 显示 Active/Pedal 的 pitch + vel
-                var ad = window._activeData || [];
-                var pd = window._pedalData || [];
-                var lines = [];
-                if (ad.length > 0) lines.push('Active: ' + ad.map(function(x){return x.p+'('+x.v+','+(x.t||0)+'ms)';}).join(' '));
-                if (pd.length > 0) lines.push('Pedal: ' + pd.map(function(x){return x.p+'('+x.v+','+(x.t||0)+'ms)';}).join(' '));
-                document.getElementById('chord-detect-notes').innerText = lines.join('\n');
                 document.getElementById('chord-debug-info').innerText = 'debug info: ' + (Android.getDebugInfo ? Android.getDebugInfo() : '');
             }
         }, 150);
@@ -696,7 +689,7 @@
 
         // Volume
         window.accompVol = 3.6;
-        window.leadVol = 1.8;
+        window.leadVol = 1.5;
         window.leadOverlay = true;
         function applyAccompVol() {
             if (typeof Android !== 'undefined') Android.setAccompVolume(window.accompVol);
@@ -704,16 +697,15 @@
         }
         function applyLeadVol() {
             if (window.leadOverlay) {
-                Android.setLeadVolume(window.cachedLeadVol || 1.8);
+                Android.setLeadVolume(window.cachedLeadVol || 1.5);
             } else {
                 window.cachedLeadVol = Android.getLeadGain();
                 Android.setLeadVolume(0);
             }
         }
         function onVolBtnClick() {} // no-op: display only, controlled by CC87
-        function updateChordDisplay(chord, timing, tones) {
+        function updateChordDisplay(chord) {
             document.getElementById('chord-display').innerText = chord || '-';
-            document.getElementById('chord-debug-info').innerText = 'debug info: ' + (timing || '');
         }
 
         
@@ -1019,7 +1011,7 @@
             window.leadVol = Android.getLeadGain();
             document.getElementById('style-vol-btn').innerText = 'Vol:' + Math.round(window.accompVol / 6.0 * 100) + '%';
             var lo = document.getElementById('lead-overlay-btn');
-            lo.innerText = 'LEAD OVERLAY  ' + Math.round(window.leadVol / 6.0 * 100) + '%';
+            lo.innerText = 'LEAD OVERLAY  ' + Math.round(window.leadVol / 5.0 * 100) + '%';
         }
         function toggleLeadOverlay() {
             window.leadOverlay = !window.leadOverlay;
@@ -1522,22 +1514,10 @@
     }
     function onNativeChordInfo(chord, roman, key, tsd, secondary) {
         _lastChordInfo = { chord, roman, key, tsd };
-        // Chord display (primary + secondary like keyboard.js)
         const pressedDiv = document.getElementById('pressed-notes');
         if (pressedDiv && chord !== '--') {
-            var secHtml = '';
-            if (secondary && secondary !== '' && secondary !== chord) {
-                // Check if secondary has a different root
-                var secRoot = (secondary.match(/^[A-G][#b]?/) || [''])[0];
-                var priRoot = (chord.match(/^[A-G][#b]?/) || [''])[0];
-                if (secRoot !== priRoot) {
-                    secHtml = '<span style="font-size:0.6em;color:rgba(255,255,255,0.3);margin-right:8px;font-weight:normal;">OR</span>' +
-                              '<span class="chord-secondary-text">' + secondary + '</span>';
-                }
-            }
-            pressedDiv.innerHTML = '<div style="height:60%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;">' +
-                '<span class="chord-primary-text">' + chord + '</span></div>' +
-                '<div style="height:40%;display:flex;align-items:baseline;justify-content:center;padding-top:2px;">' + secHtml + '</div>';
+            pressedDiv.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;">' +
+                '<span class="chord-primary-text">' + chord + '</span></div>';
         } else if (pressedDiv && window.allActiveNotes && window.allActiveNotes.size === 0) {
             pressedDiv.innerHTML = '<div style="height:60%;display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;"><span style="color:rgba(255,255,255,0.4);font-size:clamp(14px,3vh,18px);">等待和弦...</span></div><div style="height:40%;"></div>';
         }
@@ -1568,8 +1548,6 @@
             window.activeNotes = toPitchSet(state.active || []);
             window.pedalHeldNotes = toPitchSet(state.pedal || []);
             // 保留原始数据用于显示
-            window._activeData = state.active || [];
-            window._pedalData = state.pedal || [];
             window.lowNotes = new Set(state.low || []);
             window.allActiveNotes = new Set(state.all || []);
             window.isPedalDown = state.pedalDown || false;

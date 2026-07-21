@@ -7,7 +7,7 @@
 #include "AudioEngine.h"
 #include "MidiProcessor.h"
 #include "StylePlayer.h"
-#include "LowChordDetector.h"
+#include "ChordDetector.h"
 // #include "TempoTracker.h" — removed, rewriting tempo detection
 #include "BeatTracker.h"
 #include "RhythmAudioEngine.h"
@@ -18,7 +18,7 @@
 static AudioEngine audio;
 static MidiProcessor midi;
 static StylePlayer stylePlayer;
-static LowChordDetector chordDetector;
+static ChordDetector chordDetector;
 // static TempoTracker tempoTracker; — removed, rewriting tempo detection
 static BeatTracker beatTracker;
 extern RhythmAudioEngine* g_rhythmEngine;
@@ -38,6 +38,8 @@ static std::atomic<int> g_pendingTempoFlash{0};
 // 相位调试
 static std::atomic<double> g_measureStartMs{0};
 static bool g_syncJustTriggered = false;
+static std::atomic<int> g_pendingChordUpdate{0};
+static std::string g_chordDisplayStr;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
 
@@ -130,21 +132,19 @@ static void onBeatStep(int step, double bpm, void*) {
     if (bassAssist.isEnabled()) {
         // 场景 1: Cajon bass 触发 (>45)
         if (bassVel > 45 && lowPitch > 0) {
-            float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
             float curve = std::pow(bassVel / 127.0f, 0.6f);
-            int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume() * rg / 4.0f);
+            int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume());
             if (vel < 1) vel = 1; if (vel > 127) vel = 127;
-            playBass(lowPitch, vel);
+            if (vel > 1) playBass(lowPitch, vel);
         }
         // 场景 2: 无低音 → 有低音, 且 100ms 内有 Cajon bass
         if (prevLowPitch < 0 && lowPitch > 0 && bassVel <= 45) {
             double lastBassT = cajon.getLastBassTime();
             if ((ms - lastBassT) < 100.0) {
-                float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
                 float curve = std::pow(cajon.getLastBassVel() / 127.0f, 0.6f);
-                int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume() * rg / 4.0f);
+                int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume());
                 if (vel < 1) vel = 1; if (vel > 127) vel = 127;
-                playBass(lowPitch, vel);
+                if (vel > 1) playBass(lowPitch, vel);
             }
         }
         // 场景 3: 最低音变低了
@@ -250,7 +250,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         JNIEnv*, jobject, jint controller, jint value) {
     // CC86 → lead gain (0-6.0)
-    if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 6.0); return; }
+    if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 5.0); return; }
     // CC87 → 根据模式路由: type=0 控制 Cajon 音量, type=1 控制自动伴奏音量
     if (controller == 87) {
         if (assistType == 0 && g_rhythmEngine) {
@@ -307,6 +307,12 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         return;
     }
     audio.enqueueCC(0, 0, controller, value);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeRestartAudio(
+        JNIEnv*, jobject) {
+    audio.restartStream();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -425,20 +431,24 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
                 stylePlayer.setTempoBPM(newBpm);
                 g_pendingBpmUpdate.store(newBpm);
                 g_pendingTempoFlash.store(1);
+                beatTracker.sync(); // 立即从第一拍开始
+                g_syncResetting = false; // 取消 sleepFor 对齐任务
+                tempoDetector.setSyncError(0.0);
             }
         }
     }
 
     auto r = midi.processNoteOn(note, velocity, ms);
-    auto lowMap = midi.getLowNotes();
-    std::set<int> lowSet;
-    for (const auto& kv : lowMap) lowSet.insert(kv.first);
-    chordDetector.feedNotes(lowSet, midi.getAllNotes(), midi.getSplitNote());
-    // 和弦根音: 来自 LowChordDetector, 由 feedNotes 内部确定
-    std::string chordName = chordDetector.getChord();
-    if (chordName != "-") {
-        int root = chordDetector.getRootMidi();
-        stylePlayer.setChordRoot(root, chordName);
+    // 新和弦识别: 用 AllActiveNotes
+    chordDetector.detect(midi.getAllNotes());
+    if (chordDetector.changed()) {
+        g_chordDisplayStr = chordDetector.getChord();
+        g_pendingChordUpdate.store(1);
+        std::string chordName = chordDetector.getChord();
+        if (chordName != "-" && chordName != "???") {
+            int root = chordDetector.getRootMidi();
+            stylePlayer.setChordRoot(root, chordName);
+        }
     }
     return encodeResult(r.sustainCCToSend, r.bassNote, r.bassVelocity);
 }
@@ -447,7 +457,11 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOff(
         JNIEnv*, jobject, jint note) {
     auto r = midi.processNoteOff(note);
-    // 不在 NoteOff 时触发和弦检测, 防止降级
+    chordDetector.detect(midi.getAllNotes());
+    if (chordDetector.changed()) {
+        g_chordDisplayStr = chordDetector.getChord();
+        g_pendingChordUpdate.store(1);
+    }
     return encodeResult(r.sustainCCToSend, r.bassNote, 0);
 }
 
@@ -470,6 +484,17 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetNoteState(
         JNIEnv* env, jobject) {
     return env->NewStringUTF(midi.getNoteStateJson().c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetRomanFromChord(
+        JNIEnv* env, jobject, jstring chordName) {
+    const char* cname = env->GetStringUTFChars(chordName, nullptr);
+    int rootPc = chordDetector.getRootMidi();
+    if (rootPc >= 0) rootPc %= 12;
+    std::string result = midi.getRomanFromChord(std::string(cname), rootPc);
+    env->ReleaseStringUTFChars(chordName, cname);
+    return env->NewStringUTF(result.c_str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -610,6 +635,15 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingScatt
     return g_pendingScatterUpdate.exchange(0);
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingChord(
+        JNIEnv* env, jobject) {
+    if (g_pendingChordUpdate.exchange(0)) {
+        return env->NewStringUTF(g_chordDisplayStr.c_str());
+    }
+    return env->NewStringUTF("");
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempoFlash(
         JNIEnv*, jobject) {
@@ -693,7 +727,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChord(
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordTiming(
         JNIEnv* env, jobject) {
-    return env->NewStringUTF(chordDetector.getTiming().c_str());
+    return env->NewStringUTF("");
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -769,8 +803,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetDebugInfo(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeResetChord(
         JNIEnv*, jobject) {
-    chordDetector.reset();
-    stylePlayer.setChordRoot(60, "major"); // reset to C
+    chordDetector.detect(std::set<int>());
+    stylePlayer.setChordRoot(60, "major");
 }
 
 extern "C" JNIEXPORT void JNICALL
