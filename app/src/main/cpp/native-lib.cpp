@@ -683,6 +683,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInitRhythmEngine(
         JNIEnv* env, jobject, jstring wavDir) {
     const char* dir = env->GetStringUTFChars(wavDir, nullptr);
     bool ok = rhythmEngine.loadSamples(dir);
+    if (ok) rhythmEngine.loadSlapSamples(dir);  // slap采样加载失败不影响主流程
     env->ReleaseStringUTFChars(wavDir, dir);
     if (ok) cajon.setEnabled(true);
     return ok ? JNI_TRUE : JNI_FALSE;

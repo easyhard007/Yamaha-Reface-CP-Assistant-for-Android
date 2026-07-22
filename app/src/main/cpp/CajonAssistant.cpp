@@ -110,7 +110,15 @@ int CajonAssistant::processStep(int step, double /*bpm*/) {
     int bassVel = 0;
     // Bass/Tone 互斥: tone 优先
     int toneVel = 0;
-    if (tone.play && tone.velocity > 0) { engine->trigger(1, tone.velocity); hands = 2; toneVel = tone.velocity; }
+    if (tone.play && tone.velocity > 0) {
+        // Tone力度80-100时有~10%概率使用slap采样
+        if (tone.velocity >= 80 && tone.velocity <= 100 && (rand() % 100) < 10) {
+            engine->triggerSlap(tone.velocity);
+        } else {
+            engine->trigger(1, tone.velocity);
+        }
+        hands = 2; toneVel = tone.velocity;
+    }
     if (bass.play && bass.velocity > 0 && toneVel == 0) {
         engine->trigger(0, bass.velocity); hands++; bassVel = bass.velocity;
         mLastBassVel = bassVel;

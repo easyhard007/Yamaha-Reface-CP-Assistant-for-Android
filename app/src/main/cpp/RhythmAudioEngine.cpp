@@ -107,6 +107,27 @@ bool RhythmAudioEngine::loadSamples(const std::string& wavDir) {
     return true;
 }
 
+bool RhythmAudioEngine::loadSlapSamples(const std::string& wavDir) {
+    for (int r = 1; r <= 8; r++) {
+        char buf[256];
+        snprintf(buf, sizeof(buf), "%s/front_lhslap_e3_127_rr%d.wav", wavDir.c_str(), r);
+        auto ws = loadWav(buf);
+        if (ws.pcm.empty()) return false;
+        slapSamples.push_back(std::move(ws));
+    }
+    __android_log_print(ANDROID_LOG_INFO, TAG, "Loaded %zu slap samples", slapSamples.size());
+    return true;
+}
+
+void RhythmAudioEngine::triggerSlap(float velocity) {
+    if (slapSamples.empty()) return;
+    int rrIdx = rand() % 8;
+    float gain = velocity / 127.0f;
+    gain = gain * gain;
+    std::lock_guard<std::mutex> lock(voiceMutex);
+    voices.push_back({slapSamples[rrIdx].pcm.data(), slapSamples[rrIdx].pcm.size(), 0, gain});
+}
+
 void RhythmAudioEngine::trigger(int type, float velocity) {
     // type: 0=bass(L), 1=tone/tip(R), velocity: 0-127 MIDI
     if (samples.empty()) { __android_log_print(ANDROID_LOG_WARN, "RhythmAudio", "trigger: no samples loaded"); return; }

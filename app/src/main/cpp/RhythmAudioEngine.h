@@ -18,9 +18,15 @@ public:
     /// 从 assets 目录加载所有 wav 文件 (mainL, mainR, snare, hihat)
     bool loadSamples(const std::string& wavDir);
 
+    /// 加载 slap 采样 (高声压贝斯变体, 8 round-robin)
+    bool loadSlapSamples(const std::string& wavDir);
+
     /// 触发播放一个采样 (type: 0=bass, 1=tone, 2=tip)
     /// velocity: 0-127
     void trigger(int type, float velocity);
+
+    /// 触发 slap 采样 (力度>100时的贝斯变体)
+    void triggerSlap(float velocity);
 
     /// 音频回调: 将活跃采样混入输出 buffer (由 AudioEngine 调用)
     /// outBuf: interleaved stereo float buffer
@@ -46,6 +52,7 @@ private:
     };
 
     std::vector<WavSample> samples;
+    std::vector<WavSample> slapSamples;
     std::vector<ActiveVoice> voices;
     std::mutex voiceMutex;
     std::atomic<float> masterGain{0.0f}; // 0-4.0, 默认 0%
