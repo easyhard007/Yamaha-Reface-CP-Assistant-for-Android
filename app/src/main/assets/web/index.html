@@ -583,7 +583,11 @@
         function onAssistToggle() {
             var v = document.getElementById('assist-toggle').checked ? 1 : 0;
             if (typeof Android !== 'undefined') Android.setAssistType(v);
-            // panels hidden for CPU test
+            document.getElementById('style-card').style.display = v ? 'block' : 'none';
+            document.getElementById('assist-card').style.display = v ? 'none' : 'block';
+            if (v === 1 && !window.styleLoadedName && window.styleFileNames && window.styleFileNames.length > 0) {
+                doLoadStyle(0);
+            }
         }
         function updateVolDisplay() {
             if (typeof Android === 'undefined') return;
