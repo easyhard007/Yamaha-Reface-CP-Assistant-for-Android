@@ -18,6 +18,12 @@ let svgOverlay = null;
 let currentChordDot = null; 
 
 function initTSDOverlay() {
+    // 去重: 已创建过就只更新
+    if (svgOverlay && svgOverlay.parentNode) {
+        var w = svgOverlay.parentNode.clientWidth;
+        svgOverlay.setAttribute("width", w); svgOverlay.setAttribute("height", w);
+        drawTSDTriangle(w); updateChordDotPosition(w); return;
+    }
     const pickerContainer = document.querySelector('.IroWheel');
     if (!pickerContainer) return;
 

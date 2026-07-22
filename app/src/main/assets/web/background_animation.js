@@ -306,7 +306,7 @@ function renderBackground() {
     const rad = (deg * Math.PI) / 180;
     cbUniforms.uRot.value.set(Math.cos(rad), Math.sin(rad));
 
-    // 渲染输出
-    cbRenderer.render(cbScene, cbCamera);
-    cbRafId = requestAnimationFrame(renderBackground);
+    // 极光关闭测 CPU
+    // cbRenderer.render(cbScene, cbCamera);
+    // cbRafId = requestAnimationFrame(renderBackground);
 }

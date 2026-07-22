@@ -51,6 +51,11 @@ class MainActivity : AppCompatActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
 
+        // 启动时设系统音量到 90%
+        val sysAudio = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val maxVol = sysAudio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        sysAudio.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.9).toInt(), 0)
+
         webView = findViewById(R.id.webView)
         webView.settings.apply {
             javaScriptEnabled = true; domStorageEnabled = true
@@ -135,7 +140,7 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl("file:///android_asset/web/index.html")
 
         // Log TX messages from MidiUtil
-        midiUtil.onSendLog = { text -> jsLog(text, false) }
+        // midiUtil.onSendLog removed
 
         copyAssets()
         val defaultSf2 = File(cacheDir, soundFontFiles[0])
@@ -181,12 +186,6 @@ class MainActivity : AppCompatActivity() {
     private fun js(cmd: String) {
         if (!jsReady) return
         webView.post { webView.evaluateJavascript(cmd, null) }
-    }
-
-    private fun jsLog(text: String, isRx: Boolean) {
-        // Escape single quotes for JS
-        val escaped = text.replace("\\", "\\\\").replace("'", "\\'")
-        js("if(typeof onNativeMidiLogEntry==='function')onNativeMidiLogEntry('$escaped',$isRx);")
     }
 
     private fun pushDeviceList() {
@@ -242,13 +241,8 @@ class MainActivity : AppCompatActivity() {
             0xF0.toByte(), 0x43, 0x10, 0x7F, 0x1C, 0x04, 0x00, 0x00, 0x07, valByte.toByte(), 0xF7.toByte()
         )
         midiUtil.sendRaw(msg)
-        jsLog("↑ Transpose SysEx → ${transpose}", false)
+        // jsLog removed:↑ Transpose SysEx → ${transpose}", false)
         return transpose
-    }
-
-    private fun midiLogRx(text: String) {
-        val prefix = if (connectedDeviceName.isNotEmpty()) "[$connectedDeviceName] " else ""
-        jsLog("$prefix$text", true)
     }
 
     private val audioManager by lazy { getSystemService(Context.AUDIO_SERVICE) as AudioManager }
@@ -350,7 +344,7 @@ class MainActivity : AppCompatActivity() {
         nativeLoadSoundFont(file.absolutePath)
         // Refresh instrument list after SF2 change
         chordHandler.postDelayed({ pushInstrumentList() }, 500)
-        jsLog("↑ Load SF2: ${soundFontNames[index]}", false)
+        // jsLog removed:↑ Load SF2: ${soundFontNames[index]}", false)
     }
 
     private fun startChordPolling() {
@@ -361,14 +355,6 @@ class MainActivity : AppCompatActivity() {
                 js("if(typeof onNativeNoteState==='function')onNativeNoteState('$noteState');")
                 // 和弦页: chord 来自 ChordDetector, roman/key/tsd 来自 ScaleDetector
                 val chord = nativeGetChord()
-                if (chord.isNotEmpty() && chord != "-") {
-                    val romanInfo = nativeGetRomanFromChord(chord)
-                    val riParts = romanInfo.split("|")
-                    val roman = if (riParts.size >= 1) riParts[0] else "--"
-                    val key   = if (riParts.size >= 2) riParts[1] else "--"
-                    val tsd   = if (riParts.size >= 3) riParts[2] else "--"
-                    js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chord','$roman','$key','$tsd','')")
-                }
                 pushAudioDevices()
                 chordHandler.postDelayed(this, 150)
             }
@@ -393,24 +379,25 @@ class MainActivity : AppCompatActivity() {
                         if (velocity > 0) {
                             nativeNoteOn(note, velocity)
                                 handleProcessResult(nativeProcessNoteOn(note, velocity))
-                            if (nativeGetAndClearPendingScatter() != 0) js("renderScatterChart()")
+                            if (nativeGetAndClearPendingScatter() != 0) {
+                                js("scatterAddNote($note,$velocity)")
+                            }
                             if (nativeGetAndClearPendingTempoFlash() != 0) js("tempoFlash()")
                             val pendingBpm2 = nativeGetAndClearPendingBpm()
                             if (pendingBpm2 >= 0) js("updateBpmDisplay(${Math.round(pendingBpm2)})")
                             val chordStr = nativeGetAndClearPendingChord()
                             if (chordStr.isNotEmpty()) {
                                 js("updateChordDisplay('$chordStr')")
-                                js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chordStr','--','--','--','')")
                             }
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
-                            midiLogRx(log)
+                            // midiLogRx removedlog)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteon',$note,$velocity,$ch);")
                         } else {
                             nativeNoteOff(note)
                                 handleProcessResult(nativeProcessNoteOff(note))
                             js("updateChordDisplay('${nativeGetChord()}')")
                             val log = "↓ NoteOff ${midiNoteName(note)}  v0  ch$ch"
-                            midiLogRx(log)
+                            // midiLogRx removedlog)
                             js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
                         }
                         i += 3
@@ -421,10 +408,8 @@ class MainActivity : AppCompatActivity() {
                         val chordStr2 = nativeGetAndClearPendingChord()
                         if (chordStr2.isNotEmpty()) {
                             js("updateChordDisplay('$chordStr2')")
-                            js("if(typeof onNativeChordInfo==='function')onNativeChordInfo('$chordStr2','--','--','--','')")
                         }
                         val log = "↓ NoteOff ${midiNoteName(note)}  ch$ch"
-                        midiLogRx(log)
                         js("if(typeof onNativeMidi==='function')onNativeMidi('noteoff',$note,0,$ch);")
                         i += 3
                     } else if (status in 0xB0..0xBF && i + 2 < offset + count) {
@@ -436,7 +421,10 @@ class MainActivity : AppCompatActivity() {
                         if (ctrl == 85 && value != 0) midiUtil.sendCC(85, 0)
                         if (ctrl == 88 && value != 0) midiUtil.sendCC(88, 0)
                         val pendingBpm = nativeGetAndClearPendingBpm()
-                        if (pendingBpm >= 0) js("updateBpmDisplay(${Math.round(pendingBpm)})")
+                        if (pendingBpm >= 0) {
+                            js("updateBpmDisplay(${Math.round(pendingBpm)})")
+                            js("scatterSetRange(" + (240000.0 / pendingBpm).toInt() + ")")
+                        }
                         val pendingGain = nativeGetAndClearPendingRhythmGain()
                         if (pendingGain >= 0) js("updateRhythmVolSlider(${pendingGain})")
                         val pendingMinE = nativeGetAndClearPendingMinEnergy()
@@ -451,7 +439,7 @@ class MainActivity : AppCompatActivity() {
                         if (scc == 127) midiUtil.sendSustainOn()
                         else if (scc == 0) midiUtil.sendSustainOff()
                         val ccName = if (ctrl == 64) "Sustain" else "CC$ctrl"
-                        midiLogRx("↓ $ccName=$value  ch$ch")
+                        // midiLogRx removed
                         js("if(typeof onNativeMidi==='function')onNativeMidi('cc',$ctrl,$value,$ch);")
                         i += 3
                     } else { i++ }
@@ -529,12 +517,12 @@ class MainActivity : AppCompatActivity() {
                 styleSf2Loaded = true
             }
         }
-        jsLog("Style loaded: ${styleFiles[index]}", false)
+        // jsLog removed:Style loaded: ${styleFiles[index]}", false)
         return result
     }
     private fun selectStyleScene(index: Int) { nativeStyleSelectScene(index) }
-    private fun startStyle() { nativeStyleStart(); jsLog("Style started", false) }
-    private fun stopStyle() { nativeStopStyle(); jsLog("Style stopped", false) }
+    private fun startStyle() { nativeStyleStart() }
+    private fun stopStyle() { nativeStopStyle() }
     private fun isStylePlaying(): Boolean = nativeIsStylePlaying()
     private fun syncBeat() { nativeSyncBeat() }
     private fun dumpStyleDebug(): String {

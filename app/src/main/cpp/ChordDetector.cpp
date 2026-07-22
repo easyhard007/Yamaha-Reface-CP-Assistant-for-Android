@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <numeric>
 
-ChordDetector::ChordDetector() = default;
+ChordDetector::ChordDetector() : mChord("-") {}
 
 const char* ChordDetector::NOTE_NAMES[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 
