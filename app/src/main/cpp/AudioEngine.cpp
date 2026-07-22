@@ -3,6 +3,7 @@
 
 // Global rhythm engine for WAV playback
 RhythmAudioEngine* g_rhythmEngine = nullptr;
+extern float g_bassVolume;
 #include "fluid_sfont.h"
 #include <android/log.h>
 #include <cstring>
@@ -216,8 +217,12 @@ void AudioEngine::processPendingCommands() {
 oboe::DataCallbackResult AudioEngine::onAudioReady(
         oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *outBuffer = static_cast<float *>(audioData);
-#if defined(__arm__) || defined(__aarch64__)
-    uintptr_t fpscr;
+#if defined(__arm__)
+    uint32_t fpscr;
+    asm volatile("vmrs %0, fpscr" : "=r"(fpscr));
+    asm volatile("vmsr fpscr, %0" : : "r" (fpscr | (1U << 24)));
+#elif defined(__aarch64__)
+    uint64_t fpscr;
     asm volatile("mrs %0, fpcr" : "=r"(fpscr));
     asm volatile("msr fpcr, %0" : : "r" (fpscr | (1U << 24)));
 #endif
@@ -244,7 +249,7 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
             g_rhythmEngine->processBassReverb(bassBuf, numFrames);
             float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
             for (int i = 0; i < numFrames * 2; ++i)
-                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f * rg / 4.0f;
+                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f * rg / 4.0f * g_bassVolume;
         }
     }
     // Mix rhythm WAV samples, then soft-clip to prevent hard clipping

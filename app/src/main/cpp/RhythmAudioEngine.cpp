@@ -124,8 +124,8 @@ void RhythmAudioEngine::trigger(int type, float velocity) {
 }
 
 void RhythmAudioEngine::applyBassEQ(float* buf, int32_t numFrames) {
-    // 35Hz +6dB, Q=0.375 (bass only)
-    const float b0 = 1.00467f, b1 = -1.99060f, b2 = 0.98593f, a1 = -1.99060f, a2 = 0.99063f;
+    // 35Hz +1dB, Q=0.375 (bass only)
+    const float b0 = 1.00076f, b1 = -1.98751f, b2 = 0.98676f, a1 = -1.98751f, a2 = 0.98753f;
     for (int32_t i = 0; i < numFrames; i++) {
         float xL = buf[i * 2], xR = buf[i * 2 + 1];
         float yL = b0 * xL + b1 * bassEq_x1L + b2 * bassEq_x2L - a1 * bassEq_y1L - a2 * bassEq_y2L;
@@ -139,8 +139,8 @@ void RhythmAudioEngine::applyBassEQ(float* buf, int32_t numFrames) {
 }
 
 void RhythmAudioEngine::applyBassHiCutEQ(float* buf, int32_t numFrames) {
-    // Bell EQ: f0=4kHz, Q=1.0, gain=-6dB
-    const float b0 = 0.8622f, b1 = -1.2188f, b2 = 0.5857f, a1 = -1.2188f, a2 = 0.4479f;
+    // Bell EQ: f0=4kHz, Q=1.0, gain=-1dB
+    const float b0 = 0.9758f, b1 = -1.3093f, b2 = 0.5795f, a1 = -1.3093f, a2 = 0.5553f;
     for (int32_t i = 0; i < numFrames; i++) {
         float xL = buf[i * 2], xR = buf[i * 2 + 1];
         float yL = b0 * xL + b1 * bassHiEq_x1L + b2 * bassHiEq_x2L - a1 * bassHiEq_y1L - a2 * bassHiEq_y2L;

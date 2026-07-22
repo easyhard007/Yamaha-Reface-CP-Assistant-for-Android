@@ -1,4 +1,5 @@
 #include "CajonAssistant.h"
+#include <algorithm>
 #include <cmath>
 #include <chrono>
 #include <cstdlib>
@@ -33,11 +34,13 @@ float CajonAssistant::humanizeOffset(int step) {
 
 CajonAssistant::Hit CajonAssistant::grooveBass(int step, float e, int w) {
     Hit h{}; h.play = false; h.velocity = 0;
-    if (step == 0 || step == 16) { h.play = true; h.velocity = 25 + (int)(80*e); }
+    if (step == 0) { h.play = true; h.velocity = 25 + (int)(80*e); }
+    else if (step == 16) { if ((rand()%10000)/10000.0f < e*0.8f) { h.play = true; h.velocity = 25 + (int)(80*e); } }
     else if (w >= 2 && step != 8 && step != 24) {
         bool firstHalf = step < 16;
         float dm = firstHalf ? 0.5f : 1.0f;
         float prob = (-0.2f + e*0.8f) * dm;
+        if (step == 14 || step == 22) prob = -0.3f + e*0.9f;  // ~55% @e=0.94
         if ((rand()%10000)/10000.0f < prob) { h.play = true; h.velocity = 20 + w*10 + (int)(e*60); }
     } else if (w == 1 && e >= 0.8f) {
         bool firstHalf = step < 16;
@@ -56,7 +59,15 @@ CajonAssistant::Hit CajonAssistant::grooveTone(int step, float e, int w) {
         bool firstHalf = step < 16;
         float dm = firstHalf ? 0.6f : 1.0f;
         float prob = (-0.5f + e*1.0f) * dm;
-        if ((rand()%10000)/10000.0f < prob) { h.play = true; h.velocity = 20 + (int)(e*30); }
+        if (step == 18) prob = -0.2f + e*0.8f;      // e=0.25→0%, e=1.0→60%
+        else if (step == 26) prob = -0.3f + e*1.0f;  // e=0.3→0%, e=1.0→70%
+        if ((rand()%10000)/10000.0f < prob) {
+            h.play = true;
+            if (step == 18 || step == 26)
+                h.velocity = 25 + (int)(e*80);  // e=1.0→105+rand(8)≈110
+            else
+                h.velocity = 20 + (int)(e*30);
+        }
     } else if (w == 1) {
         bool firstHalf = step < 16;
         float dm = firstHalf ? 0.4f : 1.0f;
@@ -84,7 +95,7 @@ CajonAssistant::Hit CajonAssistant::grooveTip(int step, float e, int w) {
     return h;
 }
 
-int CajonAssistant::onStep(int step, double /*bpm*/) {
+int CajonAssistant::processStep(int step, double /*bpm*/) {
     currentStep.store(step);
     if (!enabled.load() || !engine) return 0;
     float e = energy.load();
@@ -92,15 +103,19 @@ int CajonAssistant::onStep(int step, double /*bpm*/) {
 
     auto bass = grooveBass(step, e, w);
     auto tone = grooveTone(step, e, w);
+    if (tone.play && (step != 8 && step != 24))
+        __android_log_print(ANDROID_LOG_INFO, "Cajon", "TONE step=%d vel=%d e=%.2f w=%d", step, tone.velocity, e, w);
     if (e <= 0.0f) { bass.velocity = 0; tone.velocity = 0; }
     int hands = 0;
     int bassVel = 0;
-    if (bass.play && bass.velocity > 0) {
+    // Bass/Tone 互斥: tone 优先
+    int toneVel = 0;
+    if (tone.play && tone.velocity > 0) { engine->trigger(1, tone.velocity); hands = 2; toneVel = tone.velocity; }
+    if (bass.play && bass.velocity > 0 && toneVel == 0) {
         engine->trigger(0, bass.velocity); hands++; bassVel = bass.velocity;
         mLastBassVel = bassVel;
         mLastBassTime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
     }
-    if (tone.play && tone.velocity > 0) { engine->trigger(1, tone.velocity); hands++; }
     if (hands < 2) {
         auto tip = grooveTip(step, e, w);
         if (e <= 0.0f) tip.velocity = 0;
@@ -109,4 +124,23 @@ int CajonAssistant::onStep(int step, double /*bpm*/) {
 
     stepWeights[step] = e * w / 4.0f;
     return bassVel;
+}
+
+void CajonAssistant::feedNoteOn(double nowMs) {
+    std::lock_guard<std::mutex> lock(mEnergyMutex);
+    mNoteTimestamps.push_back(nowMs);
+}
+
+float CajonAssistant::updateEnergy(double nowMs, double currentBpm) {
+    std::lock_guard<std::mutex> lock(mEnergyMutex);
+    double cutoff = nowMs - 2000.0;
+    mNoteTimestamps.erase(
+        std::remove_if(mNoteTimestamps.begin(), mNoteTimestamps.end(),
+            [cutoff](double t) { return t < cutoff; }),
+        mNoteTimestamps.end());
+    double bpmFactor = currentBpm / 70.0;
+    if (bpmFactor < 0.5) bpmFactor = 0.5;
+    float autoEnergy = std::min(1.0f, (float)(mNoteTimestamps.size() / (24.0 * bpmFactor)));
+    setEnergy(autoEnergy);
+    return autoEnergy;
 }

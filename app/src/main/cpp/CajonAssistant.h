@@ -1,6 +1,8 @@
 #pragma once
 #include "RhythmAudioEngine.h"
 #include <atomic>
+#include <vector>
+#include <mutex>
 
 class CajonAssistant {
 public:
@@ -8,27 +10,26 @@ public:
     ~CajonAssistant();
 
     void init(RhythmAudioEngine* engine);
-    void setEnabled(bool e) { enabled.store(e); }
 
-    /// 更新能量 (0.0-1.0)
+    void setEnabled(bool e) { enabled.store(e); }
     void setEnergy(float e) { energy.store(e); }
     float getEnergy() const { return energy.load(); }
 
-    /// 节拍回调: 当前步进 (0-31), tempo BPM. 返回 bass 力度 (0=未触发)
-    int onStep(int step, double bpm);
-
-    /// 获取当前步进
     int getCurrentStep() const { return currentStep.load(); }
-
-    // 最近一次 Bass 触发
     int getLastBassVel() const { return mLastBassVel; }
     double getLastBassTime() const { return mLastBassTime; }
-
-    /// 获取 32 步的能量矩阵 (供 UI) — 返回 32 个 float权重值
     const float* getStepWeights() const { return stepWeights; }
 
     static float humanizeOffset(int step);
     static int getMetricWeight(int step);
+
+    // ==== 每子步主入口: 触发采样 + 更新能量 ====
+    // 返回 bass 力度 (0=未触发), energy 由外部计算后 setEnergy() 再传入
+    int processStep(int step, double bpm);
+
+    // ==== 能量衰减引擎 (每子步调用, 自动清理过期时间戳) ====
+    float updateEnergy(double nowMs, double currentBpm);
+    void feedNoteOn(double nowMs);
 
 private:
     RhythmAudioEngine* engine = nullptr;
@@ -39,7 +40,10 @@ private:
     int mLastBassVel = 0;
     double mLastBassTime = 0;
 
-    /// 规则引擎
+    // 能量计算
+    std::vector<double> mNoteTimestamps;
+    std::mutex mEnergyMutex;
+
     struct Hit { bool play; int velocity; };
     Hit grooveBass(int step, float energy, int weight);
     Hit grooveTone(int step, float energy, int weight);

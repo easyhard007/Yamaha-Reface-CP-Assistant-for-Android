@@ -26,6 +26,7 @@ static RhythmAudioEngine rhythmEngine;
 static CajonAssistant cajon;
 static TempoDetector tempoDetector;
 static BassAssist bassAssist;
+float g_bassVolume = 0.8f;  // AudioEngine 混音用
 static int assistType = 0;
 static float g_minCajonEnergy = 0.0f;
 static std::atomic<double> g_pendingBpmUpdate{-1.0};
@@ -97,81 +98,26 @@ static void pushEnergyDisplayUpdate() {
     if (attached) g_jvm->DetachCurrentThread();
 }
 
-static void updateCajonEnergy(double nowMs);
-
 static void onBeatStep(int step, double bpm, void*) {
-    int bassVel = cajon.onStep(step, bpm);
+    int bassVel = cajon.processStep(step, bpm);
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    // 贝斯助手
-    static int bassNoteOn = -1;
-    static double bassNoteTime = 0;
-    static int prevLowPitch = -1;
-    static double prevLowTime = 0;
-    // 找最低音
-    auto lowMap = midi.getLowNotes();
-    int lowPitch = -1, lowVel = 0;
-    double lowTime = 0;
-    for (const auto& kv : lowMap) {
-        if (lowPitch < 0 || kv.first < lowPitch) {
-            lowPitch = kv.first; lowVel = kv.second.velocity; lowTime = kv.second.timestampMs;
-        }
-    }
-    g_bassLowPitch = lowPitch; g_bassLowVel = lowVel; g_bassLowTime = lowTime;
 
-    auto playBass = [&](int pitch, int vel) {
-        int bp = pitch;
-        while (bp > 42) bp -= 12;
-        while (bp < 31) bp += 12;
-        if (bassNoteOn >= 0) audio.enqueueNoteOff(2, 0, bassNoteOn);
-        audio.enqueueNoteOn(2, 0, bp, vel);
-        bassNoteOn = bp;
-        bassNoteTime = ms;
-    };
+    // 贝斯助手编排
+    bassAssist.processStep(bassVel, ms, midi.getLowNotes(), audio, g_rhythmEngine);
 
-    if (bassAssist.isEnabled()) {
-        // 场景 1: Cajon bass 触发 (>45)
-        if (bassVel > 45 && lowPitch > 0) {
-            float curve = std::pow(bassVel / 127.0f, 0.6f);
-            int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume());
-            if (vel < 1) vel = 1; if (vel > 127) vel = 127;
-            if (vel > 1) playBass(lowPitch, vel);
-        }
-        // 场景 2: 无低音 → 有低音, 且 100ms 内有 Cajon bass
-        if (prevLowPitch < 0 && lowPitch > 0 && bassVel <= 45) {
-            double lastBassT = cajon.getLastBassTime();
-            if ((ms - lastBassT) < 100.0) {
-                float curve = std::pow(cajon.getLastBassVel() / 127.0f, 0.6f);
-                int vel = (int)(curve * 127.0f * 1.5f * bassAssist.getVolume());
-                if (vel < 1) vel = 1; if (vel > 127) vel = 127;
-                if (vel > 1) playBass(lowPitch, vel);
-            }
-        }
-        // 场景 3: 最低音变低了
-        if (prevLowPitch > 0 && lowPitch > 0 && lowPitch < prevLowPitch && bassNoteOn >= 0) {
-            double elapsed = ms - prevLowTime;
-            if (elapsed < 3200.0) {
-                int vel = (int)((3200.0 - elapsed) / 3200.0 * 127.0);
-                if (vel > 0) playBass(lowPitch, vel);
-            }
-        }
-    }
-    prevLowPitch = lowPitch;
-    prevLowTime = lowTime;
-
-    // 10 秒超时自动 note-off
-    if (bassNoteOn >= 0 && (ms - bassNoteTime) > 10000.0) {
-        audio.enqueueNoteOff(2, 0, bassNoteOn);
-        bassNoteOn = -1;
-    }
-    updateCajonEnergy(ms); // 每子步推送能量显示
+    float autoEnergy = cajon.updateEnergy(ms, beatTracker.getCurrentBpm());
+    float energy = std::max(autoEnergy, g_minCajonEnergy);
+    cajon.setEnergy(energy);
+    pushEnergyDisplayUpdate();
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
     // beat 0 开始时重置计时器
     if (step % 32 == 0) g_measureStartMs.store(ms);
 }
 
-static void updateCajonEnergy(double nowMs) {
+// REMOVED: updateCajonEnergy moved to CajonAssistant
+static void __unused_old_updateCajonEnergy(double nowMs) {
     std::lock_guard<std::mutex> lock(energyMutex);
     // 清理超过 2 秒的旧时间戳
     double cutoff = nowMs - 2000.0;
@@ -357,11 +303,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
     // 统计近 2 秒音符密度 → Cajon 能量
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
-    {
-        std::lock_guard<std::mutex> lock(energyMutex);
-        recentNoteTimestamps.push_back(ms);
-    }
-    updateCajonEnergy(ms);
+    cajon.feedNoteOn(ms);
 
     tempoDetector.setSplitPoint(midi.getSplitNote());
     bool measureChange = tempoDetector.feedNoteOn(note, velocity, ms);
@@ -624,7 +566,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsBassAssistEnabled(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassAssistVolume(
-        JNIEnv*, jobject, jfloat volume) { bassAssist.setVolume(volume); }
+        JNIEnv*, jobject, jfloat volume) { bassAssist.setVolume(volume); g_bassVolume = volume; }
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBassAssistVolume(
         JNIEnv*, jobject) { return bassAssist.getVolume(); }
