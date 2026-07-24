@@ -113,8 +113,12 @@ CCResult MidiProcessor::processCC(int controller, int value) {
     }
 
     if (controller == 81) {
-        mBassEnhanceRatio = value / 127.0f;
-        mBassWeightsDirty = true;
+        if (mBassEnhanceEnabled) {
+            mBassEnhanceRatio = value / 127.0f;
+            mBassWeightsDirty = true;
+        } else {
+            mBassVolumeFromCC = value / 127.0f;  // 贝斯音量 (待 native-lib 读取)
+        }
     } else if (controller == 18) {
         mBassEnhanceCenter = 36 + (int)(value / 127.0f * 24);
         mBassWeightsDirty = true;

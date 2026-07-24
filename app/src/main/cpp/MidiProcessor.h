@@ -51,6 +51,7 @@ public:
     // ---- Bass enhance ----
     void setBassEnhanceEnabled(bool enabled);
     bool isBassEnhanceEnabled() const { return mBassEnhanceEnabled; }
+    float getAndClearBassVolumeFromCC() { float v = mBassVolumeFromCC; mBassVolumeFromCC = -1.0f; return v; }
     float getBassWeight(int note) const;  // weight for a given MIDI note
 
     // ---- State accessors (for polling/JNI) ----
@@ -84,6 +85,7 @@ private:
     BassEnhancer mBassEnhancer;
     bool mBassEnhanceEnabled = false;
     float mBassEnhanceRatio = 0.5f;
+    float mBassVolumeFromCC = -1.0f;  // 待处理的贝斯音量 (CC81, BassEnhance 关闭时)
     int mBassEnhanceCenter = 43;
     int mBassEnhanceSpread = 12;
     float mBassWeights[128] = {};

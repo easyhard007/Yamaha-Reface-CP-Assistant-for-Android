@@ -20,6 +20,12 @@ public:
     /// 获取和弦类型 (major, minor, 5, etc.)
     std::string getChordType() const { return mChordType; }
 
+    /// 获取和弦组成音 (音高 class 0-11)
+    const std::vector<int>& getChordNotes() const { return mChordNotes; }
+
+    /// 获取和弦组成音字符串 (调试用)
+    std::string getChordNotesString() const;
+
     /// 和弦是否发生变化 (调用 detect 后检查)
     bool changed() const { return mChanged; }
 
@@ -29,6 +35,9 @@ private:
     int mRootPc = -1;
     int mBassPc = -1;
     bool mChanged = false;
+    std::vector<int> mChordNotes;
+
+    void computeChordNotes();
 
     static constexpr double DECAY_RATE = 0.03;
     static constexpr double BASS_BONUS = 2.0;

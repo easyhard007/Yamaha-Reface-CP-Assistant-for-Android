@@ -34,7 +34,7 @@ float CajonAssistant::humanizeOffset(int step) {
 
 CajonAssistant::Hit CajonAssistant::grooveBass(int step, float e, int w) {
     Hit h{}; h.play = false; h.velocity = 0;
-    if (step == 0) { h.play = true; h.velocity = 25 + (int)(80*e); }
+    if (step == 0) { h.play = true; h.velocity = 30 + (int)(100*e); }
     else if (step == 16) { if ((rand()%10000)/10000.0f < e*0.8f) { h.play = true; h.velocity = 25 + (int)(80*e); } }
     else if (w >= 2 && step != 8 && step != 24) {
         bool firstHalf = step < 16;
@@ -97,6 +97,7 @@ CajonAssistant::Hit CajonAssistant::grooveTip(int step, float e, int w) {
 
 int CajonAssistant::processStep(int step, double /*bpm*/) {
     currentStep.store(step);
+    mLastToneVel = 0;
     if (!enabled.load() || !engine) return 0;
     float e = energy.load();
     int w = getMetricWeight(step);
@@ -118,6 +119,7 @@ int CajonAssistant::processStep(int step, double /*bpm*/) {
             engine->trigger(1, tone.velocity);
         }
         hands = 2; toneVel = tone.velocity;
+        mLastToneVel = tone.velocity;
     }
     if (bass.play && bass.velocity > 0 && toneVel == 0) {
         engine->trigger(0, bass.velocity); hands++; bassVel = bass.velocity;

@@ -10,6 +10,8 @@ struct NoteEvent {
     double timeMs;
 };
 
+struct FencePost { double position; double weight; };
+
 class TempoDetector {
 public:
     TempoDetector();
@@ -45,6 +47,9 @@ public:
     double getSyncMean() const { return mSyncMean; }
     void setSyncMean(double v) { mSyncMean = v; }
 
+    /// 栅栏模板匹配: 联合搜索最优 BPM + Phase
+    void calculateBestBpmAndPhase();
+
     /// 清理近 10 秒以外的旧音符事件
     void pruneNoteEvents(double nowMs);
 
@@ -55,6 +60,7 @@ private:
     std::vector<double> mMeasureTimestamps;
     std::vector<double> mBpmList;
     std::vector<NoteEvent> mNoteEvents;
+    std::vector<FencePost> mFence;
 
     double mBestBPM = 75.0;
     double mPhaseOffset = 0.0;

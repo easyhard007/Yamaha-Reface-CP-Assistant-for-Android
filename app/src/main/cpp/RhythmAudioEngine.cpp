@@ -179,8 +179,8 @@ void RhythmAudioEngine::processBassReverb(float* buf, int32_t numFrames) {
     applyBassHiCutEQ(buf, numFrames); // -10dB @ 4kHz
     if (!bassReverbInited) {
         bassReverb.init(44100);
-        bassReverb.setRoomSize(0.85f);
-        bassReverb.setMix(0.07f);
+        bassReverb.setRoomSize(0.35f);
+        bassReverb.setMix(0.04f);
         bassReverb.setDamp(0.6f);
         bassReverb.setLowDamp(0.2f);
         bassReverbInited = true;

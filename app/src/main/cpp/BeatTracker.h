@@ -25,6 +25,9 @@ public:
     /// 重置到第 1 拍 (SYNC / START 时调用)
     void sync();
 
+    /// Tap Tempo: 记录时间戳, ≥4次后计算并更新 BPM
+    void tapTempo();
+
     /// 获取当前拍号 (0-based, 供 JS 轮询)
     int  getCurrentBeat() const { return currentBeat.load(); }
     double getCurrentBpm() const { return bpm; }
@@ -45,6 +48,7 @@ private:
     int    beatsPerBar = 4;
     double bpm = 75.0;
     double beatIntervalMs = 800.0; // 60000 / 75 = 800
+    std::vector<double> mTapTempoStamps;
 
     std::mutex mtx;
     std::condition_variable cv;

@@ -1,7 +1,17 @@
 #include "BeatTracker.h"
 #include "CajonAssistant.h"
 #include <chrono>
+#include <thread>
 #include <android/log.h>
+
+extern std::atomic<double> g_pendingBpmUpdate;
+extern std::atomic<double> g_pendingRhythmGainUpdate;
+extern std::atomic<double> g_pendingMinEnergyUpdate;
+extern float g_minCajonEnergy;
+class RhythmAudioEngine;
+extern RhythmAudioEngine* g_rhythmEngine;
+class CajonAssistant;
+extern CajonAssistant cajon;
 
 BeatTracker::BeatTracker() = default;
 
@@ -33,6 +43,66 @@ void BeatTracker::setTempo(double newBpm) {
 void BeatTracker::sync() {
     needSync.store(true);
     cv.notify_one(); // 唤醒 beatLoop 立即跳到第 1 拍
+}
+
+void BeatTracker::tapTempo() {
+    using namespace std::chrono;
+    double nowMs = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+
+    // 最新时间戳超过 2 秒 → 清空重新计数
+    if (!mTapTempoStamps.empty() && (nowMs - mTapTempoStamps.back()) > 2000.0) {
+        mTapTempoStamps.clear();
+    }
+    mTapTempoStamps.push_back(nowMs);
+
+    if (mTapTempoStamps.size() >= 4) {
+        // 计算相邻间隔均值的 4 倍 = measure_ms
+        double sumInterval = 0.0;
+        for (size_t i = 1; i < mTapTempoStamps.size(); i++) {
+            sumInterval += mTapTempoStamps[i] - mTapTempoStamps[i - 1];
+        }
+        double avgInterval = sumInterval / (mTapTempoStamps.size() - 1);
+        double measureMs = avgInterval * 4.0;
+        double newBpm = 240000.0 / measureMs;
+        int roundedBpm = (int)(newBpm + 0.5);
+        if (roundedBpm < 30) roundedBpm = 30;
+        if (roundedBpm > 300) roundedBpm = 300;
+
+        setTempo(roundedBpm);
+        __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+            "TapTempo: %zu taps, avg=%.0fms, bpm=%d", mTapTempoStamps.size(), avgInterval, roundedBpm);
+
+        // 推送 BPM 到 UI
+        g_pendingBpmUpdate.store((double)roundedBpm);
+
+        // 如果当前节奏音量为 0 → 延迟 0.25*measure 后 sync + 启动节奏 + 设能量
+        extern RhythmAudioEngine* g_rhythmEngine;
+        float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+        if (rg <= 0.0f) {
+            int64_t delayMs = (int64_t)(measureMs * 0.25) - 50;
+            if (delayMs < 0) delayMs = 0;
+            BeatTracker* pSelf = this;
+            std::thread([delayMs, pSelf]() {
+                std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
+
+                // 先开音量+能量, 确保 sync 第一拍 Cajon 有声
+                if (g_rhythmEngine) g_rhythmEngine->setMasterGain(2.0f);
+                g_pendingRhythmGainUpdate.store(2.0);
+                g_minCajonEnergy = 0.4f;
+                g_pendingMinEnergyUpdate.store(0.4);
+                cajon.setEnergy(0.4f);
+
+                // BPM 更新 UI
+                g_pendingBpmUpdate.store(pSelf->getCurrentBpm());
+
+                // 最后 sync, 此时音量+能量已就位
+                pSelf->sync();
+            }).detach();
+
+            // 清空 tap 记录，准备下一轮
+            mTapTempoStamps.clear();
+        }
+    }
 }
 
 void BeatTracker::beatLoop() {

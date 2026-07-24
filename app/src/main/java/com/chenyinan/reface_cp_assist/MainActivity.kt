@@ -356,6 +356,22 @@ class MainActivity : AppCompatActivity() {
                 // 和弦页: chord 来自 ChordDetector, roman/key/tsd 来自 ScaleDetector
                 val chord = nativeGetChord()
                 pushAudioDevices()
+                // 检查 pending UI 更新 (tap tempo 等场景下无 MIDI 事件时也需要)
+                val pendingBpm = nativeGetAndClearPendingBpm()
+                if (pendingBpm >= 0) {
+                    js("updateBpmDisplay(${Math.round(pendingBpm)})")
+                    js("scatterSetRange(" + (240000.0 / pendingBpm).toInt() + ")")
+                    js("tempoFlash()")
+                }
+                val pendingGain = nativeGetAndClearPendingRhythmGain()
+                if (pendingGain >= 0) js("updateRhythmVolSlider(${pendingGain})")
+                val pendingMinE = nativeGetAndClearPendingMinEnergy()
+                if (pendingMinE >= 0) js("updateEnergySlider(${pendingMinE})")
+                val pbv = nativeGetAndClearPendingBassVolume()
+                if (pbv >= 0f) {
+                    val pct = Math.round(pbv * 100)
+                    js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
+                }
                 chordHandler.postDelayed(this, 150)
             }
         }
@@ -388,6 +404,8 @@ class MainActivity : AppCompatActivity() {
                             val chordStr = nativeGetAndClearPendingChord()
                             if (chordStr.isNotEmpty()) {
                                 js("updateChordDisplay('$chordStr')")
+                                val cn = nativeGetChordNotes()
+                                if (cn.isNotEmpty()) js("document.getElementById('chord-debug-info').innerText='chordNotes: $cn'")
                             }
                             val log = "↓ NoteOn  ${midiNoteName(note)}  v$velocity  ch$ch"
                             // midiLogRx removedlog)
@@ -424,6 +442,7 @@ class MainActivity : AppCompatActivity() {
                         if (pendingBpm >= 0) {
                             js("updateBpmDisplay(${Math.round(pendingBpm)})")
                             js("scatterSetRange(" + (240000.0 / pendingBpm).toInt() + ")")
+                            js("tempoFlash()")
                         }
                         val pendingGain = nativeGetAndClearPendingRhythmGain()
                         if (pendingGain >= 0) js("updateRhythmVolSlider(${pendingGain})")
@@ -438,6 +457,11 @@ class MainActivity : AppCompatActivity() {
                         val scc = nativeProcessCC(ctrl, value)
                         if (scc == 127) midiUtil.sendSustainOn()
                         else if (scc == 0) midiUtil.sendSustainOff()
+                        val pbv = nativeGetAndClearPendingBassVolume()
+                        if (pbv >= 0f) {
+                            val pct = Math.round(pbv * 100)
+                            js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
+                        }
                         val ccName = if (ctrl == 64) "Sustain" else "CC$ctrl"
                         // midiLogRx removed
                         js("if(typeof onNativeMidi==='function')onNativeMidi('cc',$ctrl,$value,$ch);")
@@ -590,7 +614,9 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetAndClearPendingTempoHighlight(): Int
     external fun nativeGetAndClearPendingScatter(): Int
     external fun nativeGetAndClearPendingTempoFlash(): Int
+    external fun nativeGetAndClearPendingBassVolume(): Float
     external fun nativeGetAndClearPendingChord(): String
+    external fun nativeGetChordNotes(): String
     external fun nativeGetTempoDetectorData(): String
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
@@ -602,7 +628,6 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetLeadGain(): Double
     external fun nativeGetChord(): String
     external fun nativeGetRomanFromChord(chordName: String): String
-    external fun nativeGetChordNotes(): String
     external fun nativeGetChordTiming(): String
     external fun nativeGetChordTones(): String
     external fun nativeGetDebugInfo(): String

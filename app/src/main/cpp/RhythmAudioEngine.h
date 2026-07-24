@@ -33,7 +33,7 @@ public:
     /// numFrames: 帧数
     void mixAudio(float* outBuf, int32_t numFrames);
 
-    /// 仅过混响 (供 BassSynth 使用, 独立 reverb 实例)
+//    /// 仅过混响 (供 BassSynth 使用, 独立 reverb 实例)
     void processBassReverb(float* buf, int32_t numFrames);
 
     /// 设置主音量增益 (0-4.0, 默认 3.2 = 80%)

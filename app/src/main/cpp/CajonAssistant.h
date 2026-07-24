@@ -18,6 +18,7 @@ public:
     int getCurrentStep() const { return currentStep.load(); }
     int getLastBassVel() const { return mLastBassVel; }
     double getLastBassTime() const { return mLastBassTime; }
+    int getLastToneVel() const { return mLastToneVel; }
     const float* getStepWeights() const { return stepWeights; }
 
     static float humanizeOffset(int step);
@@ -39,6 +40,7 @@ private:
     float stepWeights[32] = {};
     int mLastBassVel = 0;
     double mLastBassTime = 0;
+    int mLastToneVel = 0;
 
     // 能量计算
     std::vector<double> mNoteTimestamps;

@@ -129,5 +129,83 @@ std::string ChordDetector::detect(const std::set<int>& allNotes) {
         mRootPc = -1;
     }
     mChanged = (prev != mChord);
+    computeChordNotes();
     return mChord;
+}
+
+// ---- 音符名 → 音高 class (0-11) ----
+static int noteNameToPc(const std::string& name) {
+    if (name.empty()) return -1;
+    char root = name[0];
+    int semi = -1;
+    switch (root) {
+        case 'C': semi = 0; break; case 'D': semi = 2; break;
+        case 'E': semi = 4; break; case 'F': semi = 5; break;
+        case 'G': semi = 7; break; case 'A': semi = 9; break;
+        case 'B': semi = 11; break;
+        default: return -1;
+    }
+    if (name.size() > 1) {
+        if (name[1] == '#') semi++;
+        else if (name[1] == 'b') semi--;
+    }
+    while (semi < 0) semi += 12;
+    return semi % 12;
+}
+
+void ChordDetector::computeChordNotes() {
+    mChordNotes.clear();
+    if (mChord == "-" || mChord.empty()) return;
+
+    // 解析: 找 "/" 分离 bass note
+    std::string chordPart = mChord;
+    std::string bassName;
+    size_t slashPos = chordPart.find('/');
+    if (slashPos != std::string::npos) {
+        bassName = chordPart.substr(slashPos + 1);
+        chordPart = chordPart.substr(0, slashPos);
+    }
+
+    // 提取根音名 (1-2字符)
+    std::string rootName = chordPart.substr(0, 1);
+    if (chordPart.size() > 1 && (chordPart[1] == '#' || chordPart[1] == 'b'))
+        rootName += chordPart[1];
+
+    // 提取和弦类型
+    std::string type = chordPart.substr(rootName.size());
+
+    int rootPC = noteNameToPc(rootName);
+    int bassPC = rootPC;
+    if (!bassName.empty()) bassPC = noteNameToPc(bassName);
+    if (bassPC < 0 || rootPC < 0) return;
+
+    // 1. 先放 bass note
+    mChordNotes.push_back(bassPC);
+
+    // 2. 再放 root (如果 != bass)
+    if (rootPC != bassPC) mChordNotes.push_back(rootPC);
+
+    // 3. 从模板取间隔, 添加其他组成音
+    for (const auto& tmpl : TEMPLATES) {
+        if (tmpl.type == type) {
+            for (int interval : tmpl.intervals) {
+                if (interval == 0) continue; // 根音已处理
+                int pc = (rootPC + interval) % 12;
+                if (std::find(mChordNotes.begin(), mChordNotes.end(), pc) == mChordNotes.end())
+                    mChordNotes.push_back(pc);
+            }
+            break;
+        }
+    }
+}
+
+std::string ChordDetector::getChordNotesString() const {
+    if (mChordNotes.empty()) return "";
+    std::string result = "[";
+    for (size_t i = 0; i < mChordNotes.size(); i++) {
+        if (i > 0) result += ", ";
+        result += NOTE_NAMES[mChordNotes[i]];
+    }
+    result += "]";
+    return result;
 }

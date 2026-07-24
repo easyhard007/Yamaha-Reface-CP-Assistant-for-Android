@@ -7,7 +7,14 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-TempoDetector::TempoDetector() = default;
+TempoDetector::TempoDetector() {
+    mFence = {
+        {0.0,   1.0},  // 小节开始 (最强锚点)
+        {0.5,   0.5},  // 半小节 (第3拍)
+        {0.75,  0.5},  // 第4拍
+        {0.875, 0.2},  // 第4拍后半拍 (弱锚点)
+    };
+}
 
 // ===== 小节切换检测 =====
 
@@ -51,7 +58,7 @@ bool TempoDetector::feedNoteOn(int pitch, int velocity, double timeMs) {
                 mPhaseOffset = timeMs;
             }
 
-            calculateStablePhaseOffset();
+            calculateBestBpmAndPhase();
 
             mLowNotesForDetect.clear();
             mLowNotesForDetect.insert(pitch);
@@ -117,7 +124,7 @@ void TempoDetector::processNewBPM(double rawBpm) {
         mAnomalyCount = 0;
     }
 
-    calculateOptimalBPM();
+    // calculateOptimalBPM() 已由 calculateBestBpmAndPhase() 替代
 }
 
 void TempoDetector::calculateOptimalBPM() {
@@ -139,6 +146,61 @@ void TempoDetector::calculateOptimalBPM() {
     double sum = 0.0;
     for (double b : bestCluster) sum += b;
     mBestBPM = sum / (double)bestCluster.size();
+}
+
+// ===== 栅栏模板匹配 (联合搜索 BPM + Phase) =====
+
+void TempoDetector::calculateBestBpmAndPhase() {
+    if (mMeasureTimestamps.size() < 3) return;
+
+    // 取最近最多 16 个时间戳
+    size_t start = mMeasureTimestamps.size() > 16 ? mMeasureTimestamps.size() - 16 : 0;
+    std::vector<double> recent(mMeasureTimestamps.begin() + start, mMeasureTimestamps.end());
+
+    // 生成 BPM 候选: 50-140, 步长 0.5
+    const double bpmMin = 50.0;
+    const double bpmMax = 140.0;
+    const double bpmStep = 0.5;
+
+    const double bandwidth = 0.08; // ~1/3拍 @120BPM
+
+    double bestScore = -1.0;
+    double bestBpm = mBestBPM;
+    double bestPhase = mPhaseOffset;
+
+    for (double bpm = bpmMin; bpm <= bpmMax; bpm += bpmStep) {
+        double measureMs = 240000.0 / bpm;
+
+        // 对每个时间戳派生 phase 候选
+        for (double t : recent) {
+            double phase = fmod(t, measureMs);
+
+            // 评分
+            double score = 0.0;
+            for (double ts : recent) {
+                double frac = fmod(ts - phase + measureMs, measureMs) / measureMs;
+                double bestMatch = 0.0;
+                for (const auto& fp : mFence) {
+                    double dist = std::abs(frac - fp.position);
+                    if (dist > 0.5) dist = 1.0 - dist; // 循环距离
+                    double match = fp.weight * std::max(0.0, 1.0 - dist / bandwidth);
+                    if (match > bestMatch) bestMatch = match;
+                }
+                score += bestMatch;
+            }
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestBpm = bpm;
+                bestPhase = phase;
+            }
+        }
+    }
+
+    if (bestScore >= 0.0) {
+        mBestBPM = bestBpm;
+        mPhaseOffset = bestPhase;
+    }
 }
 
 // ===== 相位偏移 (圆周平均 + 排异) =====

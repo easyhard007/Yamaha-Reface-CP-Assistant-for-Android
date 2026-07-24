@@ -533,9 +533,25 @@
         function updateBpmDisplay(bpm) {
             document.getElementById('bpm-display').innerText = '♪=' + bpm;
             // 同步扫线速度: 1 小节 = 240000 / bpm ms
-            var sweep = document.getElementById('sweep-line');
             if (typeof scatterSetRange === 'function') scatterSetRange(Math.round(240000 / bpm));
         }
+        function pollBpmList() {
+            if (typeof Android === 'undefined') return;
+            var jsonStr = Android.getTempoDetectorData ? Android.getTempoDetectorData() : '{"bpm":75,"bpmList":[]}';
+            var data;
+            try { data = JSON.parse(jsonStr); } catch(e) { return; }
+            var bpm = data.bpm || 75;
+            var bpmList = data.bpmList || [];
+            var anomalyCount = data.anomaly || 0;
+            var gain = Android.getRhythmGain ? Android.getRhythmGain() : 0;
+            var topLine = 'Detected: ♪=' + bpm.toFixed(1);
+            if (gain > 0) topLine += ' (locked)';
+            if (anomalyCount > 0) topLine += ' ⚠' + anomalyCount;
+            var listColor = anomalyCount > 0 ? '#ff8c00' : '#888';
+            document.getElementById('detected-bpm').innerHTML = topLine +
+                '<br><span style="color:' + listColor + '">[' + bpmList.map(function(v){return v.toFixed(1);}).join(', ') + ']</span>';
+        }
+        setInterval(pollBpmList, 500);
         function tempoHighlight() {
             var el = document.getElementById('bpm-display');
             el.style.color = '#ffd700';
@@ -571,13 +587,19 @@
             if (s) {
                 var pct = Math.round(gain / 4.0 * 100);
                 if (document.activeElement !== s) smoothSlide('rhythm-vol', pct);
+                else s.value = pct;
                 document.getElementById('rhythm-vol-val').innerText = pct + '%';
-                updateSliderGlow();
+                document.getElementById('rhythm-vol').classList.toggle('glow', pct > 0);
             }
         }
         function updateEnergySlider(minE) {
             var s = document.getElementById('cajon-energy');
-            if (s && document.activeElement !== s) s.value = Math.round(minE * 100);
+            if (!s) return;
+            var pct = Math.round(minE * 100);
+            if (document.activeElement !== s) smoothSlide('cajon-energy', pct);
+            else s.value = pct;
+            document.getElementById('cajon-energy-val').innerText = minE.toFixed(2);
+            updateEnergyTrack();
         }
 
         function onAssistToggle() {

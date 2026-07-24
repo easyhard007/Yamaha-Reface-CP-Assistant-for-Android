@@ -23,15 +23,15 @@ static ChordDetector chordDetector;
 static BeatTracker beatTracker;
 extern RhythmAudioEngine* g_rhythmEngine;
 static RhythmAudioEngine rhythmEngine;
-static CajonAssistant cajon;
+CajonAssistant cajon;
 static TempoDetector tempoDetector;
 static BassAssist bassAssist;
 float g_bassVolume = 0.8f;  // AudioEngine 混音用
 static int assistType = 0;
-static float g_minCajonEnergy = 0.0f;
-static std::atomic<double> g_pendingBpmUpdate{-1.0};
-static std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
-static std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
+float g_minCajonEnergy = 0.0f;
+std::atomic<double> g_pendingBpmUpdate{-1.0};
+std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
+std::atomic<double> g_pendingMinEnergyUpdate{-1.0};
 static std::atomic<int> g_pendingTempoHighlight{0};
 static std::atomic<int> g_pendingScatterUpdate{0};
 static std::atomic<int> g_pendingTempoFlash{0};
@@ -40,6 +40,7 @@ static std::atomic<int> g_pendingTempoFlash{0};
 static std::atomic<double> g_measureStartMs{0};
 static bool g_syncJustTriggered = false;
 static std::atomic<int> g_pendingChordUpdate{0};
+static std::atomic<float> g_pendingBassVolUpdate{-1.0f};
 static std::string g_chordDisplayStr;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
@@ -103,12 +104,14 @@ static void onBeatStep(int step, double bpm, void*) {
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 
-    // 贝斯助手编排
-    bassAssist.processStep(bassVel, ms, midi.getLowNotes(), audio, g_rhythmEngine);
-
     float autoEnergy = cajon.updateEnergy(ms, beatTracker.getCurrentBpm());
     float energy = std::max(autoEnergy, g_minCajonEnergy);
     cajon.setEnergy(energy);
+
+    // 贝斯助手编排
+    bassAssist.processStep(step, bassVel, cajon.getLastToneVel(), ms, bpm,
+                            g_chordDisplayStr, chordDetector.getChordNotes(),
+                            energy, audio, g_rhythmEngine);
     pushEnergyDisplayUpdate();
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
@@ -411,6 +414,12 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessCC(
         JNIEnv*, jobject, jint controller, jint value) {
     auto r = midi.processCC(controller, value);
+    float bv = midi.getAndClearBassVolumeFromCC();
+    if (bv >= 0.0f) {
+        g_bassVolume = bv;
+        bassAssist.setVolume(bv);
+        g_pendingBassVolUpdate.store(bv);
+    }
     return r.sustainCCToSend;
 }
 
@@ -586,10 +595,22 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingChord
     return env->NewStringUTF("");
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordNotes(
+        JNIEnv* env, jobject) {
+    return env->NewStringUTF(chordDetector.getChordNotesString().c_str());
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingTempoFlash(
         JNIEnv*, jobject) {
     return g_pendingTempoFlash.exchange(0);
+}
+
+extern "C" JNIEXPORT jfloat JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetAndClearPendingBassVolume(
+        JNIEnv*, jobject) {
+    return g_pendingBassVolUpdate.exchange(-1.0f);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -635,8 +656,13 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCurrentBeat(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
         JNIEnv*, jobject) {
-    beatTracker.sync();
-    pushBeatDotUpdate(); // 立即推送白点归零
+    float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+    if (rg > 0.0f) {
+        beatTracker.sync();
+        pushBeatDotUpdate();
+    } else {
+        beatTracker.tapTempo();
+    }
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -644,20 +670,6 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBeatIndex(
         JNIEnv*, jobject) {
     // TempoTracker removed — rewriting tempo detection
     return beatTracker.getCurrentBeat();
-}
-
-extern "C" JNIEXPORT jstring JNICALL
-Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetChordNotes(
-        JNIEnv* env, jobject) {
-    static const char* nn[12] = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
-    auto notes = midi.getLowNotes();
-    std::string s;
-    for (const auto& kv : notes) {
-        int n = kv.first;
-        if (!s.empty()) s += " ";
-        s += nn[n % 12] + std::to_string(n / 12 - 1);
-    }
-    return env->NewStringUTF(s.c_str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL

@@ -55,9 +55,9 @@ bool AudioEngine::init(const char* sf2Path) {
         return false;
     }
 
-    mLeadGain = 1.5;  // 30% of 5.0
+    mLeadGain = 0.5;  // 10% of 5.0
     mAccompGain = 3.6;
-    fluid_synth_set_gain(mLeadSynth, 1.5f); // 30% of 5.0
+    fluid_synth_set_gain(mLeadSynth, 0.5f); // 10% of 5.0
     fluid_synth_set_interp_method(mLeadSynth, -1, FLUID_INTERP_LINEAR);
     fluid_synth_set_reverb(mLeadSynth, 0.85, 0.15, 0.8, 0.70);
     mLeadSoundFontId = fluid_synth_sfload(mLeadSynth, sf2Path, 1);
@@ -71,7 +71,7 @@ bool AudioEngine::init(const char* sf2Path) {
     fluid_synth_set_reverb(mAccompSynth, 0.85, 0.15, 0.8, 0.70);
     fluid_synth_set_gain(mBassSynth, 0.8f);
     fluid_synth_set_interp_method(mBassSynth, -1, FLUID_INTERP_LINEAR);
-    fluid_synth_set_reverb(mBassSynth, 0.85, 0.15, 0.8, 0.70);
+    fluid_synth_set_reverb(mBassSynth, 0.0, 0.0, 0.0, 0.0);  // 贝斯干声，制音时立即切断
     // 预加载默认 SF2 防止回调 crash, 后续 nativeLoadBassSoundFont 会覆盖
     mBassSoundFontId = fluid_synth_sfload(mBassSynth, sf2Path, 1);
     return true;
