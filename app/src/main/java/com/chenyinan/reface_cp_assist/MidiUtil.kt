@@ -93,12 +93,12 @@ class MidiUtil {
      * 每个音间隔 150ms，每个音持续 600ms
      */
     fun sendTestTones() {
-        val notes = intArrayOf(76, 79, 84) // E5, G5, C6
+        val notes = intArrayOf(91, 96) // G6, C7
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
         notes.forEachIndexed { index, note ->
             handler.postDelayed({
-                sendNoteOn(note, 80)
+                sendNoteOn(note, 40)
                 handler.postDelayed({
                     sendNoteOff(note)
                 }, 600)

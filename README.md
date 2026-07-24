@@ -1,19 +1,23 @@
 # Yamaha Reface CP Assistant for Android
 
-A native Android assistant app for the **Yamaha Reface CP** keyboard. It connects to the instrument over MIDI and provides real-time chord/scale visualization, pitch transposition, a smart auto-sustain pedal, bass enhancement, and SoundFont-based audio playback — all driven by a low-latency native audio engine ([Oboe](https://github.com/google/oboe)) and an embedded web UI.
+A native Android assistant app for the **Yamaha Reface CP** keyboard. It connects to the instrument over MIDI and provides real-time chord detection, pitch transposition, smart auto-sustain, bass enhancement, a Cajon rhythm engine with auto-accompaniment, beat tracking with tap tempo, and SoundFont-based audio playback — all driven by a low-latency native audio engine ([Oboe](https://github.com/google/oboe)) and an embedded WebView UI.
 
 This project is an Android port/packaging of the web-based [Yamaha-Reface-CP-Assistant](references/Yamaha-Reface-CP-Assistant), rebuilt with a Kotlin + JNI/C++ native audio stack.
 
 ## Features
 
-- 🎹 **Real-time chord & key tracking** — TSD (Tonic / Subdominant / Dominant) chord-function visualization with live key/scale detection.
-- 🌈 **Color-mapped light panel** — chords and keys mapped to colors on an interactive light panel.
+- 🎹 **Real-time chord detection** — weighted chroma vector template matching with 17 chord types, slash-chord support.
+- 🥁 **Cajon rhythm engine** — procedurally generated cajon grooves (bass/tone/tip/slap) with velocity-sensitive round-robin samples and independent per-instrument reverb/EQ.
+- 🎸 **Bass assist** — chord-root-driven bass synth with damp/mute articulation, chord-note probability selection, and energy-dependent dynamics.
+- 🎵 **Auto-accompaniment** — style-based backing tracks with scene switching (intro/main/fill/ending).
+- ⏱️ **Beat tracking & tempo detection** — PLL-based tempo detection with fence-template phase analysis and real-time BPM display on a scrolling scatter plot.
+- 👆 **Tap tempo** — tap the sync-zone to set tempo manually; auto-starts rhythm at 50% volume.
 - 🔁 **Transpose** — seamless pitch transposition without affecting the played notes.
 - ✂️ **Split point** — adjustable keyboard split point.
 - 🦶 **Auto-Sustain** — a smart auto-pedal that holds notes musically.
 - 🔊 **Bass Enhance** — adds a synthesized bass layer to enrich the low end.
-- 🎼 **SoundFont (`.sf2`) playback** — high-quality instrument sound rendered through the native Oboe audio engine.
-- 🖥️ **Virtual piano & MIDI monitor** — on-screen keyboard plus a live MIDI debug monitor.
+- 🎼 **SoundFont (`.sf2`) playback** — high-quality instrument sound rendered through the native Oboe audio engine (FluidLite).
+- 🖥️ **Virtual piano** — on-screen keyboard with real-time note display.
 
 ## Requirements
 
@@ -40,11 +44,21 @@ The SoundFont file is **not included** in this repository because of its large s
 
 3. Rebuild the project. The app loads this SoundFont at runtime to synthesize instrument sounds.
 
-> The `.sf2` file is listed in `.gitignore`, so it will not be tracked by Git even after you add it locally.
+> Most `.sf2` files are listed in `.gitignore` due to their large size, but `033FingerBass-LiveHQNaturalGM.sf2` (bass soundfont) is tracked in the repository.
+
+## ⚠️ Manual Style Files Setup (Optional)
+
+Auto-accompaniment supports **Yamaha `.sty` style files**. Place them in:
+
+```
+app\src\main\assets\styles\
+```
+
+These style files are also available from **JJazzLab**.
 
 ## About JJazzLab
 
-The SoundFont used by this app comes from **JJazzLab**, an open-source application. JJazzLab is an open-source project; its source repository is available at:
+The SoundFont and style files used by this app come from **JJazzLab**, an open-source application. JJazzLab is an open-source project; its source repository is available at:
 
 - **https://github.com/jjazzboss/JJazzLab**
 
@@ -62,16 +76,33 @@ Please refer to the JJazzLab repository and its license for the terms of use of 
 ## Usage
 
 1. Launch the app on your device.
-2. Open **Settings** (the `?` button).
-3. Select the **SoundFont** and **Instrument**.
-4. Choose the **MIDI port** connected to your Reface CP and press **Start**.
-5. Play your Reface CP — chords, keys, the light panel, and audio output will respond in real time.
+2. Open **Settings** (the `?` button), select the **SoundFont** and **Instrument**.
+3. Choose the **MIDI port** connected to your Reface CP and press **Start**.
+4. Play your Reface CP — chords, rhythm, and bass will respond in real time.
+
+### Accompany Assist Mode (default)
+
+Generates **Cajon percussion** and **chord-driven bass** accompaniment based on your MIDI input:
+
+- **Energy slider** — controls rhythmic density of the Cajon groove.
+- **Rhythm volume** — mix level of the Cajon drums. When set to 0, tap the **sync-zone** to set tempo manually (tap tempo); the app analyzes your playing speed to determine BPM automatically.
+- **Bass volume** — mix level of the bass synth. When Bass Enhance is disabled on your Reface CP, CC#81 knob controls bass volume instead.
+- **Sync-zone** — tap to reset the beat to 1 (rhythm > 0) or tap tempo (rhythm = 0).
+
+### Auto-Accompaniment Mode
+
+Plays **Yamaha `.sty` style files** with structured backing tracks:
+
+1. Place `.sty` files in `app/src/main/assets/styles/` before building.
+2. Switch to Auto-Accompaniment mode in the UI.
+3. **Select a style** from the list — the app loads its scenes (intro / main / fill / ending).
+4. Click a **scene button** to switch sections. The style plays automatically, following the detected chord and tempo.
 
 ## Tech Stack
 
 - **Kotlin** + AndroidX
-- **Native C++ (JNI)** audio engine with **Oboe** for low-latency SoundFont rendering
-- **WebView** UI (HTML/CSS/JS) with [Tonal.js](https://github.com/tonaljs/tonal), [Three.js](https://threejs.org/), and [iro.js](https://iro.js.org/)
+- **Native C++ (JNI)** audio engine with **Oboe** + **FluidLite** for low-latency SoundFont rendering
+- **WebView** UI (HTML/CSS/JS, Canvas 2D scatter chart)
 - CMake 3.22.1, 16 KB page-size aligned (Android 15+ ready)
 
 ## License

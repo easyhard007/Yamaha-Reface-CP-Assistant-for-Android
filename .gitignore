@@ -22,6 +22,8 @@ local.properties
 *.SF2
 *.sf3
 *.SF3
+# Exception: bass soundfont for BassAssist
+!app/src/main/assets/033FingerBass-LiveHQNaturalGM.sf2
 
 ### Backup soundfonts ###
 /soundfont_bak/
