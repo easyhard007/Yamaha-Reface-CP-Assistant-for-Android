@@ -102,6 +102,7 @@ class MainActivity : AppCompatActivity() {
             { nativeGetTimeSig() },
             { nativeGetCurrentBeat() },
             { syncBeat() },
+            { m -> nativeRequestBpmMult(m) },
             { nativeGetChord() },
             { nativeGetChordNotes() },
             { nativeGetChordTiming() },
@@ -621,6 +622,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()
+    external fun nativeRequestBpmMult(mult: Int)
     external fun nativeGetBeatIndex(): Int
     external fun nativeSetAccompVolume(vol: Double)
     external fun nativeSetLeadVolume(vol: Double)

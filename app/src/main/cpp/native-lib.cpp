@@ -41,6 +41,7 @@ static std::atomic<double> g_measureStartMs{0};
 static bool g_syncJustTriggered = false;
 static std::atomic<int> g_pendingChordUpdate{0};
 static std::atomic<float> g_pendingBassVolUpdate{-1.0f};
+static std::atomic<int> g_pendingBpmMult{0};  // 2=×2, -2=÷2, 0=无
 static std::string g_chordDisplayStr;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
@@ -100,6 +101,18 @@ static void pushEnergyDisplayUpdate() {
 }
 
 static void onBeatStep(int step, double bpm, void*) {
+    // ×2/÷2 请求: 在小节第一拍时先重设 tempo 再触发第一拍
+    if (step == 0) {
+        int mult = g_pendingBpmMult.exchange(0);
+        if (mult == 2 || mult == -2) {
+            double cur = beatTracker.getCurrentBpm();
+            double newBpm = (mult == 2) ? cur * 2.0 : std::ceil(cur / 2.0);
+            beatTracker.setTempo(newBpm);
+            g_pendingBpmUpdate.store(newBpm);
+            __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                "BPM mult %d: %.1f → %.1f", mult, cur, newBpm);
+        }
+    }
     int bassVel = cajon.processStep(step, bpm);
     auto now = std::chrono::steady_clock::now().time_since_epoch();
     double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
@@ -663,6 +676,12 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
     } else {
         beatTracker.tapTempo();
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeRequestBpmMult(
+        JNIEnv*, jobject, jint mult) {
+    g_pendingBpmMult.store(mult);
 }
 
 extern "C" JNIEXPORT jint JNICALL

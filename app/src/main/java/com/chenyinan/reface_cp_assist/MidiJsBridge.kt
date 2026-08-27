@@ -28,6 +28,7 @@ class MidiJsBridge(
     private val onGetTimeSig: () -> Int,
     private val onGetCurrentBeat: () -> Int,
     private val onSyncBeat: () -> Unit,
+    private val onRequestBpmMult: (Int) -> Unit,
     private val onGetChord: () -> String,
     private val onGetChordNotes: () -> String,
     private val onGetChordTiming: () -> String,
@@ -95,6 +96,7 @@ class MidiJsBridge(
     @JavascriptInterface fun getTimeSig(): Int = onGetTimeSig()
     @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
     @JavascriptInterface fun syncBeat() { onSyncBeat() }
+    @JavascriptInterface fun requestBpmMult(mult: Int) { onRequestBpmMult(mult) }
     @JavascriptInterface fun getChord(): String = onGetChord()
     @JavascriptInterface fun getChordNotes(): String = onGetChordNotes()
     @JavascriptInterface fun getChordTiming(): String = onGetChordTiming()

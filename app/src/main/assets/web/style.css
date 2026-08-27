@@ -480,5 +480,19 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     animation: bpmFlash 0.6s ease-in-out 2;
 }
 
+/* ===== BPM ×2/÷2 Button ===== */
+@keyframes bpmMultFlash {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.15; }
+}
+#bpm-mult-btn.flash {
+    animation: bpmMultFlash 0.25s ease-in-out infinite;
+    background: #ffd700 !important;
+    color: #111 !important;
+}
+/* 锁图标: 音量=0 解锁(暗灰), 音量>0 锁定(白色) */
+#bpm-lock-icon { color: #555; transition: color 0.2s; }
+#bpm-lock-icon.locked { color: #fff; }
+
 /* ===== Scatter Chart ===== */
 }
