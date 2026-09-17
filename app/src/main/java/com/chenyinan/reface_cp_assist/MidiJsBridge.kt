@@ -62,7 +62,12 @@ class MidiJsBridge(
     private val onGetReverbLevel: () -> Double,
     private val onSetHumanize: (Float, Float) -> Unit,
     private val onGetHumanizeTiming: () -> Float,
-    private val onGetHumanizeVelocity: () -> Float
+    private val onGetHumanizeVelocity: () -> Float,
+    // Drum loops
+    private val onGetDrumLoopList: () -> String,
+    private val onSelectDrumLoop: (String) -> Unit,
+    private val onPlayDrumLoop: (String) -> Unit,
+    private val onStopDrumLoop: () -> Unit
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -133,4 +138,9 @@ class MidiJsBridge(
     @JavascriptInterface fun setHumanize(timing: Float, velocity: Float) { onSetHumanize(timing, velocity) }
     @JavascriptInterface fun getHumanizeTiming(): Float = onGetHumanizeTiming()
     @JavascriptInterface fun getHumanizeVelocity(): Float = onGetHumanizeVelocity()
+    // Drum loops
+    @JavascriptInterface fun getDrumLoopList(): String = onGetDrumLoopList()
+    @JavascriptInterface fun selectDrumLoop(folder: String) { onSelectDrumLoop(folder) }
+    @JavascriptInterface fun playDrumLoop(variation: String) { onPlayDrumLoop(variation) }
+    @JavascriptInterface fun stopDrumLoop() { onStopDrumLoop() }
 }

@@ -12,6 +12,10 @@ include_directories(
         fluidlite/src
         # 确保子文件夹也能被搜到 (双重保险)
         fluidlite/include/fluidlite
+        # sbsms (高质量时间拉伸)
+        sbsms
+        # Signalsmith Stretch (低质量低延迟时间拉伸)
+        signalsmith
 )
 
 # ==========================================
@@ -78,6 +82,21 @@ add_library(
         RhythmAudioEngine.cpp
         CajonAssistant.cpp
         TempoDetector.cpp
+        DrumLoopEngine.cpp
+        TempoStream.cpp
+        SignalsmithStream.cpp
+        # sbsms 时间拉伸库
+        sbsms/buffer.cpp
+        sbsms/dBTable.cpp
+        sbsms/fft.cpp
+        sbsms/grain.cpp
+        sbsms/resample.cpp
+        sbsms/sbsms.cpp
+        sbsms/slide.cpp
+        sbsms/sms.cpp
+        sbsms/subband.cpp
+        sbsms/track.cpp
+        sbsms/trackpoint.cpp
         ${FLUIDLITE_SOURCES}
 )
 

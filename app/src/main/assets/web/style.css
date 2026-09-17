@@ -1,4 +1,4 @@
-* {
+﻿* {
     -webkit-user-select: none; user-select: none;
     -webkit-tap-highlight-color: transparent;
 }
@@ -496,3 +496,21 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 
 /* ===== Scatter Chart ===== */
 }
+/* ===== DRUM LOOPS ===== */
+.drumloop-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.15;
+    padding: 4px 2px !important;
+    font-size: 15px;
+    font-weight: bold;
+    opacity: 0.35;              /* 默认: 未拉伸完成 (灰) */
+    pointer-events: none;
+}
+.drumloop-bars { font-size: 8px; font-weight: normal; color: #999; }
+.drumloop-btn.ready { opacity: 1; pointer-events: auto; cursor: pointer; }  /* 前0.5s渲染完成 (可播放) */
+.drumloop-btn.full { box-shadow: 0 0 4px rgba(255,255,255,0.35); }  /* 完整渲染完成 */
+.drumloop-btn.btn-active { background: #2e7d32; }
+.drumloop-btn.btn-active .drumloop-bars { color: #cfc; }

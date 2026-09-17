@@ -1,8 +1,11 @@
 #include "AudioEngine.h"
 #include "RhythmAudioEngine.h"
+#include "DrumLoopEngine.h"
 
 // Global rhythm engine for WAV playback
 RhythmAudioEngine* g_rhythmEngine = nullptr;
+// Global drum loop engine (opus → PCM 循环混音)
+DrumLoopEngine* g_drumLoopEngine = nullptr;
 extern float g_bassVolume;
 #include "fluid_sfont.h"
 #include <android/log.h>
@@ -255,6 +258,12 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     // Mix rhythm WAV samples, then soft-clip to prevent hard clipping
     if (g_rhythmEngine) {
         g_rhythmEngine->mixAudio(outBuffer, numFrames);
+        for (int i = 0; i < numFrames * 2; ++i)
+            outBuffer[i] = tanhf(outBuffer[i]);
+    }
+    // Mix drum loops (opus 循环), then soft-clip
+    if (g_drumLoopEngine) {
+        g_drumLoopEngine->mixAudio(outBuffer, numFrames, audioStream->getSampleRate());
         for (int i = 0; i < numFrames * 2; ++i)
             outBuffer[i] = tanhf(outBuffer[i]);
     }

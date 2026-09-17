@@ -14,6 +14,7 @@
 #include "CajonAssistant.h"
 #include "TempoDetector.h"
 #include "BassAssist.h"
+#include "DrumLoopEngine.h"
 
 static AudioEngine audio;
 static MidiProcessor midi;
@@ -26,6 +27,8 @@ static RhythmAudioEngine rhythmEngine;
 CajonAssistant cajon;
 static TempoDetector tempoDetector;
 static BassAssist bassAssist;
+extern DrumLoopEngine* g_drumLoopEngine;
+static DrumLoopEngine drumLoopEngine;
 float g_bassVolume = 0.8f;  // AudioEngine 混音用
 static int assistType = 0;
 float g_minCajonEnergy = 0.0f;
@@ -163,6 +166,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
     // Init rhythm engine BEFORE audio starts (callback needs g_rhythmEngine set)
     g_rhythmEngine = &rhythmEngine;
     cajon.init(&rhythmEngine);
+    g_drumLoopEngine = &drumLoopEngine;
     audio.start();
     // Beat tracker
     auto now = std::chrono::steady_clock::now().time_since_epoch();
@@ -213,7 +217,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
         JNIEnv*, jobject, jint controller, jint value) {
     // CC86 → lead gain (0-6.0)
     if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 5.0); return; }
-    // CC87 → 根据模式路由: type=0 控制 Cajon 音量, type=1 控制自动伴奏音量
+    // CC87 → 根据模式路由: type=0 控制 Cajon 音量, type=1 控制鼓循环/伴奏音量
     if (controller == 87) {
         if (assistType == 0 && g_rhythmEngine) {
             float gain = value / 127.0f * 4.0f;
@@ -890,3 +894,105 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetReverbRoomSize(
 extern "C" JNIEXPORT jdouble JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetReverbLevel(
         JNIEnv*, jobject) { return audio.getReverbLevel(1); }
+
+// ===== Drum Loops (opus → 流式拉伸 → 循环播放) =====
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderStart(
+        JNIEnv* env, jobject, jstring name, jint sampleRate, jfloat ratio, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.renderStart(n, sampleRate, ratio, gen);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderFeed(
+        JNIEnv* env, jobject, jstring name, jshortArray pcm, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    jsize len = env->GetArrayLength(pcm);
+    jshort* elems = env->GetShortArrayElements(pcm, nullptr);
+    int64_t progress = drumLoopEngine.renderFeed(n, (const int16_t*)elems, (int32_t)len, gen);
+    env->ReleaseShortArrayElements(pcm, elems, JNI_ABORT);
+    env->ReleaseStringUTFChars(name, n);
+    return progress;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderFinish(
+        JNIEnv* env, jobject, jstring name, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.renderFinish(n, gen);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderCancelAll(
+        JNIEnv*, jobject) {
+    drumLoopEngine.renderCancelAll();
+}
+
+// ===== Drum Loops: 低质量低延迟 (Signalsmith) =====
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmStart(
+        JNIEnv* env, jobject, jstring name, jint sampleRate, jfloat ratio, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.sgsmStart(n, sampleRate, ratio, gen);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmFeed(
+        JNIEnv* env, jobject, jstring name, jshortArray pcm, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    jsize len = env->GetArrayLength(pcm);
+    jshort* elems = env->GetShortArrayElements(pcm, nullptr);
+    int64_t progress = drumLoopEngine.sgsmFeed(n, (const int16_t*)elems, (int32_t)len, gen);
+    env->ReleaseShortArrayElements(pcm, elems, JNI_ABORT);
+    env->ReleaseStringUTFChars(name, n);
+    return progress;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmFinish(
+        JNIEnv* env, jobject, jstring name, jint gen) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.sgsmFinish(n, gen);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopPlay(
+        JNIEnv* env, jobject, jstring name) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    drumLoopEngine.play(n);
+    env->ReleaseStringUTFChars(name, n);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopStop(
+        JNIEnv*, jobject) {
+    drumLoopEngine.stop();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopClear(
+        JNIEnv*, jobject) {
+    drumLoopEngine.clear();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSetVolume(
+        JNIEnv*, jobject, jfloat volume) {
+    drumLoopEngine.setVolume(volume);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSetRate(
+        JNIEnv*, jobject, jfloat rate) {
+    drumLoopEngine.setRate(rate);
+}

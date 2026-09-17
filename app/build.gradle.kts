@@ -10,7 +10,7 @@ android {
     }
 
     androidResources {
-        noCompress.addAll(listOf("wav", "mp3", "ogg", "sf2"))
+        noCompress.addAll(listOf("wav", "mp3", "ogg", "sf2", "opus"))
     }
 
     defaultConfig {
@@ -19,6 +19,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+
+        // 仅 arm64 (设备 OPPO PLB110); 大幅降低并行编译压力, 避免 clang 并发读取头文件的偶发错误
+        ndk { abiFilters += listOf("arm64-v8a") }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         externalNativeBuild {

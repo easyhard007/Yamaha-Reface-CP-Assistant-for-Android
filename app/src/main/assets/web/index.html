@@ -101,43 +101,36 @@
             <div style="text-align:center; margin:6px 0;">
                 <div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-top:2px;">
                     <div style="display:flex;flex-direction: column;">
-                        <span style="color:#ddd; font-size:8px;"> RHYTHM  ASSIST </span>
-                        <span style="color:#aaa; font-size:10px;">伴奏辅助</span>
+                        <span style="color:#ddd; font-size:8px;">CAJON ASSIST</span>
+                        <span style="color:#aaa; font-size:10px;">箱鼓助手</span>
                     </div>
                     <label class="switch">
                         <input type="checkbox" id="assist-toggle" onchange="onAssistToggle()">
                         <span class="slider"></span>
                     </label>
                     <div style="display:flex;flex-direction: column;">
-                        <span style="color:#ddd; font-size:8px;">AUTO ARRANGER</span>
-                        <span style="color:#aaa; font-size:10px;">自动伴奏</span>
+                        <span style="color:#ddd; font-size:8px;">DRUM LOOPS</span>
+                        <span style="color:#aaa; font-size:10px;">鼓循环</span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 自动伴奏卡片 -->
-        <div class="card" id="style-card" style="display:none;">
-            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">AUTO ARRANGER</div>
-            <h3 style="margin-top:0;">自动伴奏</h3>
-            <div class="glass-btn btn-rect" onclick="loadTestStyle()" id="load-style-btn" style="width:100%; box-sizing:border-box; margin-bottom:4px;">📂 Load Style</div>
-            <div style="display:none; gap:6px; margin-bottom:4px;" id="style-ctrl-row">
-                <div class="glass-btn btn-rect" id="style-tempo-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Tempo:75</div>
-                <div class="glass-btn btn-rect" onclick="onVolBtnClick()" id="style-vol-btn" style="font-size:11px; padding:6px 10px; flex:0 0 auto;">Vol:80%</div>
-                <div class="glass-btn btn-rect" onclick="toggleTestStyle()" id="style-play-btn" style="background:#2e7d32; flex:1; text-align:center;">▶ Start</div>
-            </div>
-            <div id="style-info" style="color:#aaa; font-size:11px; margin-bottom:4px;">点击按钮选择节奏文件并加载</div>
-            <div id="scene-list" style="display:none;">
-                <div id="scene-buttons" style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;"></div>
-                <p style="color:#ccc; font-size:12px; margin:4px 0;">音轨:</p>
-                <div id="track-rows" style="font-size:10px;"></div>
-            </div>
+        <!-- 鼓循环卡片 -->
+        <div class="card" id="drum-card" style="display:none;">
+            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">DRUM LOOPS</div>
+            <h3 style="margin-top:0;">鼓循环</h3>
+            <select id="drumloop-select" onchange="onDrumLoopSelect()" style="width:100%; margin-bottom:8px; background:#222; color:#eee; border:1px solid #444; border-radius:6px; padding:6px;">
+                <option value="">-- 选择鼓循环 --</option>
+            </select>
+            <div id="drumloop-status" style="color:#888; font-size:11px; text-align:center; margin-bottom:8px; min-height:14px;"></div>
+            <div id="drumloop-grid" style="display:none;"></div>
         </div>
 
-        <!-- 伴奏辅助卡片 -->
+        <!-- 箱鼓助手卡片 -->
         <div class="card" id="assist-card">
-            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">RHYTHM ASSISTANT</div>
-            <h3 style="margin-top:0;">伴奏辅助</h3>
+            <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">CAJON ASSIST</div>
+            <h3 style="margin-top:0;">箱鼓助手</h3>
             <div style="text-align:center; margin:8px 0;">
                 <span style="color:#aaa; font-size:10px;">音量</span>
                 <input type="range" id="rhythm-vol" class="energy-range" min="0" max="100" value="0" oninput="onRhythmVol()">
@@ -333,178 +326,8 @@
             if (typeof updateBassWeightMap === 'function')  updateBassWeightMap();
         }
 
-        // ===== Style / Rhythm Test =====
-        window.styleScenes = [];
-        window.styleFileNames = [];
-        window.styleSelectedScene = 0;
-        window.styleTimer = null;
-        window.styleLoadedName = '';
+        // ===== Style / Rhythm Test (已移除: 自动伴奏模式已改为鼓循环模式) =====
 
-        function loadTestStyle() {
-            if (typeof Android === 'undefined') { document.getElementById('style-info').innerText = 'Android only'; return; }
-            try {
-                var listJson = Android.getStyleFileList();
-                window.styleFileNames = JSON.parse(listJson);
-                if (window.styleFileNames.length === 0) { document.getElementById('style-info').innerText = 'No style files'; return; }
-                if (window.styleFileNames.length === 1) { doLoadStyle(0); return; }
-                // Popup overlay
-                var html = '<div style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:2000; display:flex; flex-direction:column; align-items:center; justify-content:center;" onclick="closeStylePopup()">' +
-                    '<div style="background:#1a1a1a; border-radius:12px; padding:16px; max-width:320px; width:90%;" onclick="event.stopPropagation()">' +
-                    '<p style="color:#fff; font-size:14px; margin:0 0 10px 0;">Select Style</p>';
-                for (var i = 0; i < window.styleFileNames.length; i++) {
-                    var name = window.styleFileNames[i].replace(/\.sty$/i, '').replace(/\.STY$/i, '');
-                    html += '<div class="glass-btn btn-rect" onclick="closeStylePopup();doLoadStyle(' + i + ')" style="font-size:12px; padding:6px 10px; margin-bottom:4px; width:100%; box-sizing:border-box;">' + name + '</div>';
-                }
-                html += '<div class="glass-btn btn-rect" onclick="closeStylePopup()" style="font-size:11px; padding:6px 10px; margin-top:6px; width:100%; box-sizing:border-box;">Cancel</div>';
-                html += '</div></div>';
-                var popup = document.createElement('div');
-                popup.id = 'style-popup';
-                popup.innerHTML = html;
-                document.body.appendChild(popup);
-            } catch(e) { document.getElementById('style-info').innerText = 'Error: ' + e.message; }
-        }
-        function closeStylePopup() {
-            var p = document.getElementById('style-popup');
-            if (p) p.remove();
-        }
-        function doLoadStyle(fileIdx) {
-            // 记住当前是否在播放, 然后停掉旧 midi 信号 (但不停止播放线程)
-            var wasPlaying = (typeof Android !== 'undefined' && Android.isStylePlaying());
-            if (wasPlaying) {
-                Android.stopStyle();
-                clearStyleTimer();
-            }
-            document.getElementById('style-info').innerText = 'Loading ' + window.styleFileNames[fileIdx] + ' ...';
-            try {
-                var json = Android.loadStyleFile(fileIdx);
-                var scenes = JSON.parse(json);
-                if (scenes.error) { document.getElementById('style-info').innerText = 'Error: ' + scenes.error; return; }
-                window.styleScenes = scenes;
-                window.styleSelectedScene = 0;
-                Android.selectStyleScene(0);
-                var name = window.styleFileNames[fileIdx].replace(/\.sty$/i, '').replace(/\.STY$/i, '');
-                window.styleLoadedName = name;
-                document.getElementById('load-style-btn').innerText = name;
-                document.getElementById('style-info').innerText = 'Loaded: ' + name + ' (' + scenes.length + ' scenes)';
-                refreshSceneButtons(scenes, 0);
-                refreshTrackRows();
-                document.getElementById('scene-list').style.display = 'block';
-                document.getElementById('style-ctrl-row').style.display = 'flex';
-                buildBeatDots();
-                var bpm = Math.round(Android.getStyleTempo());
-                document.getElementById('style-tempo-btn').innerText = 'Tempo:' + bpm;
-                // 如果之前在播放, 自动恢复
-                if (wasPlaying) {
-                    Android.startStyle();
-                    var btn = document.getElementById('style-play-btn');
-                    btn.style.background = '#c62828'; btn.innerText = '⏹ Stop';
-                    document.getElementById('style-info').innerText = 'Loaded: ' + name + ' | ▶ ' + scenes[0].name + ' (C chord)';
-                    startStyleTimer();
-                } else {
-                    var btn = document.getElementById('style-play-btn');
-                    btn.style.background = '#2e7d32'; btn.innerText = '▶ Start';
-                }
-            } catch(e) { document.getElementById('style-info').innerText = 'Parse error: ' + e.message; }
-        }
-        function refreshSceneButtons(scenes, selectedIdx) {
-            var html = '';
-            for (var i = 0; i < scenes.length; i++) {
-                var s = 'font-size:11px; padding:4px 8px;';
-                if (i === selectedIdx) s += 'border:2px solid #fff; box-shadow:0 0 8px rgba(255,255,255,0.5);';
-                html += '<div id="scene-btn-' + i + '" class="glass-btn btn-rect" onclick="selectScene(' + i + ')" style="' + s + '">' + scenes[i].name + ':' + scenes[i].measures + '</div>';
-            }
-            document.getElementById('scene-buttons').innerHTML = html;
-        }
-        function selectScene(idx) {
-            if (typeof Android === 'undefined') return;
-            window.styleSelectedScene = idx;
-            Android.selectStyleScene(idx);
-            if (!Android.isStylePlaying()) refreshSceneButtons(window.styleScenes, idx);
-        }
-        function toggleTestStyle() {
-            if (typeof Android === 'undefined') return;
-            if (Android.isStylePlaying()) {
-                Android.stopStyle();
-                clearStyleTimer();
-                var btn = document.getElementById('style-play-btn');
-                btn.style.background = '#2e7d32'; btn.innerText = '▶ Start';
-                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' (' + window.styleScenes.length + ' scenes) - Stopped';
-                refreshSceneButtons(window.styleScenes, window.styleSelectedScene);
-                refreshTrackRows();
-            } else {
-                Android.selectStyleScene(window.styleSelectedScene);
-                Android.startStyle();
-                var btn = document.getElementById('style-play-btn');
-                btn.style.background = '#c62828'; btn.innerText = '⏹ Stop';
-                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' | ▶ ' + window.styleScenes[window.styleSelectedScene].name + ' (C chord)';
-                startStyleTimer();
-            }
-        }
-        // Timer
-        function startStyleTimer() { clearStyleTimer(); window.styleTimer = setInterval(pollStyleState, 150); }
-        function clearStyleTimer() { if (window.styleTimer) { clearInterval(window.styleTimer); window.styleTimer = null; } }
-        function pollStyleState() {
-            if (typeof Android === 'undefined' || !Android.isStylePlaying()) {
-                var btn = document.getElementById('style-play-btn');
-                if (btn) { btn.style.background = '#2e7d32'; btn.innerText = '▶ Start'; }
-                document.getElementById('style-info').innerText = 'Loaded: ' + window.styleLoadedName + ' (' + window.styleScenes.length + ' scenes) - Stopped';
-                buildBeatDots(); // 重置所有dot为灰色
-                clearStyleTimer(); refreshTrackRows(); return;
-            }
-            var cur = Android.getCurrentStyleScene(), pend = Android.getPendingStyleScene();
-            for (var i = 0; i < window.styleScenes.length; i++) {
-                var b = document.getElementById('scene-btn-' + i);
-                if (!b) continue;
-                b.style.boxShadow = ''; b.style.border = ''; b.style.animation = '';
-                if (i === cur) { b.style.border = '2px solid #fff'; b.style.boxShadow = '0 0 12px rgba(255,255,255,0.7)'; }
-                else if (i === pend && pend >= 0) { b.style.border = '2px solid #fff'; b.style.animation = 'style-blink 0.5s ease-in-out infinite alternate'; }
-            }
-            updateTrackLEDs();
-            updateBeatDots();
-            updateVolDisplay();
-        }
-        // Track list
-        function refreshTrackRows() {
-            var insts = window.instrumentNames || [];
-            try {
-                var json = Android.getStyleChannels();
-                var channels = JSON.parse(json);
-                if (!channels || !channels.length) { document.getElementById('track-rows').innerHTML = ''; return; }
-                var html = '';
-                for (var i = 0; i < channels.length; i++) {
-                    var ch = channels[i];
-                    // 鼓组 (bank=128) 在 insts 中的偏移: bank 0 在索引 0-127, bank 128 在 128+
-                    var progIdx = (ch.bank === 128) ? (128 + ch.program) : ch.program;
-                    var instName = (insts[progIdx] || ('Prog ' + ch.program));
-                    var extra = ' MSB=' + ch.msb + ' LSB=' + ch.lsb;
-                    if (ch.bank === 128) extra += ' [DRUM]';
-                    else if (ch.msb > 0) extra += ' [→GM b0]';
-                    var volPan = ' <span style="color:#555;">vol:' + ch.vol + ' pan:' + ch.pan + (ch.rev > 0 ? ' rev:' + ch.rev : '') + (ch.cho > 0 ? ' cho:' + ch.cho : '') + '</span>';
-                    html += '<div id="tr-' + ch.channel + '" style="display:flex; align-items:center; gap:4px; padding:2px 0; border-bottom:1px solid #222;">' +
-                        '<div class="glass-btn" onclick="toggleMute(' + ch.channel + ')" id="mute-' + ch.channel +
-                        '" style="font-size:9px; padding:2px 5px; min-width:24px; text-align:center;">M</div>' +
-                        '<span style="color:#ccc; flex:1;">Ch.' + ch.channel + ' ' + instName + extra +
-                        ' (b' + ch.bank + ' p' + ch.program + ')' + volPan + '</span>' +
-                        '<span id="led-' + ch.channel + '" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#666;"></span>' +
-                        '</div>';
-                }
-                document.getElementById('track-rows').innerHTML = html;
-                refreshMuteButtons();
-            } catch(e) {}
-        }
-        function toggleMute(ch) { if (typeof Android !== 'undefined') { Android.toggleMute(ch); refreshMuteButtons(); } }
-        function refreshMuteButtons() {
-            if (typeof Android === 'undefined') return;
-            try {
-                var channels = JSON.parse(Android.getStyleChannels());
-                for (var i = 0; i < channels.length; i++) {
-                    var ch = channels[i].channel;
-                    var btn = document.getElementById('mute-' + ch);
-                    if (!btn) continue;
-                    btn.style.background = Android.isChannelMuted(ch) ? '#c62828' : '';
-                }
-            } catch(e) {}
-        }
         // ——— 节拍器 ———
         function updateBeatDots() {
             if (typeof Android === 'undefined') return;
@@ -645,17 +468,140 @@
         function onAssistToggle() {
             var v = document.getElementById('assist-toggle').checked ? 1 : 0;
             if (typeof Android !== 'undefined') Android.setAssistType(v);
-            document.getElementById('style-card').style.display = v ? 'block' : 'none';
+            document.getElementById('drum-card').style.display = v ? 'block' : 'none';
             document.getElementById('assist-card').style.display = v ? 'none' : 'block';
-            if (v === 1 && !window.styleLoadedName && window.styleFileNames && window.styleFileNames.length > 0) {
-                doLoadStyle(0);
+            if (v === 0) stopDrumLoopPlayback();
+        }
+        // ===== DRUM LOOPS =====
+        window._drumMeta = null;
+        window._drumCurrent = null;
+        var DRUM_COLUMNS = [
+            ['verse', 'VERSE'],
+            ['verse2', 'VERSE 2'],
+            ['prechorus', 'PRE CHORUS'],
+            ['chorus', 'CHORUS'],
+            ['fill', 'FILL']
+        ];
+        function onDrumLoopListJson(json) {
+            var sel = document.getElementById('drumloop-select');
+            sel.innerHTML = '<option value="">-- 选择鼓循环 --</option>';
+            try {
+                JSON.parse(json).forEach(function (n) {
+                    var o = document.createElement('option');
+                    o.value = n; o.text = n;
+                    sel.appendChild(o);
+                });
+            } catch (e) {}
+        }
+        function onDrumLoopSelect() {
+            var folder = document.getElementById('drumloop-select').value;
+            if (!folder) return;
+            stopDrumLoopPlayback();
+            window._drumMeta = null;
+            document.getElementById('drumloop-grid').style.display = 'none';
+            document.getElementById('drumloop-status').innerText = '加载元数据...';
+            if (typeof Android !== 'undefined') Android.selectDrumLoop(folder);
+        }
+        function onDrumLoopMeta(json) {
+            try {
+                var meta = JSON.parse(json);
+                window._drumMeta = meta;
+                var groups = {};
+                DRUM_COLUMNS.forEach(function (c) {
+                    groups[c[0]] = meta.variations
+                        .filter(function (v) { return v.category === c[0]; })
+                        .sort(function (a, b) { return a.index.localeCompare(b.index); });
+                });
+                var m = 0;
+                DRUM_COLUMNS.forEach(function (c) { m = Math.max(m, groups[c[0]].length); });
+                var html = '<div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px;">';
+                DRUM_COLUMNS.forEach(function (c) {
+                    html += '<div style="text-align:center; color:#aaa; font-size:9px; padding:2px 0;">' + c[1] + '</div>';
+                });
+                for (var r = 0; r < m; r++) {
+                    DRUM_COLUMNS.forEach(function (c) {
+                        var v = groups[c[0]][r];
+                        if (v) {
+                            html += '<div class="glass-btn btn-rect drumloop-btn" data-key="' + v.key + '">' +
+                                v.index + '<span class="drumloop-bars">' + v.bars + '小节</span></div>';
+                        } else {
+                            html += '<div style="visibility:hidden;"></div>';
+                        }
+                    });
+                }
+                html += '</div>';
+                var grid = document.getElementById('drumloop-grid');
+                grid.innerHTML = html;
+                grid.style.display = 'block';
+                grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
+                    b.onclick = function () { onDrumLoopBtnClick(b); };
+                    b.classList.add('ready');  // 延迟测试模式: 全部立即可点击
+                });
+                document.getElementById('drumloop-status').innerText = '点击按钮即时渲染播放';
+            } catch (e) {
+                document.getElementById('drumloop-status').innerText = '元数据解析失败';
             }
+        }
+        function onDrumLoopProgress(done, total) {
+            document.getElementById('drumloop-status').innerText = '加载音频 ' + done + '/' + total + ' ...';
+        }
+        function onDrumLoopReady() {
+            document.getElementById('drumloop-status').innerText = '就绪（未渲染的点击后低延迟播放，已渲染的高质量播放）';
+        }
+        function onDrumLoopStretchReset(total) {
+            // 双引擎模式: 所有按钮保持可点击 (状态0走低延迟引擎), 仅清除"完整"标记
+            var grid = document.getElementById('drumloop-grid');
+            grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
+                b.classList.remove('full');
+                b.classList.add('ready');
+            });
+            document.getElementById('drumloop-status').innerText = '高质量渲染 0/' + total;
+        }
+        function onDrumLoopPreRoll(key, ready, total) {
+            var grid = document.getElementById('drumloop-grid');
+            var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
+            if (btn) btn.classList.add('ready');  // 状态1: 高质量已渲染 0.5s
+            document.getElementById('drumloop-status').innerText = '预热 ' + ready + '/' + total;
+        }
+        function onDrumLoopStretched(key, done, total) {
+            var grid = document.getElementById('drumloop-grid');
+            var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
+            if (btn) btn.classList.add('full');  // 状态2: 高质量完整渲染
+            document.getElementById('drumloop-status').innerText = '高质量渲染 ' + done + '/' + total;
+        }
+        function onDrumLoopStretchDone() {
+            document.getElementById('drumloop-status').innerText = '全部渲染完成，点击按钮循环播放';
+        }
+        function onDrumLoopPlaying(key) {
+            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
+        }
+        function onDrumLoopError(msg) {
+            document.getElementById('drumloop-status').innerText = '错误: ' + msg;
+        }
+        function onDrumLoopBtnClick(btn) {
+            if (!btn.classList.contains('ready')) return;  // 预热未完成不可播放
+            var key = btn.getAttribute('data-key');
+            if (window._drumCurrent === key) {
+                if (typeof Android !== 'undefined') Android.stopDrumLoop();
+                btn.classList.remove('btn-active');
+                window._drumCurrent = null;
+            } else {
+                if (typeof Android !== 'undefined') Android.playDrumLoop(key);
+                var grid = document.getElementById('drumloop-grid');
+                grid.querySelectorAll('.drumloop-btn').forEach(function (b) { b.classList.remove('btn-active'); });
+                btn.classList.add('btn-active');
+                window._drumCurrent = key;
+            }
+        }
+        function stopDrumLoopPlayback() {
+            if (window._drumCurrent && typeof Android !== 'undefined') Android.stopDrumLoop();
+            window._drumCurrent = null;
+            var grid = document.getElementById('drumloop-grid');
+            if (grid) grid.querySelectorAll('.drumloop-btn').forEach(function (b) { b.classList.remove('btn-active'); });
         }
         function updateVolDisplay() {
             if (typeof Android === 'undefined') return;
-            window.accompVol = Android.getAccompGain();
             window.leadVol = Android.getLeadGain();
-            document.getElementById('style-vol-btn').innerText = 'Vol:' + Math.round(window.accompVol / 6.0 * 100) + '%';
             var lo = document.getElementById('lead-overlay-btn');
             lo.innerText = 'LEAD OVERLAY  ' + Math.round(window.leadVol / 5.0 * 100) + '%';
         }
@@ -1282,6 +1228,10 @@
         if (typeof initBackground === 'function') initBackground();
         window.isRunning = true;
     };
+    // 初始化鼓循环下拉列表
+    if (typeof Android !== 'undefined' && Android.getDrumLoopList) {
+        onDrumLoopListJson(Android.getDrumLoopList());
+    }
     </script>
 
     <!-- PWA 注册与强制刷新监听 -->

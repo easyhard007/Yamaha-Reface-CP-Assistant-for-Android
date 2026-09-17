@@ -30,6 +30,24 @@ class MainActivity : AppCompatActivity() {
     private var midiOutputPort: android.media.midi.MidiOutputPort? = null
     private var midiDeviceInfoList: List<MidiDeviceInfo> = emptyList()
     private val midiUtil = MidiUtil()
+    private val drumLoopPlayer by lazy {
+        DrumLoopPlayer(
+            this,
+            { code -> js(code) },
+            { name, sr, ratio, gen -> nativeDrumLoopRenderStart(name, sr, ratio, gen) },
+            { name, chunk, gen -> nativeDrumLoopRenderFeed(name, chunk, gen) },
+            { name, gen -> nativeDrumLoopRenderFinish(name, gen) },
+            { name, sr, ratio, gen -> nativeDrumLoopSgsmStart(name, sr, ratio, gen) },
+            { name, chunk, gen -> nativeDrumLoopSgsmFeed(name, chunk, gen) },
+            { name, gen -> nativeDrumLoopSgsmFinish(name, gen) },
+            { nativeDrumLoopRenderCancelAll() },
+            { name -> nativeDrumLoopPlay(name) },
+            { nativeDrumLoopStop() },
+            { nativeDrumLoopClear() },
+            { nativeGetCurrentBpm() }
+        )
+    }
+    private var lastNativeBpm = -1.0
     private lateinit var webView: WebView
     private var isRefaceConnected = false
     private var isConnecting = false
@@ -136,7 +154,11 @@ class MainActivity : AppCompatActivity() {
             { nativeGetReverbLevel() },
             { t, v -> nativeSetHumanize(t, v) },
             { nativeGetHumanizeTiming() },
-            { nativeGetHumanizeVelocity() }
+            { nativeGetHumanizeVelocity() },
+            { drumLoopPlayer.getFolderListJson() },
+            { folder -> drumLoopPlayer.selectFolder(folder) },
+            { v -> drumLoopPlayer.play(v) },
+            { drumLoopPlayer.stop() }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -372,6 +394,12 @@ class MainActivity : AppCompatActivity() {
                 if (pbv >= 0f) {
                     val pct = Math.round(pbv * 100)
                     js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
+                }
+                // BPM 变化 → 触发鼓循环重新拉伸
+                val bpmNow = nativeGetCurrentBpm()
+                if (Math.abs(bpmNow - lastNativeBpm) > 0.05) {
+                    lastNativeBpm = bpmNow
+                    drumLoopPlayer.onBpmChanged(bpmNow)
                 }
                 chordHandler.postDelayed(this, 150)
             }
@@ -661,4 +689,18 @@ class MainActivity : AppCompatActivity() {
     companion object {
         init { System.loadLibrary("cynarranger") }
     }
+
+    // Drum loops (JNI 绑定到 MainActivity 类实例方法, 勿放入 companion object)
+    external fun nativeDrumLoopRenderStart(name: String, sampleRate: Int, ratio: Float, gen: Int): Boolean
+    external fun nativeDrumLoopRenderFeed(name: String, pcm: ShortArray, gen: Int): Long
+    external fun nativeDrumLoopRenderFinish(name: String, gen: Int): Boolean
+    external fun nativeDrumLoopSgsmStart(name: String, sampleRate: Int, ratio: Float, gen: Int): Boolean
+    external fun nativeDrumLoopSgsmFeed(name: String, pcm: ShortArray, gen: Int): Long
+    external fun nativeDrumLoopSgsmFinish(name: String, gen: Int): Boolean
+    external fun nativeDrumLoopRenderCancelAll()
+    external fun nativeDrumLoopPlay(name: String)
+    external fun nativeDrumLoopStop()
+    external fun nativeDrumLoopClear()
+    external fun nativeDrumLoopSetVolume(volume: Float)
+    external fun nativeDrumLoopSetRate(rate: Float)
 }
