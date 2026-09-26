@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -22,6 +23,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
 
@@ -36,10 +38,14 @@ class MainActivity : AppCompatActivity() {
             { code -> js(code) },
             { name, sr, ratio, gen -> nativeDrumLoopRenderStart(name, sr, ratio, gen) },
             { name, chunk, gen -> nativeDrumLoopRenderFeed(name, chunk, gen) },
-            { name, gen -> nativeDrumLoopRenderFinish(name, gen) },
+            { name, gen -> nativeDrumLoopRenderFinishStep(name, gen) },
             { name, sr, ratio, gen -> nativeDrumLoopSgsmStart(name, sr, ratio, gen) },
             { name, chunk, gen -> nativeDrumLoopSgsmFeed(name, chunk, gen) },
-            { name, gen -> nativeDrumLoopSgsmFinish(name, gen) },
+            { name, gen -> nativeDrumLoopSgsmFinishStep(name, gen) },
+            { name -> nativeDrumLoopPromotePending(name) },
+            { name -> nativeDrumLoopRequestSwitch(name) },
+            { ms -> nativeDrumLoopFadeOut(ms) },
+            { nativeDrumLoopSyncBeat() },
             { nativeDrumLoopRenderCancelAll() },
             { name -> nativeDrumLoopPlay(name) },
             { nativeDrumLoopStop() },
@@ -47,7 +53,6 @@ class MainActivity : AppCompatActivity() {
             { nativeGetCurrentBpm() }
         )
     }
-    private var lastNativeBpm = -1.0
     private lateinit var webView: WebView
     private var isRefaceConnected = false
     private var isConnecting = false
@@ -75,6 +80,7 @@ class MainActivity : AppCompatActivity() {
         sysAudio.setStreamVolume(AudioManager.STREAM_MUSIC, (maxVol * 0.9).toInt(), 0)
 
         webView = findViewById(R.id.webView)
+        webView.isHapticFeedbackEnabled = true
         webView.settings.apply {
             javaScriptEnabled = true; domStorageEnabled = true
             allowFileAccess = true; allowContentAccess = true
@@ -121,6 +127,8 @@ class MainActivity : AppCompatActivity() {
             { nativeGetCurrentBeat() },
             { syncBeat() },
             { m -> nativeRequestBpmMult(m) },
+            { delta -> adjustBpm(delta) },
+            { held -> setBpmHold(held) },
             { nativeGetChord() },
             { nativeGetChordNotes() },
             { nativeGetChordTiming() },
@@ -157,8 +165,10 @@ class MainActivity : AppCompatActivity() {
             { nativeGetHumanizeVelocity() },
             { drumLoopPlayer.getFolderListJson() },
             { folder -> drumLoopPlayer.selectFolder(folder) },
-            { v -> drumLoopPlayer.play(v) },
-            { drumLoopPlayer.stop() }
+            { v -> drumLoopPlayer.setPending(v) },
+            { drumLoopPlayer.startPlayback() },
+            { drumLoopPlayer.stopPlayback() },
+            { drumLoopPlayer.stopPlaybackImmediate() }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -348,6 +358,11 @@ class MainActivity : AppCompatActivity() {
     private val chordHandler = Handler(Looper.getMainLooper())
     private var chordRunnable: Runnable? = null
     private val tempoRestoreRunnable = Runnable { js("tempoRestore()") }
+    private val bpmPrepDispatchLock = Any()
+    private var bpmHoldActive = false
+    private var bpmPreparedTargetThisHold = -1.0
+    private var bpmLatestStepTarget = -1.0
+    private var bpmPrepDispatchRevision = 0L
 
     private fun pushSf2List() {
         val arr = JSONArray()
@@ -395,12 +410,19 @@ class MainActivity : AppCompatActivity() {
                     val pct = Math.round(pbv * 100)
                     js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
                 }
-                // BPM 变化 → 触发鼓循环重新拉伸
-                val bpmNow = nativeGetCurrentBpm()
-                if (Math.abs(bpmNow - lastNativeBpm) > 0.05) {
-                    lastNativeBpm = bpmNow
-                    drumLoopPlayer.onBpmChanged(bpmNow)
+                // native 来源的预备变速事件（×2/÷2、CC90）仍通过状态轮询领取。
+                // WebView +/- 会在 adjustBpm() 的同一次桥接调用中直接派发，不经过这里等待。
+                val prepTarget = nativeDrumLoopGetAndClearBpmPrep()
+                if (prepTarget >= 0) startBpmPreparation(prepTarget)
+                // 鼓循环: beat-0 切换事件 / 切换延迟 / 淡出完成
+                val sw = nativeDrumLoopGetAndClearSwitchEvent()
+                if (sw.isNotEmpty()) {
+                    drumLoopPlayer.onSwitchFired(sw)
+                    js("onDrumLoopSwitchEvent('$sw')")
                 }
+                val lat = nativeDrumLoopGetAndClearLatencyMs()
+                if (lat >= 0) js("onDrumLoopLatency(${lat.toLong()})")
+                if (nativeDrumLoopGetAndClearStoppedEvent() != 0) js("onDrumLoopStopped()")
                 chordHandler.postDelayed(this, 150)
             }
         }
@@ -578,6 +600,81 @@ class MainActivity : AppCompatActivity() {
     private fun stopStyle() { nativeStopStyle() }
     private fun isStylePlaying(): Boolean = nativeIsStylePlaying()
     private fun syncBeat() { nativeSyncBeat() }
+
+    /**
+     * 把已经确定的 BPM 目标放到主线程立即开始预备渲染。
+     * revision 只合并尚未执行的直接派发任务；它没有定时等待，也不会影响 native 来源的轮询。
+     */
+    private fun dispatchBpmPreparation(target: Double) {
+        val revision = synchronized(bpmPrepDispatchLock) {
+            bpmPrepDispatchRevision += 1
+            bpmPrepDispatchRevision
+        }
+        chordHandler.post {
+            val isLatest = synchronized(bpmPrepDispatchLock) {
+                revision == bpmPrepDispatchRevision
+            }
+            if (!isLatest) return@post
+            startBpmPreparation(target)
+        }
+    }
+
+    /** 只有预备流程真正启动后才向 native 确认，拍头才允许采用这个目标。 */
+    private fun startBpmPreparation(target: Double) {
+        drumLoopPlayer.onBpmChangePreparing(target)
+        nativeBpmPrepStarted(target)
+    }
+
+    private fun adjustBpm(delta: Int): Double {
+        val target = nativeRequestBpmDelta(delta)
+        if (target >= 0.0) {
+            val prepareNow = synchronized(bpmPrepDispatchLock) {
+                bpmLatestStepTarget = target
+                if (!bpmHoldActive) {
+                    true
+                } else if (bpmPreparedTargetThisHold < 0.0) {
+                    // 长按的第一个目标立即准备；后续 50 ms 步进只更新最终目标。
+                    bpmPreparedTargetThisHold = target
+                    true
+                } else {
+                    // 若主线程连 500 ms 都尚未执行首个任务，它已过时；松手时只派发最终目标。
+                    bpmPrepDispatchRevision += 1
+                    false
+                }
+            }
+            if (prepareNow) dispatchBpmPreparation(target)
+            // 使用系统键盘点击触感，尊重设备的全局触感反馈设置。
+            webView.post { webView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP) }
+        }
+        return target
+    }
+
+    private fun setBpmHold(held: Boolean) {
+        // 先更新 native 锁；JS 会等待本次桥接返回后才发送第一次 +/- 步进。
+        nativeSetBpmHold(held)
+
+        var finalTarget = -1.0
+        synchronized(bpmPrepDispatchLock) {
+            if (held) {
+                bpmHoldActive = true
+                bpmPreparedTargetThisHold = -1.0
+                bpmLatestStepTarget = -1.0
+            } else {
+                if (bpmHoldActive && bpmLatestStepTarget >= 0.0 &&
+                    (bpmPreparedTargetThisHold < 0.0 ||
+                        abs(bpmLatestStepTarget - bpmPreparedTargetThisHold) >= 0.001)
+                ) {
+                    finalTarget = bpmLatestStepTarget
+                }
+                bpmHoldActive = false
+                bpmPreparedTargetThisHold = -1.0
+                bpmLatestStepTarget = -1.0
+            }
+        }
+
+        // 松手后立即为长按期间合并出的最终目标启动一次预备流程。
+        if (!held && finalTarget >= 0.0) dispatchBpmPreparation(finalTarget)
+    }
     private fun dumpStyleDebug(): String {
         if (styleFiles.isEmpty()) return "No style loaded"
         val sty = File(cacheDir, styleFiles[0])
@@ -593,6 +690,7 @@ class MainActivity : AppCompatActivity() {
     private fun getPendingStyleScene(): Int = nativeGetPendingScene()
 
     override fun onDestroy() {
+        nativeSetBpmHold(false)
         super.onDestroy()
         closeMidiDevice()
     }
@@ -651,6 +749,9 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()
     external fun nativeRequestBpmMult(mult: Int)
+    external fun nativeRequestBpmDelta(delta: Int): Double
+    external fun nativeSetBpmHold(held: Boolean)
+    external fun nativeBpmPrepStarted(target: Double): Boolean
     external fun nativeGetBeatIndex(): Int
     external fun nativeSetAccompVolume(vol: Double)
     external fun nativeSetLeadVolume(vol: Double)
@@ -693,10 +794,19 @@ class MainActivity : AppCompatActivity() {
     // Drum loops (JNI 绑定到 MainActivity 类实例方法, 勿放入 companion object)
     external fun nativeDrumLoopRenderStart(name: String, sampleRate: Int, ratio: Float, gen: Int): Boolean
     external fun nativeDrumLoopRenderFeed(name: String, pcm: ShortArray, gen: Int): Long
-    external fun nativeDrumLoopRenderFinish(name: String, gen: Int): Boolean
+    external fun nativeDrumLoopRenderFinishStep(name: String, gen: Int): Long
     external fun nativeDrumLoopSgsmStart(name: String, sampleRate: Int, ratio: Float, gen: Int): Boolean
     external fun nativeDrumLoopSgsmFeed(name: String, pcm: ShortArray, gen: Int): Long
-    external fun nativeDrumLoopSgsmFinish(name: String, gen: Int): Boolean
+    external fun nativeDrumLoopSgsmFinishStep(name: String, gen: Int): Long
+    external fun nativeDrumLoopPromotePending(name: String): Boolean
+    external fun nativeDrumLoopRequestSwitch(name: String)
+    external fun nativeDrumLoopFadeOut(durationMs: Int)
+    external fun nativeDrumLoopSyncBeat()
+    external fun nativeDrumLoopIsPlaying(): Boolean
+    external fun nativeDrumLoopGetAndClearSwitchEvent(): String
+    external fun nativeDrumLoopGetAndClearLatencyMs(): Double
+    external fun nativeDrumLoopGetAndClearBpmPrep(): Double
+    external fun nativeDrumLoopGetAndClearStoppedEvent(): Int
     external fun nativeDrumLoopRenderCancelAll()
     external fun nativeDrumLoopPlay(name: String)
     external fun nativeDrumLoopStop()

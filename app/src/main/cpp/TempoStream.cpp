@@ -54,10 +54,11 @@ struct TempoStream::Impl {
         : sampleRate(sr), ratio(r),
           ratioA((double)kProcessRate / (double)sr),
           ratioB((double)sr / (double)kProcessRate) {
-        // 单次 read(512): 最多消费 512×ratio 输入 + 启动预填充/预采样余量
-        margin0 = (double)quality.getMaxPresamples() +
-                  (double)quality.getFrameSize() * 2.0 +
-                  512.0 * (double)ratio + 512.0;
+        // 单次 read(512) 的最大输入消耗实测 ~22272 帧 (启动预填充 + 轨道再同步),
+        // 余量不足会导致 sbsms 零填充 (输出数字静音段), 故取 1.5 倍安全系数
+        margin0 = ((double)quality.getMaxPresamples() +
+                   (double)quality.getFrameSize() * 2.0 +
+                   512.0 * (double)ratio + 512.0) * 1.5;
         readBlock.resize(512 * 2);
     }
 };
@@ -72,18 +73,33 @@ public:
     // sbsms 拉取 44.1k 输入帧: 从 48k inBuf 线性插值
     long samples(_sbsms_::audio* buf, long n) override {
         const size_t inAvail = p->inBuf.size() / 2;
+
+        // 关键修改：如果本次请求无法被完整满足，且输入还没结束，
+        // 直接返回 0，绝不返回部分数据。
+        // 否则 sbsms 会用零填充请求中未满足的部分，把零当成真实输入
+        // 送进相位声码器，输出端就会出现约 100ms 的静音/卡顿。
+        if (!p->finished) {
+            // 计算本次请求需要的最后一个输入帧位置（48k 空间）
+            const double lastInPos = (p->aOutPos + (double)(n - 1)) / p->ratioA;
+            const size_t lastIp = (size_t)lastInPos;
+            if (lastIp + 1 >= inAvail) {
+                return 0;  // aOutPos 不变，等下次 feed 后再来
+            }
+        }
+
         long produced = 0;
         for (long i = 0; i < n; i++) {
             const double inPos = (p->aOutPos + (double)produced) / p->ratioA;
             const size_t ip = (size_t)inPos;
             if (ip + 1 >= inAvail) {
+                // 到这里说明 p->finished == true，且已经读到尾部
                 if (p->finished && ip < inAvail) {
                     buf[i][0] = p->inBuf[ip * 2];
                     buf[i][1] = p->inBuf[ip * 2 + 1];
                     produced++;
                     continue;
                 }
-                break;
+                break;  // 真正的输入结束
             }
             const float frac = (float)(inPos - (double)ip);
             buf[i][0] = p->inBuf[ip * 2] + (p->inBuf[ip * 2 + 2] - p->inBuf[ip * 2]) * frac;

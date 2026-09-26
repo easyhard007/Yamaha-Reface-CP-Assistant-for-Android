@@ -470,6 +470,45 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
             border-right: none !important; /* 竖屏下移除右侧分割线 */
     }
 
+/* ===== BPM controls ===== */
+.bpm-side {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+.bpm-side-left { justify-content: flex-end; padding-right: 4px; }
+.bpm-side-right { justify-content: flex-start; padding-left: 4px; }
+.bpm-step-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 28px;
+    min-width: 28px;
+    height: 28px;
+    margin: 2px 0 0;
+    padding: 0;
+    border: 1px solid #555;
+    border-radius: 6px;
+    background: #2b2b2b;
+    color: #eee;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 26px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+}
+.bpm-step-btn.pressing,
+.bpm-step-btn:active {
+    background: #555;
+    border-color: #aaa;
+    transform: scale(0.94);
+}
+
 /* ===== BPM Flash ===== */
 @keyframes bpmFlash {
     0%   { color: #ffd700; text-shadow: 0 0 12px #ffd700; }
@@ -497,6 +536,20 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 /* ===== Scatter Chart ===== */
 }
 /* ===== DRUM LOOPS ===== */
+#drum-play-btn {
+    background: #2e7d32;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+#drum-play-btn.drum-play-stop { background: #c62828; }
+#drum-play-btn.drum-play-disabled {
+    background: #4a4a4a;
+    color: #8b8b8b;
+    cursor: default;
+    opacity: 0.72;
+    pointer-events: none;
+}
 .drumloop-btn {
     display: flex;
     flex-direction: column;
@@ -506,11 +559,15 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     padding: 4px 2px !important;
     font-size: 15px;
     font-weight: bold;
-    opacity: 0.35;              /* 默认: 未拉伸完成 (灰) */
-    pointer-events: none;
+    opacity: 1;
+    cursor: pointer;
 }
 .drumloop-bars { font-size: 8px; font-weight: normal; color: #999; }
-.drumloop-btn.ready { opacity: 1; pointer-events: auto; cursor: pointer; }  /* 前0.5s渲染完成 (可播放) */
-.drumloop-btn.full { box-shadow: 0 0 4px rgba(255,255,255,0.35); }  /* 完整渲染完成 */
-.drumloop-btn.btn-active { background: #2e7d32; }
-.drumloop-btn.btn-active .drumloop-bars { color: #cfc; }
+.drumloop-btn.full { box-shadow: 0 0 4px rgba(255,255,255,0.35); }  /* 高质量完整渲染标记 */
+.drumloop-btn.drum-active { background: #2e7d32; }                   /* 实心: 正在播放 */
+.drumloop-btn.drum-active .drumloop-bars { color: #cfc; }
+.drumloop-btn.drum-blink { animation: drumblink 0.7s ease-in-out infinite alternate; }  /* 闪烁: 待播放 */
+@keyframes drumblink {
+    from { box-shadow: 0 0 2px rgba(255,255,255,0.2); background: rgba(255,255,255,0.10); }
+    to   { box-shadow: 0 0 8px rgba(255,255,255,0.8); background: rgba(255,255,255,0.35); }
+}

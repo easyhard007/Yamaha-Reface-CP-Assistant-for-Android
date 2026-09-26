@@ -1,7 +1,9 @@
 #include <jni.h>
 #include <string>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <mutex>
 #include <android/log.h>
 #include "AudioEngine.h"
@@ -39,12 +41,26 @@ static std::atomic<int> g_pendingTempoHighlight{0};
 static std::atomic<int> g_pendingScatterUpdate{0};
 static std::atomic<int> g_pendingTempoFlash{0};
 
+// ===== 鼓循环: beat-0 切换请求 =====
+static std::mutex g_drumSwitchMutex;
+static std::string g_pendingDrumSwitch;           // 待切换 variation (下一小节第一拍触发)
+static std::string g_drumSwitchEventName;         // 已触发的切换名 (Kotlin 轮询)
+static std::atomic<int> g_drumSwitchEvent{0};
+
 // 相位调试
 static std::atomic<double> g_measureStartMs{0};
 static bool g_syncJustTriggered = false;
 static std::atomic<int> g_pendingChordUpdate{0};
 static std::atomic<float> g_pendingBassVolUpdate{-1.0f};
-static std::atomic<int> g_pendingBpmMult{0};  // 2=×2, -2=÷2, 0=无
+static std::atomic<int> g_bpmPrepPending{0};      // 1 = 预备变速, 等待第一拍应用
+static std::atomic<double> g_bpmPrepTarget{0.0};  // 目标 BPM
+static std::atomic<int> g_bpmPrepEvent{0};        // native 来源待 Kotlin 轮询的预备请求
+static std::mutex g_bpmPrepMutex;                 // 串行化连续 +/- 与拍头应用
+static uint64_t g_measureSerial = 0;              // 已开始的小节序号 (由 step 0 递增)
+static uint64_t g_bpmPrepEarliestMeasure = 0;     // 最早允许正式变速的小节序号
+static bool g_bpmAdjustHeld = false;              // +/- 指针按住期间禁止拍头正式变速
+static bool g_bpmPrepDispatched = false;          // Kotlin 已为最新目标启动预备流程
+static constexpr double kBpmPrepTailFraction = 0.125;
 static std::string g_chordDisplayStr;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
@@ -60,6 +76,43 @@ static std::mutex energyMutex;
 // ===== C++ → Kotlin push 通道 =====
 static JavaVM* g_jvm = nullptr;
 static jobject g_activityObj = nullptr;
+
+static double clampBpm(double bpm) {
+    if (bpm < 30.0) return 30.0;
+    if (bpm > 300.0) return 300.0;
+    return bpm;
+}
+
+static double steadyNowMs() {
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
+    return std::chrono::duration<double, std::milli>(now).count();
+}
+
+// 必须在 g_bpmPrepMutex 内调用。预备发生在小节最后 1/8 时，跳过紧邻的拍头。
+static uint64_t calculateBpmPrepEarliestMeasureLocked() {
+    const double bpm = beatTracker.getCurrentBpm();
+    const double measureMs = bpm > 0.0 ? 240000.0 / bpm : 0.0; // 当前调度固定 4/4
+    const double startMs = g_measureStartMs.load();
+    const double elapsedMs = steadyNowMs() - startMs;
+    const bool inTailWindow = startMs <= 0.0 || measureMs <= 0.0 || elapsedMs < 0.0 ||
+        elapsedMs >= measureMs * (1.0 - kBpmPrepTailFraction);
+    return g_measureSerial + (inTailWindow ? 2u : 1u);
+}
+
+// g_bpmPrepMutex 必须由调用者持有。notifyKotlin=false 用于 WebView +/- 的同步桥接路径：
+// MainActivity 会在同一次调用链中立即派发预备流程，无需等待 150 ms 状态轮询。
+static void setBpmPrepTargetLocked(double target, bool notifyKotlin = true) {
+    g_bpmPrepTarget.store(clampBpm(target));
+    g_bpmPrepPending.store(1);
+    g_bpmPrepEvent.store(notifyKotlin ? 1 : 0);
+    g_bpmPrepDispatched = false;
+    g_bpmPrepEarliestMeasure = calculateBpmPrepEarliestMeasureLocked();
+}
+
+static void requestBpmPrep(double target) {
+    std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+    setBpmPrepTargetLocked(target);
+}
 
 static void pushSustainToKotlin(int cc) {
     if (!g_jvm || !g_activityObj || cc < 0) return;
@@ -104,21 +157,63 @@ static void pushEnergyDisplayUpdate() {
 }
 
 static void onBeatStep(int step, double bpm, void*) {
-    // ×2/÷2 请求: 在小节第一拍时先重设 tempo 再触发第一拍
+    const double ms = steadyNowMs();
+    // 预备变速只能在满足锁和安全窗口条件的第一拍正式执行。
     if (step == 0) {
-        int mult = g_pendingBpmMult.exchange(0);
-        if (mult == 2 || mult == -2) {
-            double cur = beatTracker.getCurrentBpm();
-            double newBpm = (mult == 2) ? cur * 2.0 : std::ceil(cur / 2.0);
-            beatTracker.setTempo(newBpm);
-            g_pendingBpmUpdate.store(newBpm);
+        double target = -1.0;
+        bool deferBpmSwitch = false;
+        bool held = false;
+        bool dispatched = false;
+        uint64_t measureSerial = 0;
+        uint64_t earliestMeasure = 0;
+        {
+            std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+            measureSerial = ++g_measureSerial;
+            g_measureStartMs.store(ms);
+            if (g_bpmPrepPending.load()) {
+                held = g_bpmAdjustHeld;
+                dispatched = g_bpmPrepDispatched;
+                earliestMeasure = g_bpmPrepEarliestMeasure;
+                deferBpmSwitch = held || !dispatched || measureSerial < earliestMeasure;
+                if (!deferBpmSwitch) {
+                    g_bpmPrepPending.store(0);
+                    g_bpmPrepDispatched = false;
+                    target = g_bpmPrepTarget.load();
+                }
+            }
+        }
+
+        // BPM 仍被长按锁/末尾安全窗推迟时，同一次预备产生的 variation 切换也必须保留。
+        // 否则会把尚未完成的目标速度缓冲切到播放槽，随后又被下一次长按请求取消。
+        if (!deferBpmSwitch) {
+            std::lock_guard<std::mutex> lk(g_drumSwitchMutex);
+            if (!g_pendingDrumSwitch.empty()) {
+                std::string sw = g_pendingDrumSwitch;
+                g_pendingDrumSwitch.clear();
+                if (g_drumLoopEngine) {
+                    g_drumLoopEngine->play(sw);
+                    g_drumSwitchEventName = sw;
+                    g_drumSwitchEvent.store(1);
+                    __android_log_print(ANDROID_LOG_INFO, "DrumLoop",
+                                        "beat-0 switch to %s", sw.c_str());
+                }
+            }
+        } else {
             __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
-                "BPM mult %d: %.1f → %.1f", mult, cur, newBpm);
+                                "BPM deferred at beat-0: held=%d dispatched=%d measure=%llu earliest=%llu",
+                                held ? 1 : 0, dispatched ? 1 : 0,
+                                (unsigned long long)measureSerial,
+                                (unsigned long long)earliestMeasure);
+        }
+        if (target >= 0.0) {
+            beatTracker.setTempo(target);
+            stylePlayer.setTempoBPM(target);
+            g_pendingBpmUpdate.store(target);
+            __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                                "BPM applied at beat-0: %.1f", target);
         }
     }
     int bassVel = cajon.processStep(step, bpm);
-    auto now = std::chrono::steady_clock::now().time_since_epoch();
-    double ms = std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 
     float autoEnergy = cajon.updateEnergy(ms, beatTracker.getCurrentBpm());
     float energy = std::max(autoEnergy, g_minCajonEnergy);
@@ -131,8 +226,6 @@ static void onBeatStep(int step, double bpm, void*) {
     pushEnergyDisplayUpdate();
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
-    // beat 0 开始时重置计时器
-    if (step % 32 == 0) g_measureStartMs.store(ms);
 }
 
 // REMOVED: updateCajonEnergy moved to CajonAssistant
@@ -262,11 +355,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
             }
             double ratio = std::pow(1.5, std::copysign(std::pow(std::abs(x), 1.4), x));
             double newBpm = std::round(baseBpm * ratio);
-            if (newBpm < 30.0) newBpm = 30.0;
-            if (newBpm > 300.0) newBpm = 300.0;
-            beatTracker.setTempo(newBpm);
-            stylePlayer.setTempoBPM(newBpm);
-            g_pendingBpmUpdate.store(newBpm);
+            // 预备变速: 每次旋转都更新目标并触发预备 (不在旋转时立即应用)
+            requestBpmPrep(newBpm);
         }
         lastTouch = nowSec;
         g_pendingTempoHighlight.store(1); // 每次 CC90 都重置 Kotlin 计时器
@@ -685,7 +775,68 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeRequestBpmMult(
         JNIEnv*, jobject, jint mult) {
-    g_pendingBpmMult.store(mult);
+    // 预备变速: 立即计算目标 BPM 并通知 Kotlin 提前重置渲染,
+    // 实际的 BPM 变更在节拍器第一拍由 onBeatStep 应用
+    std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+    double cur = g_bpmPrepPending.load()
+        ? g_bpmPrepTarget.load()
+        : beatTracker.getCurrentBpm();
+    double target;
+    if (mult == 2) target = cur * 2.0;
+    else if (mult == -2) target = std::ceil(cur / 2.0);
+    else target = cur;
+    target = clampBpm(target);
+    setBpmPrepTargetLocked(target);
+    __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                        "BPM prep: mult %d → target %.1f (apply at beat-0)", mult, target);
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeRequestBpmDelta(
+        JNIEnv*, jobject, jint delta) {
+    if (delta != -1 && delta != 1) return -1.0;
+
+    double target;
+    bool applyImmediately;
+    {
+        std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+        // 连续点击/长按时从尚未生效的目标继续累加，而不是反复读取旧 BPM。
+        double base = g_bpmPrepPending.load()
+            ? g_bpmPrepTarget.load()
+            : std::round(beatTracker.getCurrentBpm());
+        target = clampBpm(base + (double)delta);
+        if (std::abs(target - base) < 0.001) return -1.0; // 已到 30/300 边界
+
+        applyImmediately = !drumLoopEngine.isPlaying();
+        // +/- 由 MainActivity 在 adjustBpm() 返回后直接启动预备渲染；不要再写入轮询事件，
+        // 否则同一目标会在最多 150 ms 后被重复处理。新目标也会覆盖尚未领取的旧事件。
+        setBpmPrepTargetLocked(target, false);
+        if (applyImmediately) {
+            g_bpmPrepPending.store(0);
+            g_bpmPrepEarliestMeasure = 0;
+        }
+    }
+
+    if (applyImmediately) {
+        beatTracker.setTempo(target);
+        stylePlayer.setTempoBPM(target);
+        g_pendingBpmUpdate.store(target);
+        __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                            "BPM delta %+d applied immediately → %.1f", delta, target);
+    } else {
+        __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                            "BPM delta %+d prepared → %.1f (apply at beat-0)", delta, target);
+    }
+    return target;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBpmHold(
+        JNIEnv*, jobject, jboolean held) {
+    std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+    g_bpmAdjustHeld = held == JNI_TRUE;
+    __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                        "BPM hold lock: %s", g_bpmAdjustHeld ? "on" : "off");
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -918,13 +1069,113 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderFeed(
     return progress;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderFinish(
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRenderFinishStep(
         JNIEnv* env, jobject, jstring name, jint gen) {
     const char* n = env->GetStringUTFChars(name, nullptr);
-    bool ok = drumLoopEngine.renderFinish(n, gen);
+    int64_t r = drumLoopEngine.renderFinishStep(n, gen);
+    env->ReleaseStringUTFChars(name, n);
+    return r;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopPromotePending(
+        JNIEnv* env, jobject, jstring name) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.promotePending(n);
     env->ReleaseStringUTFChars(name, n);
     return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// ===== 鼓循环: 播放控制 (beat-0 切换 / 淡出 / 延迟测量) =====
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopRequestSwitch(
+        JNIEnv* env, jobject, jstring name) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    std::lock_guard<std::mutex> lk(g_drumSwitchMutex);
+    g_pendingDrumSwitch = n;
+    env->ReleaseStringUTFChars(name, n);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopFadeOut(
+        JNIEnv*, jobject, jint durationMs) {
+    drumLoopEngine.fadeOut(durationMs);
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopIsPlaying(
+        JNIEnv*, jobject) {
+    return drumLoopEngine.isPlaying() ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearSwitchEvent(
+        JNIEnv* env, jobject) {
+    if (g_drumSwitchEvent.exchange(0)) {
+        std::lock_guard<std::mutex> lk(g_drumSwitchMutex);
+        return env->NewStringUTF(g_drumSwitchEventName.c_str());
+    }
+    return env->NewStringUTF("");
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearLatencyMs(
+        JNIEnv*, jobject) {
+    return (jdouble)drumLoopEngine.getAndClearLatencyMs();
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearBpmPrep(
+        JNIEnv*, jobject) {
+    // native 来源（×2/÷2、CC90）的预备变速事件: 返回目标 BPM; -1 = 无。
+    // 这里只领取事件；Kotlin 真正启动预备流程后再调用 nativeBpmPrepStarted() 确认。
+    std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+    if (g_bpmPrepEvent.exchange(0)) {
+        return (jdouble)g_bpmPrepTarget.load();
+    }
+    return -1.0;
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeBpmPrepStarted(
+        JNIEnv*, jobject, jdouble target) {
+    std::lock_guard<std::mutex> lk(g_bpmPrepMutex);
+    const double latestTarget = g_bpmPrepTarget.load();
+    if (std::abs(latestTarget - (double)target) >= 0.001) {
+        __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                            "Ignore stale BPM prep ack: %.1f (latest %.1f)",
+                            (double)target, latestTarget);
+        return JNI_FALSE;
+    }
+
+    // 防止直接派发的 +/- 与尚在队列中的轮询事件重复处理同一目标。
+    g_bpmPrepEvent.store(0);
+    if (g_bpmPrepPending.load()) {
+        // 以渲染流程实际启动的时刻再次检查最后 1/8 安全窗。
+        g_bpmPrepEarliestMeasure = std::max(
+            g_bpmPrepEarliestMeasure, calculateBpmPrepEarliestMeasureLocked());
+        g_bpmPrepDispatched = true;
+    }
+    __android_log_print(ANDROID_LOG_INFO, "BeatTracker",
+                        "BPM prep started: %.1f pending=%d earliest=%llu",
+                        latestTarget, g_bpmPrepPending.load(),
+                        (unsigned long long)g_bpmPrepEarliestMeasure);
+    return JNI_TRUE;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearStoppedEvent(
+        JNIEnv*, jobject) {
+    return drumLoopEngine.getAndClearStoppedEvent();
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSyncBeat(
+        JNIEnv*, jobject) {
+    // 鼓循环模式: 同步节拍器到第一拍 (播放开始时调用, 让节拍点从第一拍亮起)
+    beatTracker.sync();
 }
 
 extern "C" JNIEXPORT void JNICALL
@@ -956,13 +1207,13 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmFeed(
     return progress;
 }
 
-extern "C" JNIEXPORT jboolean JNICALL
-Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmFinish(
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSgsmFinishStep(
         JNIEnv* env, jobject, jstring name, jint gen) {
     const char* n = env->GetStringUTFChars(name, nullptr);
-    bool ok = drumLoopEngine.sgsmFinish(n, gen);
+    int64_t r = drumLoopEngine.sgsmFinishStep(n, gen);
     env->ReleaseStringUTFChars(name, n);
-    return ok ? JNI_TRUE : JNI_FALSE;
+    return r;
 }
 
 extern "C" JNIEXPORT void JNICALL

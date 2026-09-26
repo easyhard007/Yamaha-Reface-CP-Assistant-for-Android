@@ -1,110 +1,118 @@
 # Yamaha Reface CP Assistant for Android
 
-A native Android assistant app for the **Yamaha Reface CP** keyboard. It connects to the instrument over MIDI and provides real-time chord detection, pitch transposition, smart auto-sustain, bass enhancement, a Cajon rhythm engine with auto-accompaniment, beat tracking with tap tempo, and SoundFont-based audio playback — all driven by a low-latency native audio engine ([Oboe](https://github.com/google/oboe)) and an embedded WebView UI.
+A native Android companion app for the **Yamaha Reface CP**. It connects to the keyboard through Android MIDI, analyzes notes, chords, key, tempo, and beat position in real time, and combines that information with a low-latency native audio engine.
 
-This project is an Android port/packaging of the web-based [Yamaha-Reface-CP-Assistant](references/Yamaha-Reface-CP-Assistant), rebuilt with a Kotlin + JNI/C++ native audio stack.
+The current app has two performance modes:
+
+- **Drum Loops (default)** — plays packaged stereo Opus drum-loop variations, time-stretched to the current BPM, with beat-aligned section changes.
+- **Cajon Assistant** — the mode previously called “Accompany Assist”; it keeps the original procedural Cajon groove and chord-driven bass assistant.
+
+The former Yamaha `.sty` **Auto-Accompaniment** UI has been replaced by Drum Loops. Its parser and playback engine remain in the source tree as legacy/reference code, but it is not a current user-facing mode.
+
+This project is based on the web version of [Yamaha-Reface-CP-Assistant](references/Yamaha-Reface-CP-Assistant) and is rebuilt around Kotlin, JNI/C++, [Oboe](https://github.com/google/oboe), FluidLite, and a WebView UI.
 
 ## Features
 
-- 🎹 **Real-time chord detection** — weighted chroma vector template matching with 17 chord types, slash-chord support.
-- 🥁 **Cajon rhythm engine** — procedurally generated cajon grooves (bass/tone/tip/slap) with velocity-sensitive round-robin samples and independent per-instrument reverb/EQ.
-- 🎸 **Bass assist** — chord-root-driven bass synth with damp/mute articulation, chord-note probability selection, and energy-dependent dynamics.
-- 🎵 **Auto-accompaniment** — style-based backing tracks with scene switching (intro/main/fill/ending).
-- ⏱️ **Beat tracking & tempo detection** — PLL-based tempo detection with fence-template phase analysis and real-time BPM display on a scrolling scatter plot.
-- 👆 **Tap tempo** — tap the sync-zone to set tempo manually; auto-starts rhythm at 50% volume.
-- 🔁 **Transpose** — seamless pitch transposition without affecting the played notes.
-- ✂️ **Split point** — adjustable keyboard split point.
-- 🦶 **Auto-Sustain** — a smart auto-pedal that holds notes musically.
-- 🔊 **Bass Enhance** — adds a synthesized bass layer to enrich the low end.
-- 🎼 **SoundFont (`.sf2`) playback** — high-quality instrument sound rendered through the native Oboe audio engine (FluidLite).
-- 🖥️ **Virtual piano** — on-screen keyboard with real-time note display.
+- 🥁 **Drum Loops** — packaged song sections such as Verse, Verse 2, Pre-Chorus, Chorus, and Fill, with a pending/playing state and next-measure switching.
+- ⚡ **Responsive loop loading** — Android MediaCodec decodes Opus; Signalsmith Stretch provides an immediate low-latency version while SBSMS renders a higher-quality version in the background.
+- 🔄 **Tempo matching** — loop audio is time-stretched to the current BPM without intentionally changing pitch. The BPM display has −/+ controls (tap for one step, hold to repeat with system haptics); a −/+ press starts preparation immediately instead of waiting for the UI polling cycle, while the multiplier and hardware knob use the native event path. During playback the prepared tempo is applied only at a safe measure boundary.
+- 🎚️ **Smooth playback transitions** — short crossfades between variations, loop-boundary fades, a one-second stop fade, and switch-latency reporting.
+- 🪘 **Cajon Assistant** — procedurally generated bass/tone/tip/slap hits using velocity layers and round-robin WAV samples.
+- 🎸 **Bass Assist** — chord-driven bass with damp/mute articulation, energy-dependent dynamics, and a dedicated bass SoundFont.
+- 🎹 **Real-time chord and key detection** — weighted chroma template matching, slash-chord support, chord tones, and scale/roman-numeral analysis.
+- ⏱️ **Beat tracking and tempo detection** — 32nd-note scheduling, tap tempo, BPM display, and a scrolling note/tempo scatter plot.
+- 🦶 **Smart Auto-Sustain** — automatically holds notes and briefly releases the pedal when a harmonic collision is detected.
+- 🔊 **Bass Enhance** — sends a weighted lower-octave layer back to the Reface CP.
+- 🔁 **Transpose and split point** — Reface CP SysEx transposition and an adjustable analysis split point.
+- 🎼 **SoundFont lead overlay** — selectable FluidLite instruments mixed through the native Oboe output.
+- 🖥️ **Virtual piano** — live note, pedal, chord, and performance-state visualization.
 
 ## Requirements
 
-- Android device with **MIDI support** (`android.software.midi`), running **Android 8.1 (API 27)** or higher.
-- A USB/MIDI connection to the Yamaha Reface CP (a USB-OTG cable is typically required).
-- Android Studio (with NDK & CMake 3.22.1) for building from source.
+- An Android device with `android.software.midi`, running **Android 8.1 (API 27)** or later.
+- A USB/MIDI connection to the Yamaha Reface CP; a USB-OTG adapter is typically required.
+- An **arm64-v8a** device for the current build configuration.
+- Android Studio with the Android NDK and CMake 3.22.1 when building from source.
 
-## ⚠️ Manual SoundFont Setup (Required)
+## Manual SoundFont Setup (Required)
 
-The SoundFont file is **not included** in this repository because of its large size (~356 MB). You must download it manually before building or the app will have no instrument sound.
+The main SoundFont is not included because it is approximately 356 MB. Before building:
 
-1. Download the file named **`JJazzLab-SoundFont.sf2`**.
-2. Place it in the following folder:
+1. Download `JJazzLab-SoundFont.sf2`.
+2. Place it at:
 
-   ```
-   Yamaha Reface CP Assistant for Android\app\src\main\assets\
-   ```
-
-   The final path should be:
-
-   ```
-   app\src\main\assets\JJazzLab-SoundFont.sf2
+   ```text
+   app/src/main/assets/JJazzLab-SoundFont.sf2
    ```
 
-3. Rebuild the project. The app loads this SoundFont at runtime to synthesize instrument sounds.
+3. Rebuild the app.
 
-> Most `.sf2` files are listed in `.gitignore` due to their large size, but `033FingerBass-LiveHQNaturalGM.sf2` (bass soundfont) is tracked in the repository.
+Most `.sf2` files are excluded by `.gitignore`. The smaller `033FingerBass-LiveHQNaturalGM.sf2`, used by Bass Assist, is tracked in the repository.
 
-## ⚠️ Manual Style Files Setup (Optional)
+## Drum-Loop Assets
 
-Auto-accompaniment supports **Yamaha `.sty` style files**. Place them in:
+Drum-loop packs live under `app/src/main/assets/drumloops/`. Each pack is a directory containing:
 
+```text
+drumloops/
+└── PACK_NAME/
+    ├── PACK_NAME.json
+    ├── VERSE_01.opus
+    ├── CHORUS_01.opus
+    ├── FILLS_01.opus
+    └── ...
 ```
-app\src\main\assets\styles\
-```
 
-These style files are also available from **JJazzLab**.
+The JSON metadata supplies the pack BPM, time signature, sample rate, and a `variations` object whose keys match the Opus filenames. The current bundled pack is 48 kHz stereo, 4/4, and contains multiple Intro, Verse, Pre-Chorus, Chorus, Fill, Bridge, Ending, and Pickup variations. The present main grid exposes Verse, Verse 2, Pre-Chorus, Chorus, and Fill; the other section controls are reserved for further development.
 
-## About JJazzLab
-
-The SoundFont and style files used by this app come from **JJazzLab**, an open-source application. JJazzLab is an open-source project; its source repository is available at:
-
-- **https://github.com/jjazzboss/JJazzLab**
-
-Please refer to the JJazzLab repository and its license for the terms of use of the SoundFont.
+Legacy `.sty` files still exist under `app/src/main/assets/styles/` for the retained parser/player code. They are not required for the current Drum Loops mode.
 
 ## Building
 
-1. Clone this repository.
-2. Complete the [Manual SoundFont Setup](#-manual-soundfont-setup-required) step above.
-3. Open the project in Android Studio (NDK and CMake 3.22.1 will be configured automatically).
-4. Build and run on a MIDI-capable Android device.
+1. Clone the repository.
+2. Complete the [manual SoundFont setup](#manual-soundfont-setup-required).
+3. Open the project in Android Studio.
+4. Install the requested SDK, NDK, and CMake components if prompted.
+5. Build and run on a MIDI-capable arm64 Android device.
 
-> Note: `app/build.gradle.kts` contains a release signing config pointing to a local keystore. Adjust or remove it to match your own signing setup before building a release.
+`app/build.gradle.kts` currently contains a machine-specific release signing configuration. Replace or remove it before producing your own release build. Do not reuse the repository’s local signing settings for distribution.
 
 ## Usage
 
-1. Launch the app on your device.
-2. Open **Settings** (the `?` button), select the **SoundFont** and **Instrument**.
-3. Choose the **MIDI port** connected to your Reface CP and press **Start**.
-4. Play your Reface CP — chords, rhythm, and bass will respond in real time.
+1. Connect the Reface CP to the Android device and launch the app.
+2. Open Settings, select the MIDI device, SoundFont, and overlay instrument, then start the connection.
+3. Play the keyboard. Note state, chords, tempo information, and the virtual keyboard update in real time.
 
-### Accompany Assist Mode (default)
+### Drum Loops (default)
 
-Generates **Cajon percussion** and **chord-driven bass** accompaniment based on your MIDI input:
+1. Leave the mode switch on **DRUM LOOPS**.
+2. Select a loop pack. The app reads its metadata and loads the Opus assets into memory. The play button stays grey and inactive until a pack and pending variation are fully ready.
+3. A default Verse variation is selected. Once **▶** turns green, press it to start playback and reset the beat to measure one.
+4. While playing, tap another variation. It becomes pending and switches on the next measure’s first beat.
+5. Use **−** or **+** beside the BPM display to change one BPM per tap. Preparation starts as soon as the press reaches Android, without the former 150 ms polling delay. Holding for 0.5 seconds repeats at roughly 50 ms per step and produces keyboard-style haptic feedback when enabled by the device; the first target is prepared immediately, intermediate hold steps are coalesced, and the final target is prepared immediately on release. With no loop playing, the BPM changes immediately. During playback, a held button prevents the prepared tempo from taking effect until release; a request made in the final 1/8 of a measure also skips the imminent boundary, leaving a full extra measure for rendering.
+6. Press **■** to stop with a one-second fade.
 
-- **Energy slider** — controls rhythmic density of the Cajon groove.
-- **Rhythm volume** — mix level of the Cajon drums. When set to 0, tap the **sync-zone** to set tempo manually (tap tempo); the app analyzes your playing speed to determine BPM automatically.
-- **Bass volume** — mix level of the bass synth. When Bass Enhance is disabled on your Reface CP, CC#81 knob controls bass volume instead.
-- **Sync-zone** — tap to reset the beat to 1 (rhythm > 0) or tap tempo (rhythm = 0).
+Variation buttons indicate background preparation state. An unprepared variation can start through the fast Signalsmith path. Once the SBSMS version reaches a safe startup watermark, a pending downbeat switch starts directly from that high-quality buffer; if the fallback is already playing, promotion happens at its loop boundary. A completed SBSMS render becomes the variation's primary cache, so selecting it again cannot restart from a stale low-quality buffer.
 
-### Auto-Accompaniment Mode
+### Cajon Assistant
 
-Plays **Yamaha `.sty` style files** with structured backing tracks:
+Move the mode switch to **CAJON ASSIST**. This is the retained and renamed former Accompany Assist mode.
 
-1. Place `.sty` files in `app/src/main/assets/styles/` before building.
-2. Switch to Auto-Accompaniment mode in the UI.
-3. **Select a style** from the list — the app loads its scenes (intro / main / fill / ending).
-4. Click a **scene button** to switch sections. The style plays automatically, following the detected chord and tempo.
+- **Volume** controls the Cajon sample mix.
+- **Bass** controls the chord-driven bass synth and is mutually exclusive with Bass Enhance.
+- **Energy** sets the minimum groove density; played-note density can raise it automatically.
+- **Sync zone** resets the beat while the Cajon is audible. With Cajon volume at zero, repeated taps set the tempo; after enough taps, the rhythm starts automatically.
 
-## Tech Stack
+## Architecture
 
-- **Kotlin** + AndroidX
-- **Native C++ (JNI)** audio engine with **Oboe** + **FluidLite** for low-latency SoundFont rendering
-- **WebView** UI (HTML/CSS/JS, Canvas 2D scatter chart)
-- CMake 3.22.1, 16 KB page-size aligned (Android 15+ ready)
+- **Kotlin / Android MIDI** — device connection, WebView bridge, Opus decoding, loop-render scheduling, and application lifecycle.
+- **JNI / C++17** — MIDI state, harmony and tempo analysis, beat scheduling, Cajon/Bass generation, time stretching, loop playback, and final audio mixing.
+- **Oboe + FluidLite** — low-latency stereo output and SoundFont synthesis.
+- **SBSMS + Signalsmith Stretch** — high-quality background and low-latency on-demand time stretching.
+- **WebView (HTML/CSS/JavaScript)** — the performance UI and visualizations.
+
+For implementation details, see [技术说明.md](技术说明.md) and [代码文件结构说明.md](代码文件结构说明.md).
 
 ## License
 
-See the [LICENSE](LICENSE) file for this project's license. The bundled SoundFont and third-party libraries retain their respective licenses.
+See [LICENSE](LICENSE). Bundled samples, SoundFonts, and third-party libraries retain their respective licenses.

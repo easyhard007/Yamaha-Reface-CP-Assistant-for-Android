@@ -220,6 +220,10 @@ void AudioEngine::processPendingCommands() {
 oboe::DataCallbackResult AudioEngine::onAudioReady(
         oboe::AudioStream *audioStream, void *audioData, int32_t numFrames) {
     float *outBuffer = static_cast<float *>(audioData);
+    // 关键: 输出缓冲必须先清零 — Oboe 的缓冲可能残留上一轮数据,
+    // 且 fluid_synth_write_float 在 synth 停止 (无活动音符) 时直接返回不写入,
+    // 否则鼓循环的 += 会不断叠加残留数据 → 饱和为 1.0 的爆音
+    memset(outBuffer, 0, (size_t)numFrames * 2 * sizeof(float));
 #if defined(__arm__)
     uint32_t fpscr;
     asm volatile("vmrs %0, fpscr" : "=r"(fpscr));
@@ -236,6 +240,8 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
         fluid_synth_write_float(mLeadSynth, numFrames, outBuffer, 0, 2, outBuffer, 1, 2);
         float* mixPtr = mMixBuffer.data();
         if (mMixBuffer.size() >= (size_t)numFrames * 2) {
+            // mixPtr 同样必须先清零: accomp synth 无活动音符时不写入 (残留会叠加)
+            memset(mixPtr, 0, (size_t)numFrames * 2 * sizeof(float));
             fluid_synth_write_float(mAccompSynth, numFrames, mixPtr, 0, 2, mixPtr, 1, 2);
             for (int i = 0; i < numFrames * 2; ++i)
                 outBuffer[i] = tanhf(outBuffer[i] + mixPtr[i]);
@@ -264,6 +270,20 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
     // Mix drum loops (opus 循环), then soft-clip
     if (g_drumLoopEngine) {
         g_drumLoopEngine->mixAudio(outBuffer, numFrames, audioStream->getSampleRate());
+        // 调试: 检测鼓循环混音后是否过载 (爆音排查)
+        static int overloadLogCount = 0;
+        float mx = 0.0f;
+        int overCount = 0;
+        for (int i = 0; i < numFrames * 2; i++) {
+            float a = fabsf(outBuffer[i]);
+            if (a > mx) mx = a;
+            if (a > 0.95f) overCount++;
+        }
+        if (mx > 0.95f && (overloadLogCount++ % 20 == 0)) {
+            __android_log_print(ANDROID_LOG_WARN, "AudioEngine",
+                                "DRUM OVERLOAD: max=%.3f overSamples=%d/%d",
+                                mx, overCount, numFrames * 2);
+        }
         for (int i = 0; i < numFrames * 2; ++i)
             outBuffer[i] = tanhf(outBuffer[i]);
     }

@@ -1,110 +1,118 @@
 # Yamaha Reface CP Assistant for Android（中文版）
 
-专为 **Yamaha Reface CP** 键盘设计的原生 Android 辅助应用。它通过 MIDI 连接您的乐器，提供实时和弦检测、升降调、智能自动踏板、低音增强、箱鼓节奏引擎与自动伴奏、节拍跟踪与 tap tempo，以及基于 SoundFont 的音频回放——全部由低延迟原生音频引擎（[Oboe](https://github.com/google/oboe)）和内嵌 WebView UI 驱动。
+这是一个面向 **Yamaha Reface CP** 的原生 Android 辅助应用。应用通过 Android MIDI 与琴连接，实时分析音符、和弦、调性、速度和拍位，并通过低延迟原生音频引擎提供节奏与音色辅助。
 
-本项目是基于 Web 的 [Yamaha-Reface-CP-Assistant](references/Yamaha-Reface-CP-Assistant) 的 Android 移植版本，使用 Kotlin + JNI/C++ 原生音频架构重新构建。
+当前产品包含两种演奏模式：
+
+- **鼓循环（默认）**：播放随应用打包的立体声 Opus 鼓循环片段，根据当前 BPM 变速，并在小节边界切换段落。
+- **箱鼓助手**：原“伴奏辅助模式”的保留与改名版本，继续提供程序化箱鼓律动和和弦驱动的贝斯助手。
+
+原先基于 Yamaha `.sty` 文件的**自动伴奏模式**已经被“鼓循环”取代。`.sty` 解析器和播放器源码仍作为遗留兼容/研究代码保留，但它们已不是当前 UI 中可操作的产品模式。
+
+本项目源自 Web 版 [Yamaha-Reface-CP-Assistant](references/Yamaha-Reface-CP-Assistant)，Android 版本采用 Kotlin、JNI/C++、[Oboe](https://github.com/google/oboe)、FluidLite 与 WebView UI 重新构建。
 
 ## 功能特性
 
-- 🎹 **实时和弦检测** —— 加权 chroma 向量模板匹配，支持 17 种和弦类型与转位和弦（斜杠和弦）。
-- 🥁 **箱鼓节奏引擎** —— 程序化生成箱鼓律动（bass/tone/tip/slap），力度感应 round-robin 采样，独立乐器混响/EQ。
-- 🎸 **贝斯助手** —— 基于和弦根音的贝斯合成器，支持制音/闷音技法、和弦音概率选择、能量感应动态变化。
-- 🎵 **自动伴奏** —— 基于 style 文件的伴奏轨，支持场景切换（intro/main/fill/ending）。
-- ⏱️ **节拍跟踪与速度检测** —— PLL 速度检测 + 栅栏模板相位分析，散点图实时显示 BPM。
-- 👆 **Tap Tempo** —— 点击 sync-zone 手动打拍定速，自动以 50% 音量启动节奏。
-- 🔁 **转调（Transpose）** —— 无缝升降调，不影响实际演奏的音符。
-- ✂️ **分割点（Split）** —— 可调节的键盘分割点。
-- 🦶 **自动延音（Auto-Sustain）** —— 智能自动踏板，按音乐逻辑保持音符。
-- 🔊 **低音增强（Bass Enhance）** —— 加入合成的低音层，丰富低频表现。
-- 🎼 **SoundFont（`.sf2`）回放** —— 通过原生 Oboe 音频引擎（FluidLite）渲染高质量乐器音色。
-- 🖥️ **虚拟钢琴** —— 屏幕键盘，实时显示音符。
+- 🥁 **鼓循环** —— 支持 Verse、Verse 2、Pre-Chorus、Chorus、Fill 等片段，区分“待播放”和“正在播放”状态，并在下一小节第一拍切换。
+- ⚡ **快速起播与后台高质量渲染** —— Android MediaCodec 解码 Opus；Signalsmith Stretch 负责低延迟应急起播，SBSMS 在后台生成高质量版本。
+- 🔄 **BPM 匹配** —— 鼓循环按照当前 BPM 做时间拉伸，设计目标是不改变音高；BPM 两侧提供 −/+ 按钮（轻触单步、长按连调并带系统触感反馈）。−/+ 会绕过 UI 状态轮询并立即启动预备流程，倍速按钮与硬件旋钮仍走 native 事件通道；播放中只在安全的小节边界正式生效。
+- 🎚️ **平滑切换** —— 片段间短交叉淡化、循环边界淡化、停止时 1 秒淡出，并可显示从触发到首次出声的切换延迟。
+- 🪘 **箱鼓助手** —— 程序化生成 bass/tone/tip/slap 律动，使用多力度层和 round-robin WAV 采样。
+- 🎸 **贝斯助手** —— 根据和弦生成贝斯，包含制音/闷音、能量相关动态和专用贝斯 SoundFont。
+- 🎹 **实时和弦与调性检测** —— 加权 chroma 模板匹配、斜杠和弦、和弦组成音、调性与罗马数字分析。
+- ⏱️ **节拍与速度检测** —— 32 分音符级调度、Tap Tempo、BPM 显示和滚动音符散点图。
+- 🦶 **智能自动延音** —— 自动保持音符，并在检测到和声碰撞时短暂松开踏板。
+- 🔊 **低音增强** —— 将加权的低八度音符回发给 Reface CP。
+- 🔁 **转调与分割点** —— 通过 Reface CP SysEx 转调，并可调整分析用键盘分割点。
+- 🎼 **SoundFont 叠加音色** —— 通过 FluidLite 和 Oboe 混合可选的演奏叠加音色。
+- 🖥️ **虚拟钢琴** —— 实时显示音符、踏板、和弦和播放状态。
 
 ## 环境要求
 
-- 支持 **MIDI**（`android.software.midi`）的 Android 设备，系统 **Android 8.1（API 27）** 及以上。
-- 与 Yamaha Reface CP 的 USB/MIDI 连接（通常需要 USB-OTG 数据线）。
-- Android Studio（含 NDK 与 CMake 3.22.1）用于从源码构建。
+- 支持 `android.software.midi`、运行 **Android 8.1（API 27）**或更高版本的 Android 设备。
+- Yamaha Reface CP 的 USB/MIDI 连接；通常需要 USB-OTG 转接线。
+- 当前构建配置要求 **arm64-v8a** 设备。
+- 从源码构建时需要 Android Studio、Android NDK 与 CMake 3.22.1。
 
-## ⚠️ 手动放置 SoundFont（必须）
+## 手动放置 SoundFont（必须）
 
-由于 SoundFont 文件体积较大（约 356 MB），本仓库**未包含**该文件。在构建之前，您必须手动下载，否则应用将没有乐器声音。
+主 SoundFont 约 356 MB，因此未包含在仓库中。构建前请：
 
-1. 下载名为 **`JJazzLab-SoundFont.sf2`** 的文件。
-2. 将其放入以下文件夹：
+1. 下载 `JJazzLab-SoundFont.sf2`。
+2. 将其放到：
 
-   ```
-   Yamaha Reface CP Assistant for Android\app\src\main\assets\
-   ```
-
-   最终路径应为：
-
-   ```
-   app\src\main\assets\JJazzLab-SoundFont.sf2
+   ```text
+   app/src/main/assets/JJazzLab-SoundFont.sf2
    ```
 
-3. 重新构建项目。应用在运行时会加载此 SoundFont 以合成乐器音色。
+3. 重新构建应用。
 
-> 大多数 `.sf2` 文件因体积过大被 `.gitignore` 排除，但 `033FingerBass-LiveHQNaturalGM.sf2`（贝斯音源）已纳入版本管理。
+大多数 `.sf2` 文件都被 `.gitignore` 排除。贝斯助手使用的较小文件 `033FingerBass-LiveHQNaturalGM.sf2` 已纳入仓库。
 
-## ⚠️ 手动放置 Style 文件（可选）
+## 鼓循环资源格式
 
-自动伴奏支持 **Yamaha `.sty` 格式**的伴奏文件。将其放入：
+鼓循环包位于 `app/src/main/assets/drumloops/`。每个包是一个独立文件夹：
 
+```text
+drumloops/
+└── PACK_NAME/
+    ├── PACK_NAME.json
+    ├── VERSE_01.opus
+    ├── CHORUS_01.opus
+    ├── FILLS_01.opus
+    └── ...
 ```
-app\src\main\assets\styles\
-```
 
-这些 style 文件同样可从 **JJazzLab** 获取。
+JSON 元数据提供循环包 BPM、拍号、采样率，以及与 Opus 文件名对应的 `variations` 对象。当前随项目提供的循环包是 48 kHz、立体声、4/4，包含 Intro、Verse、Pre-Chorus、Chorus、Fill、Bridge、Ending 和 Pickup 等多类片段。当前主网格开放 Verse、Verse 2、Pre-Chorus、Chorus 和 Fill；其他段落按钮仍是后续扩展入口。
 
-## 关于 JJazzLab
-
-本应用使用的 SoundFont 与 style 文件来自 **JJazzLab**。JJazzLab 是一个**开源应用**，其源代码仓库地址为：
-
-- **https://github.com/jjazzboss/JJazzLab**
-
-关于 SoundFont 的使用条款，请参阅 JJazzLab 仓库及其许可证。
+`app/src/main/assets/styles/` 中仍保留旧 `.sty` 资源，供遗留解析/播放代码使用；当前“鼓循环”模式不依赖这些文件。
 
 ## 构建方法
 
 1. 克隆本仓库。
-2. 完成上方的[手动放置 SoundFont](#-手动放置-soundfont必须)步骤。
-3. 在 Android Studio 中打开项目（NDK 和 CMake 3.22.1 会自动配置）。
-4. 在支持 MIDI 的 Android 设备上构建并运行。
+2. 完成上方的[手动放置 SoundFont](#手动放置-soundfont必须)。
+3. 使用 Android Studio 打开项目。
+4. 如果 IDE 提示，请安装对应的 SDK、NDK 与 CMake 组件。
+5. 在支持 MIDI 的 arm64 Android 设备上构建并运行。
 
-> 注意：`app/build.gradle.kts` 中包含指向本地 keystore 的 release 签名配置。在构建 release 版本前，请根据您自己的签名设置进行调整或移除。
+`app/build.gradle.kts` 当前包含与开发者本机绑定的 release 签名配置。生成自己的发布包前，请替换或移除该配置，不要直接沿用仓库中的本地签名设置。
 
 ## 使用方法
 
-1. 在设备上启动应用。
-2. 打开**设置**（`?` 按钮），选择 **SoundFont** 与 **Instrument（乐器）**。
-3. 选择连接到 Reface CP 的 **MIDI 端口**，然后点击**启动**。
-4. 弹奏您的 Reface CP —— 和弦、节奏、贝斯将实时响应。
+1. 将 Reface CP 连接到 Android 设备并启动应用。
+2. 打开设置，选择 MIDI 设备、SoundFont 和叠加音色，然后启动连接。
+3. 弹奏键盘；音符状态、和弦、速度信息和虚拟键盘会实时更新。
 
-### 伴奏辅助模式（默认）
+### 鼓循环（默认）
 
-根据您的 MIDI 输入自动生成 **Cajon 箱鼓打击乐** 和 **和弦驱动的贝斯** 伴奏：
+1. 将模式开关保持在 **DRUM LOOPS / 鼓循环**。
+2. 选择一个鼓循环包；应用会读取元数据，并把 Opus 资源载入内存。在循环包和待播放片段完整就绪前，播放按钮保持灰色且不可点击。
+3. 应用默认选中第一个 Verse 片段。等待 **▶** 变成绿色后点击，即可开始播放并把节拍同步到第一小节。
+4. 播放过程中点击其他片段，该片段会进入待播放状态，并在下一小节第一拍切换。
+5. 点击 BPM 两侧的 **−** 或 **+** 可单步减/加 1；按钮请求到达 Android 后会立即启动预备流程，不再等待原先最长 150 ms 的状态轮询。按住 0.5 秒后约每 50 ms 连续变化一次，并在设备开启触感反馈时产生类似系统键盘的短振动；长按的第一个目标立即准备，中间步进合并，松手时立即准备最终目标。鼓循环未播放时 BPM 立即生效；播放中按住按钮会锁住正式变速，松手后才允许在后续第一拍生效。若预备请求落在当前小节最后 1/8，则跳过紧邻的第一拍，额外保留一整小节的渲染时间。
+6. 点击 **■**，鼓循环会用 1 秒淡出停止。
 
-- **能量滑条** —— 控制箱鼓律动的节奏密度。
-- **伴奏音量** —— 箱鼓的混音电平。设为 0 时，点击 **sync-zone** 可手动打拍定速（tap tempo）；应用也会根据您的弹奏速度自动推算 BPM。
-- **贝斯音量** —— 贝斯合成器的混音电平。当 Reface CP 上 Bass Enhance 关闭时，CC#81 旋钮改为控制贝斯音量。
-- **Sync-zone** —— 点击回到第 1 拍（伴奏音量 > 0）或 tap tempo 打拍（伴奏音量 = 0）。
+片段按钮还会显示后台准备状态。未准备的片段可以先通过 Signalsmith 快速路径起播；SBSMS 高质量版本达到安全起播水位后，若恰逢下一次小节第一拍切换会直接使用高质量版本，否则会在当前循环边界无缝接管。已经完整渲染的高质量版本会成为该片段的主缓存，再次切回时不会继续使用旧的低质量缓存。
 
-### 自动伴奏模式
+### 箱鼓助手
 
-播放 **Yamaha `.sty` 格式**的结构化伴奏轨：
+把模式开关切换到 **CAJON ASSIST / 箱鼓助手**。这就是原“伴奏辅助模式”的保留与改名版本。
 
-1. 构建前将 `.sty` 文件放入 `app/src/main/assets/styles/`。
-2. 在 UI 中切换到自动伴奏模式。
-3. **选择 style** —— 应用加载其场景（intro / main / fill / ending）。
-4. 点击**场景按钮**切换段落，伴奏自动跟随检测到的和弦与速度播放。
+- **音量**：控制箱鼓采样混音音量。
+- **贝斯**：控制和弦驱动贝斯；它与 Bass Enhance 互斥。
+- **能量**：设置律动密度下限；实际弹奏的音符密度还可以自动提高能量。
+- **Sync 区域**：箱鼓有声时点击会重置到第一拍；箱鼓音量为零时可连续点击进行 Tap Tempo，达到足够次数后会自动启动节奏。
 
-## 技术栈
+## 技术架构
 
-- **Kotlin** + AndroidX
-- **原生 C++（JNI）** 音频引擎，使用 **Oboe** + **FluidLite** 实现低延迟 SoundFont 渲染
-- **WebView** UI（HTML/CSS/JS，Canvas 2D 散点图）
-- CMake 3.22.1，16 KB 页对齐（适配 Android 15+）
+- **Kotlin / Android MIDI**：设备连接、WebView 桥、Opus 解码、鼓循环渲染调度和 Android 生命周期。
+- **JNI / C++17**：MIDI 状态、和声与速度分析、节拍调度、箱鼓/贝斯生成、时间拉伸、循环播放与最终混音。
+- **Oboe + FluidLite**：低延迟立体声输出和 SoundFont 合成。
+- **SBSMS + Signalsmith Stretch**：后台高质量与按需低延迟时间拉伸。
+- **WebView（HTML/CSS/JavaScript）**：演奏界面与可视化。
+
+实现细节请参阅[技术说明.md](技术说明.md)和[代码文件结构说明.md](代码文件结构说明.md)。
 
 ## 许可证
 
-本项目许可证请参阅 [LICENSE](LICENSE) 文件。随附的 SoundFont 及第三方库保留其各自的许可证。
+项目许可证见 [LICENSE](LICENSE)。随附采样、SoundFont 与第三方库保留各自许可证。

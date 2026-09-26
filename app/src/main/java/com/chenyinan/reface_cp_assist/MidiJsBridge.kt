@@ -29,6 +29,8 @@ class MidiJsBridge(
     private val onGetCurrentBeat: () -> Int,
     private val onSyncBeat: () -> Unit,
     private val onRequestBpmMult: (Int) -> Unit,
+    private val onAdjustBpm: (Int) -> Double,
+    private val onSetBpmHold: (Boolean) -> Unit,
     private val onGetChord: () -> String,
     private val onGetChordNotes: () -> String,
     private val onGetChordTiming: () -> String,
@@ -66,8 +68,10 @@ class MidiJsBridge(
     // Drum loops
     private val onGetDrumLoopList: () -> String,
     private val onSelectDrumLoop: (String) -> Unit,
-    private val onPlayDrumLoop: (String) -> Unit,
-    private val onStopDrumLoop: () -> Unit
+    private val onSetDrumPending: (String) -> Unit,
+    private val onDrumStartPlayback: () -> Unit,
+    private val onDrumStopPlayback: () -> Unit,
+    private val onDrumStopImmediate: () -> Unit
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -102,6 +106,8 @@ class MidiJsBridge(
     @JavascriptInterface fun getCurrentBeat(): Int = onGetCurrentBeat()
     @JavascriptInterface fun syncBeat() { onSyncBeat() }
     @JavascriptInterface fun requestBpmMult(mult: Int) { onRequestBpmMult(mult) }
+    @JavascriptInterface fun adjustBpm(delta: Int): Double = onAdjustBpm(delta.coerceIn(-1, 1))
+    @JavascriptInterface fun setBpmHold(held: Boolean) { onSetBpmHold(held) }
     @JavascriptInterface fun getChord(): String = onGetChord()
     @JavascriptInterface fun getChordNotes(): String = onGetChordNotes()
     @JavascriptInterface fun getChordTiming(): String = onGetChordTiming()
@@ -141,6 +147,8 @@ class MidiJsBridge(
     // Drum loops
     @JavascriptInterface fun getDrumLoopList(): String = onGetDrumLoopList()
     @JavascriptInterface fun selectDrumLoop(folder: String) { onSelectDrumLoop(folder) }
-    @JavascriptInterface fun playDrumLoop(variation: String) { onPlayDrumLoop(variation) }
-    @JavascriptInterface fun stopDrumLoop() { onStopDrumLoop() }
+    @JavascriptInterface fun setDrumPending(variation: String) { onSetDrumPending(variation) }
+    @JavascriptInterface fun drumStartPlayback() { onDrumStartPlayback() }
+    @JavascriptInterface fun drumStopPlayback() { onDrumStopPlayback() }
+    @JavascriptInterface fun drumStopImmediate() { onDrumStopImmediate() }
 }

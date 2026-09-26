@@ -86,13 +86,15 @@
             <div id="chord-debug-info" style="color:#555; font-size:9px; text-align:center; min-height:15px;">debug info: </div>
             <div id="sync-zone" onclick="syncBeat()" style="cursor:pointer;">
                 <div style="display:flex; align-items:center; min-height:30px;">
-                    <div style="flex:1; display:flex; align-items:center; justify-content:flex-end; padding-right:16px;">
+                    <div class="bpm-side bpm-side-left">
                         <div id="bpm-lock-icon" style="width:30px;height:30px;margin-top:2px;display:flex;align-items:center;justify-content:center;">
                             <svg viewBox="0 0 1024 1024" width="16" height="16" xmlns="http://www.w3.org/2000/svg"><path d="M284.444672 455.110656v-113.77664c0-125.67552 101.879808-227.556352 227.555328-227.556352s227.555328 101.879808 227.555328 227.555328v113.777664h71.11168c23.564288 0 42.665984 19.10272 42.665984 42.667008v369.777664c0 23.564288-19.101696 42.667008-42.665984 42.667008H213.332992c-23.564288 0-42.665984-19.10272-42.665984-42.667008v-369.77664c0-23.565312 19.101696-42.668032 42.665984-42.668032h71.11168z m85.332992 0H654.22336v-113.77664c0-78.547968-63.675392-142.22336-142.222336-142.22336-78.546944 0-142.222336 63.675392-142.222336 142.22336v113.77664z" fill="currentColor"></path></svg>
                         </div>
+                        <button type="button" id="bpm-dec-btn" class="bpm-step-btn" aria-label="BPM 减 1" title="BPM -1；长按连续减少" onclick="event.stopPropagation();">−</button>
                     </div>
                     <div id="bpm-display" style="color:#eee; font-weight:bold; font-size:clamp(10px,5vh,20px); text-align:center; width:80px;">♪ = 75</div>
-                    <div style="flex:1; display:flex; align-items:center; justify-content:flex-start; padding-left:16px;">
+                    <div class="bpm-side bpm-side-right">
+                        <button type="button" id="bpm-inc-btn" class="bpm-step-btn" aria-label="BPM 加 1" title="BPM +1；长按连续增加" onclick="event.stopPropagation();">+</button>
                         <div id="bpm-mult-btn" onclick="event.stopPropagation();onBpmMultClick();" style="width:24px;height:24px;margin-top:2px;margin-left:2px;border-radius:6px;background:#333;color:#ccc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:bold;cursor:pointer;user-select:none;">×2</div>
                     </div>
                 </div>
@@ -105,7 +107,7 @@
                         <span style="color:#aaa; font-size:10px;">箱鼓助手</span>
                     </div>
                     <label class="switch">
-                        <input type="checkbox" id="assist-toggle" onchange="onAssistToggle()">
+                        <input type="checkbox" id="assist-toggle" checked onchange="onAssistToggle()">
                         <span class="slider"></span>
                     </label>
                     <div style="display:flex;flex-direction: column;">
@@ -120,9 +122,17 @@
         <div class="card" id="drum-card" style="display:none;">
             <div style="color:#ddd; font-size:10px; text-align:center; margin-bottom:0px;">DRUM LOOPS</div>
             <h3 style="margin-top:0;">鼓循环</h3>
-            <select id="drumloop-select" onchange="onDrumLoopSelect()" style="width:100%; margin-bottom:8px; background:#222; color:#eee; border:1px solid #444; border-radius:6px; padding:6px;">
-                <option value="">-- 选择鼓循环 --</option>
-            </select>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+                <select id="drumloop-select" onchange="onDrumLoopSelect()" style="flex:1; min-width:0; margin:0; height:36px; box-sizing:border-box; background:#222; color:#eee; border:1px solid #444; border-radius:6px; padding:6px;">
+                    <option value="">-- 选择鼓循环 --</option>
+                </select>
+                <div id="drum-play-btn" class="drum-play-disabled" role="button" aria-disabled="true" onclick="onDrumPlayBtn()" style="flex:0 0 auto; width:46px; height:36px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:16px; border-radius:6px;">▶</div>
+            </div>
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">INTRO</div>
+                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">BREAK</div>
+                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">ENDING</div>
+            </div>
             <div id="drumloop-status" style="color:#888; font-size:11px; text-align:center; margin-bottom:8px; min-height:14px;"></div>
             <div id="drumloop-grid" style="display:none;"></div>
         </div>
@@ -331,6 +341,20 @@
         // ——— 节拍器 ———
         function updateBeatDots() {
             if (typeof Android === 'undefined') return;
+            var dots = document.getElementById('beat-dots');
+            var drumMode = document.getElementById('assist-toggle').checked;
+            // 鼓循环模式: 未播放时节拍点全部熄灭 (不隐藏容器)
+            if (drumMode && !window._drumCurrent) {
+                if (dots) {
+                    dots.style.display = 'flex';
+                    dots.querySelectorAll('span').forEach(function (d) {
+                        d.style.background = '#666';
+                        d.style.boxShadow = '';
+                    });
+                }
+                return;
+            }
+            if (dots) dots.style.display = 'flex';
             var ts = Android.getTimeSig ? Android.getTimeSig() : 4;
             var count = (ts === 3) ? 3 : (ts === 6) ? 6 : 4;
             var beat = Android.getCurrentBeat ? Android.getCurrentBeat() : 0;
@@ -364,6 +388,8 @@
             document.getElementById('chord-display').innerText = chord || '-';
         }
         var _bpmPendingMult = 0; // 0=无, 2=等待×2, -2=等待÷2
+        var _bpmPendingStep = false;
+        var _bpmHold = { timeout: null, interval: null, pointerId: null, button: null, locked: false };
         function updateLockIcon(gain) {
             var icon = document.getElementById('bpm-lock-icon');
             if (!icon) return;
@@ -385,6 +411,87 @@
             document.getElementById('bpm-mult-btn').classList.add('flash');
             tempoHighlight();
         }
+        function previewBpmTarget(bpm) {
+            var target = Math.round(Number(bpm));
+            if (!isFinite(target) || target < 0) return;
+            document.getElementById('bpm-display').innerText = '♪=' + target;
+            _bpmPendingStep = true;
+            tempoHighlight();
+            updateBpmMultBtn();
+        }
+        function requestBpmStep(delta) {
+            if (typeof Android === 'undefined' || !Android.adjustBpm) return;
+            var target = Number(Android.adjustBpm(delta));
+            if (isFinite(target) && target >= 0) previewBpmTarget(target);
+        }
+        function setBpmHoldLock(held) {
+            if (typeof Android !== 'undefined' && Android.setBpmHold) Android.setBpmHold(held);
+        }
+        function stopBpmHold(event) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                // 忽略上一根手指/指针延迟到达的 lostpointercapture，避免中断新按键。
+                if (typeof event.pointerId === 'number' &&
+                    _bpmHold.pointerId !== null && event.pointerId !== _bpmHold.pointerId) return;
+            }
+            var button = _bpmHold.button;
+            var pointerId = _bpmHold.pointerId;
+            var locked = _bpmHold.locked;
+            if (_bpmHold.timeout !== null) clearTimeout(_bpmHold.timeout);
+            if (_bpmHold.interval !== null) clearInterval(_bpmHold.interval);
+            _bpmHold = { timeout: null, interval: null, pointerId: null, button: null, locked: false };
+            if (locked) setBpmHoldLock(false);
+            if (button) {
+                button.classList.remove('pressing');
+                try {
+                    if (pointerId !== null && button.hasPointerCapture(pointerId)) {
+                        button.releasePointerCapture(pointerId);
+                    }
+                } catch (e) {}
+            }
+        }
+        function bindBpmStepButton(id, delta) {
+            var button = document.getElementById(id);
+            if (!button) return;
+            button.addEventListener('pointerdown', function (event) {
+                if (event.pointerType === 'mouse' && event.button !== 0) return;
+                stopBpmHold();
+                event.preventDefault();
+                event.stopPropagation();
+                _bpmHold.pointerId = event.pointerId;
+                _bpmHold.button = button;
+                _bpmHold.locked = true;
+                button.classList.add('pressing');
+                try { button.setPointerCapture(event.pointerId); } catch (e) {}
+                // 在第一次 ±1 之前先锁住拍头；若最终只是轻触，抬手会立即解锁。
+                setBpmHoldLock(true);
+                requestBpmStep(delta);
+                _bpmHold.timeout = setTimeout(function () {
+                    requestBpmStep(delta);
+                    _bpmHold.interval = setInterval(function () {
+                        requestBpmStep(delta);
+                    }, 50);
+                }, 500);
+            });
+            button.addEventListener('pointerup', stopBpmHold);
+            button.addEventListener('pointercancel', stopBpmHold);
+            button.addEventListener('lostpointercapture', stopBpmHold);
+            button.addEventListener('contextmenu', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            });
+            // 键盘 Enter/Space 会产生 detail=0 的 click；触屏/鼠标已由 pointerdown 处理。
+            button.addEventListener('click', function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                if (event.detail === 0) requestBpmStep(delta);
+            });
+        }
+        bindBpmStepButton('bpm-dec-btn', -1);
+        bindBpmStepButton('bpm-inc-btn', 1);
+        window.addEventListener('blur', function () { stopBpmHold(); });
+        window.addEventListener('pagehide', function () { stopBpmHold(); });
         function updateBpmDisplay(bpm) {
             document.getElementById('bpm-display').innerText = '♪=' + bpm;
             // 同步扫线速度: 1 小节 = 240000 / bpm ms
@@ -395,6 +502,10 @@
                 tempoRestore();
                 var btn = document.getElementById('bpm-mult-btn');
                 if (btn) btn.classList.remove('flash');
+            }
+            if (_bpmPendingStep) {
+                _bpmPendingStep = false;
+                tempoRestore();
             }
             updateBpmMultBtn();
         }
@@ -470,11 +581,13 @@
             if (typeof Android !== 'undefined') Android.setAssistType(v);
             document.getElementById('drum-card').style.display = v ? 'block' : 'none';
             document.getElementById('assist-card').style.display = v ? 'none' : 'block';
-            if (v === 0) stopDrumLoopPlayback();
+            if (v === 0) resetDrumPlayback();
         }
         // ===== DRUM LOOPS =====
         window._drumMeta = null;
-        window._drumCurrent = null;
+        window._drumCurrent = null;   // 正在播放的 variation (实心)
+        window._drumPending = null;   // 待播放的 variation (闪烁)
+        window._drumReady = false;    // 循环包元数据与 Opus 均已加载完成
         var DRUM_COLUMNS = [
             ['verse', 'VERSE'],
             ['verse2', 'VERSE 2'],
@@ -482,6 +595,29 @@
             ['chorus', 'CHORUS'],
             ['fill', 'FILL']
         ];
+        function updateDrumButtonStates() {
+            var grid = document.getElementById('drumloop-grid');
+            if (!grid) return;
+            grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
+                var key = b.getAttribute('data-key');
+                b.classList.remove('drum-active', 'drum-blink');
+                if (key === window._drumCurrent) b.classList.add('drum-active');
+                else if (key === window._drumPending) b.classList.add('drum-blink');
+            });
+            var pb = document.getElementById('drum-play-btn');
+            if (pb) {
+                var canStart = window._drumReady && !!window._drumPending;
+                var disabled = !window._drumCurrent && !canStart;
+                pb.classList.toggle('drum-play-stop', !!window._drumCurrent);
+                pb.classList.toggle('drum-play-disabled', disabled);
+                pb.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+                if (window._drumCurrent) {
+                    pb.innerText = '■';
+                } else {
+                    pb.innerText = '▶';
+                }
+            }
+        }
         function onDrumLoopListJson(json) {
             var sel = document.getElementById('drumloop-select');
             sel.innerHTML = '<option value="">-- 选择鼓循环 --</option>';
@@ -492,13 +628,20 @@
                     sel.appendChild(o);
                 });
             } catch (e) {}
+            updateDrumButtonStates();
         }
         function onDrumLoopSelect() {
             var folder = document.getElementById('drumloop-select').value;
-            if (!folder) return;
-            stopDrumLoopPlayback();
+            resetDrumPlayback();
+            window._drumReady = false;
             window._drumMeta = null;
             document.getElementById('drumloop-grid').style.display = 'none';
+            updateDrumButtonStates();
+            if (!folder) {
+                document.getElementById('drumloop-status').innerText = '';
+                if (typeof Android !== 'undefined') Android.selectDrumLoop('');
+                return;
+            }
             document.getElementById('drumloop-status').innerText = '加载元数据...';
             if (typeof Android !== 'undefined') Android.selectDrumLoop(folder);
         }
@@ -535,25 +678,75 @@
                 grid.style.display = 'block';
                 grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
                     b.onclick = function () { onDrumLoopBtnClick(b); };
-                    b.classList.add('ready');  // 延迟测试模式: 全部立即可点击
                 });
-                document.getElementById('drumloop-status').innerText = '点击按钮即时渲染播放';
+                document.getElementById('drumloop-status').innerText = '加载音频 0/' + meta.variations.length + ' ...';
             } catch (e) {
                 document.getElementById('drumloop-status').innerText = '元数据解析失败';
             }
+        }
+        function onDrumLoopBtnClick(btn) {
+            var key = btn.getAttribute('data-key');
+            if (key === window._drumCurrent) return;  // 点击正在播放的: 无操作
+            window._drumPending = key;
+            if (typeof Android !== 'undefined') Android.setDrumPending(key);
+            updateDrumButtonStates();
+        }
+        function onDrumPlayBtn() {
+            if (window._drumCurrent) {
+                if (typeof Android !== 'undefined') Android.drumStopPlayback();
+            } else {
+                if (!window._drumReady || !window._drumPending) return;
+                if (typeof Android !== 'undefined') Android.drumStartPlayback();
+            }
+        }
+        function onDrumLoopDefaultPending(key) { window._drumPending = key; updateDrumButtonStates(); }
+        function onDrumLoopPending(key) { window._drumPending = key; updateDrumButtonStates(); }
+        function onDrumLoopPlaying(key) {
+            window._drumCurrent = key;
+            window._drumPending = null;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
+        }
+        function onDrumLoopSwitchEvent(key) {
+            window._drumCurrent = key;
+            window._drumPending = null;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
+        }
+        function onDrumLoopStopping() {
+            window._drumCurrent = null;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '停止中...';
+        }
+        function onDrumLoopStopped() {
+            window._drumCurrent = null;
+            updateDrumButtonStates();
+        }
+        function onDrumLoopLatency(ms) {
+            document.getElementById('drumloop-status').innerText = '切换延迟: ' + ms + ' ms';
+        }
+        function resetDrumPlayback() {
+            if (window._drumCurrent && typeof Android !== 'undefined') Android.drumStopImmediate();
+            window._drumCurrent = null;
+            window._drumPending = null;
+            updateDrumButtonStates();
         }
         function onDrumLoopProgress(done, total) {
             document.getElementById('drumloop-status').innerText = '加载音频 ' + done + '/' + total + ' ...';
         }
         function onDrumLoopReady() {
-            document.getElementById('drumloop-status').innerText = '就绪（未渲染的点击后低延迟播放，已渲染的高质量播放）';
+            window._drumReady = true;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '就绪（点击 ▶ 开始播放）';
+        }
+        function onDrumLoopPlaybackBlocked(msg) {
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = msg || '请先选择并等待鼓循环加载完成';
         }
         function onDrumLoopStretchReset(total) {
-            // 双引擎模式: 所有按钮保持可点击 (状态0走低延迟引擎), 仅清除"完整"标记
             var grid = document.getElementById('drumloop-grid');
             grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
                 b.classList.remove('full');
-                b.classList.add('ready');
             });
             document.getElementById('drumloop-status').innerText = '高质量渲染 0/' + total;
         }
@@ -572,32 +765,8 @@
         function onDrumLoopStretchDone() {
             document.getElementById('drumloop-status').innerText = '全部渲染完成，点击按钮循环播放';
         }
-        function onDrumLoopPlaying(key) {
-            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
-        }
         function onDrumLoopError(msg) {
             document.getElementById('drumloop-status').innerText = '错误: ' + msg;
-        }
-        function onDrumLoopBtnClick(btn) {
-            if (!btn.classList.contains('ready')) return;  // 预热未完成不可播放
-            var key = btn.getAttribute('data-key');
-            if (window._drumCurrent === key) {
-                if (typeof Android !== 'undefined') Android.stopDrumLoop();
-                btn.classList.remove('btn-active');
-                window._drumCurrent = null;
-            } else {
-                if (typeof Android !== 'undefined') Android.playDrumLoop(key);
-                var grid = document.getElementById('drumloop-grid');
-                grid.querySelectorAll('.drumloop-btn').forEach(function (b) { b.classList.remove('btn-active'); });
-                btn.classList.add('btn-active');
-                window._drumCurrent = key;
-            }
-        }
-        function stopDrumLoopPlayback() {
-            if (window._drumCurrent && typeof Android !== 'undefined') Android.stopDrumLoop();
-            window._drumCurrent = null;
-            var grid = document.getElementById('drumloop-grid');
-            if (grid) grid.querySelectorAll('.drumloop-btn').forEach(function (b) { b.classList.remove('btn-active'); });
         }
         function updateVolDisplay() {
             if (typeof Android === 'undefined') return;
@@ -1227,6 +1396,8 @@
         if (typeof initKeyboardDOM === 'function') initKeyboardDOM();
         if (typeof initBackground === 'function') initBackground();
         window.isRunning = true;
+        // 默认鼓循环模式
+        if (typeof onAssistToggle === 'function') onAssistToggle();
     };
     // 初始化鼓循环下拉列表
     if (typeof Android !== 'undefined' && Android.getDrumLoopList) {

@@ -5,6 +5,7 @@ import android.media.MediaCodec
 import android.media.MediaDataSource
 import android.media.MediaExtractor
 import android.media.MediaFormat
+import android.os.Process
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
@@ -34,10 +35,14 @@ class DrumLoopPlayer(
     private val pushJs: (String) -> Unit,
     private val nativeRenderStart: (String, Int, Float, Int) -> Boolean,
     private val nativeRenderFeed: (String, ShortArray, Int) -> Long,
-    private val nativeRenderFinish: (String, Int) -> Boolean,
+    private val nativeRenderFinishStep: (String, Int) -> Long,
     private val nativeSgsmStart: (String, Int, Float, Int) -> Boolean,
     private val nativeSgsmFeed: (String, ShortArray, Int) -> Long,
-    private val nativeSgsmFinish: (String, Int) -> Boolean,
+    private val nativeSgsmFinishStep: (String, Int) -> Long,
+    private val nativePromotePending: (String) -> Boolean,
+    private val nativeRequestSwitch: (String) -> Unit,
+    private val nativeFadeOut: (Int) -> Unit,
+    private val nativeSyncBeat: () -> Unit,
     private val nativeRenderCancelAll: () -> Unit,
     private val nativePlay: (String) -> Unit,
     private val nativeStop: () -> Unit,
@@ -63,15 +68,17 @@ class DrumLoopPlayer(
     private val opusData = mutableMapOf<String, ByteArray>()
     private var metaBpm = 0.0
     private var metaSampleRate = 48000
-    private var folderLoaded = false
+    @Volatile private var folderLoaded = false
 
     @Volatile private var currentBpm = 0.0
     @Volatile private var playingVariation: String? = null
+    @Volatile private var bpmSwitchPending = false   // BPM 改变后等待第一拍切换中
 
     private val stateLock = Object()
     private val decodeSessions = mutableMapOf<String, OpusDecoder>()
     private val states = mutableMapOf<String, Int>()          // variation → 0/1/2
     private val claims = mutableMapOf<String, Int>()          // variation → 认领 token
+    private val sgsmClaims = mutableMapOf<String, Int>()      // 低延迟渲染独立 token/解码器，可与高质量预热并行
     private val startedStreams = mutableSetOf<String>()       // 已 nativeRenderStart (sbsms)
     private val startedSgsm = mutableSetOf<String>()          // 已 nativeSgsmStart
     private val sgsmDone = mutableSetOf<String>()             // sgsm 已完成渲染
@@ -79,15 +86,29 @@ class DrumLoopPlayer(
     @Volatile private var readyCount = 0
     @Volatile private var doneCount = 0
 
-    // 三线程
+    /**
+     * 拉伸计算与 Oboe 播放本来就在不同线程；这里进一步降低所有渲染线程的 Linux nice 值，
+     * 让实时音频回调在 CPU 紧张时优先获得时间片。按需线程略高于批量预热，保证拍头前能准备好目标。
+     */
+    private fun renderWorker(name: String, androidPriority: Int, task: Runnable) =
+        Thread({
+            runCatching { Process.setThreadPriority(androidPriority) }
+                .onFailure { Log.w(TAG, "set thread priority failed: $name", it) }
+            task.run()
+        }, name).apply { isDaemon = true }
+
+    // 三条渲染队列；播放由 Oboe 实时回调线程完成，不在这些 executor 上运行。
     private val preRollExec = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DrumPreRoll").apply { isDaemon = true }
+        renderWorker("DrumPreRoll", Process.THREAD_PRIORITY_BACKGROUND, r)
     }
     private val fullExec = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DrumFullRender").apply { isDaemon = true }
+        renderWorker("DrumFullRender", Process.THREAD_PRIORITY_BACKGROUND, r)
     }
     private val onDemandExec = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DrumOnDemand").apply { isDaemon = true }
+        renderWorker("DrumOnDemand", Process.THREAD_PRIORITY_DEFAULT + 4, r)
+    }
+    private val codecCleanupExec = Executors.newSingleThreadExecutor { r ->
+        renderWorker("DrumCodecCleanup", Process.THREAD_PRIORITY_BACKGROUND, r)
     }
 
     /** 拉伸比例 = 当前BPM / 循环包BPM */
@@ -115,18 +136,31 @@ class DrumLoopPlayer(
         stretchGeneration.incrementAndGet()
         folderLoaded = false
         playingVariation = null
+        pendingVariation = null
         nativeStop()
         nativeClear()
         nativeRenderCancelAll()
         releaseAllSessions()
-        Thread {
+        if (folder.isBlank()) {
+            synchronized(opusData) { opusData.clear() }
+            synchronized(stateLock) {
+                states.clear()
+                claims.clear()
+                sgsmClaims.clear()
+                startedStreams.clear()
+                startedSgsm.clear()
+                sgsmDone.clear()
+            }
+            return
+        }
+        renderWorker("DrumAssetLoader", Process.THREAD_PRIORITY_BACKGROUND, Runnable {
             try {
                 loadFolder(folder, gen)
             } catch (e: Exception) {
                 Log.e(TAG, "loadFolder failed: $folder", e)
                 pushJs("onDrumLoopError('${jsEscape(e.message ?: "加载失败")}')")
             }
-        }.start()
+        }).start()
     }
 
     private fun loadFolder(folder: String, gen: Int) {
@@ -144,8 +178,10 @@ class DrumLoopPlayer(
 
         val arr = JSONArray()
         val keys = variations.keys()
+        val keyList = mutableListOf<String>()
         while (keys.hasNext()) {
             val key = keys.next()
+            keyList.add(key)
             val v = variations.getJSONObject(key)
             val duration = v.optDouble("duration", 0.0)
             val bars = if (bpm > 0 && duration > 0) {
@@ -157,11 +193,18 @@ class DrumLoopPlayer(
                 .put("index", indexOf(key))
                 .put("bars", bars))
         }
+        if (gen != loadGeneration.get()) return
         pushJs("onDrumLoopMeta('" + jsEscape(JSONObject()
             .put("name", folder)
             .put("bpm", bpm)
             .put("variations", arr)
             .toString()) + "')")
+
+        // 默认待播放: VERSE 类别第一个 (一般是 verse_01), 无则按 VERSE2/PRECHORUS/CHORUS 顺序
+        val defPending = pickDefaultPending(keyList)
+        if (gen != loadGeneration.get()) return
+        pendingVariation = defPending
+        if (defPending != null) pushJs("onDrumLoopDefaultPending('$defPending')")
 
         // 2. 载入全部 opus 字节
         synchronized(opusData) { opusData.clear() }
@@ -185,9 +228,8 @@ class DrumLoopPlayer(
 
     // ================= 渲染批次 (双引擎三线程) =================
 
-    private fun startStretchPass(priority: String?) {
+    private fun startStretchPass(priority: String?, bpm: Double = getCurrentBpm()) {
         val gen = stretchGeneration.incrementAndGet()
-        val bpm = getCurrentBpm()
         currentBpm = bpm
         val ratio = stretchRatio(bpm, metaBpm)
         Log.i(TAG, "stretch pass gen=$gen bpm=$bpm loopBpm=$metaBpm ratio=$ratio priority=$priority")
@@ -206,6 +248,7 @@ class DrumLoopPlayer(
             doneCount = 0
             states.clear()
             claims.clear()
+            sgsmClaims.clear()
             startedStreams.clear()
             startedSgsm.clear()
             sgsmDone.clear()
@@ -226,6 +269,8 @@ class DrumLoopPlayer(
             Log.w(TAG, "renderStart failed: $name")
             return
         }
+        // 登记: 防止后续点击时 ensureRenderStarted 重复 renderStart (会重置播放缓冲)
+        synchronized(stateLock) { startedStreams.add(name) }
         val preRollFrames = (dec.sampleRate * PRE_ROLL_SECONDS).toLong()  // 0.5s 输出
         var progress = 0L
         var eof = false
@@ -238,7 +283,7 @@ class DrumLoopPlayer(
 
         if (eof) {
             // 音频短于 0.5s: 直接完整渲染
-            if (nativeRenderFinish(name, gen)) {
+            if (drainToComplete(name, gen)) {
                 var rc = 0
                 var dc = 0
                 synchronized(stateLock) {
@@ -265,9 +310,17 @@ class DrumLoopPlayer(
             rc = readyCount
         }
         pushJs("onDrumLoopPreRoll('$name',$rc,$totalInPass)")
+        Log.i(TAG, "preRoll done: $name progress=$progress")
 
-        // 正在播放的 variation (BPM 改变): 立即完整渲染 (按需线程, 最高优先级)
-        if (name == priority) submitOnDemand(name)
+        // 当前批次的优先目标或用户当前选中的目标一旦预热完成：
+        // 1) native 标记“下一次显式切换可直接从 SBSMS 起播”；若同批次 Signalsmith
+        //    已经在播，则改为循环边界升级。native 会用缓冲批次阻止新速度数据提前接管旧速度。
+        // 2) 立即把高质量续渲染转入按需队列；该请求会终止同目标的 Signalsmith 后台任务。
+        // 因此 BPM 拍头到达时，已预热就选 SBSMS，尚未预热才继续选 Signalsmith。
+        if (name == priority || name == pendingVariation) {
+            nativePromotePending(name)
+            submitOnDemand(name)
+        }
 
         // 全部预热完成 → 线程2 按序号顺序完整渲染
         if (rc >= totalInPass) submitAllFullRenders(order, gen)
@@ -284,7 +337,7 @@ class DrumLoopPlayer(
         if (gen != stretchGeneration.get()) return
         val token = gen
         synchronized(stateLock) {
-            if (claims.containsKey(name) || sgsmDone.contains(name)) return
+            if (claims.containsKey(name)) return
             val st = states[name] ?: STATE_NONE
             if (st == STATE_DONE) return
             claims[name] = token
@@ -299,7 +352,7 @@ class DrumLoopPlayer(
                 }
             }
             if (gen != stretchGeneration.get()) return
-            if (!nativeRenderFinish(name, gen)) {
+            if (!drainToComplete(name, gen)) {
                 pushJs("onDrumLoopError('渲染失败: $name')")
                 return
             }
@@ -318,13 +371,38 @@ class DrumLoopPlayer(
         }
     }
 
+    /** 协作式排空: 逐步调用 native finishStep, 期间响应取消 (返回 false = 被取消/失败) */
+    private fun drainToComplete(name: String, gen: Int, token: Int? = null): Boolean {
+        var guard = 0
+        while (gen == stretchGeneration.get() &&
+            (token == null || token == -onDemandGen.get()) && guard++ < 20000) {
+            val n = nativeRenderFinishStep(name, gen)
+            if (n == 0L) return true   // 排空完成
+            if (n < 0) return false    // 批次过期
+        }
+        return false
+    }
+
+    private fun drainSgsmToComplete(name: String, gen: Int, token: Int): Boolean {
+        var guard = 0
+        while (token == -onDemandGen.get() && gen == stretchGeneration.get() && guard++ < 20000) {
+            val n = nativeSgsmFinishStep(name, gen)
+            if (n == 0L) return true
+            if (n < 0) return false
+        }
+        return false
+    }
+
     // ================= 按需渲染 (线程3, 双模式) =================
 
     /** 高质量续渲染 (状态1 点击 / BPM 改变的正在播放 variation) */
     private fun submitOnDemand(name: String) {
-        val token = -onDemandGen.incrementAndGet()
+        val token: Int
         synchronized(stateLock) {
+            // 同一目标已经在续渲染时直接复用；不要先递增全局 token，否则会把现有任务
+            // 取消掉，却又因为 claim 已存在而没有提交替代任务。
             if (claims.containsKey(name)) return
+            token = -onDemandGen.incrementAndGet()
             claims[name] = token
         }
         onDemandExec.execute { safeTask(name) { taskOnDemandRender(name, token) } }
@@ -341,7 +419,7 @@ class DrumLoopPlayer(
                 if (nativeRenderFeed(name, chunk, gen) < 0) return
             }
             if (token != -onDemandGen.get() || gen != stretchGeneration.get()) return
-            if (!nativeRenderFinish(name, gen)) {
+            if (!drainToComplete(name, gen, token)) {
                 pushJs("onDrumLoopError('渲染失败: $name')")
                 return
             }
@@ -362,74 +440,150 @@ class DrumLoopPlayer(
 
     /** 低质量低延迟渲染 (状态0 点击): Signalsmith 流式, 几乎立即出声 */
     private fun submitSgsmOnDemand(name: String) {
-        val token = -onDemandGen.incrementAndGet()
+        val token: Int
         synchronized(stateLock) {
-            if (sgsmDone.contains(name) || claims.containsKey(name)) return
-            claims[name] = token
+            if (sgsmDone.contains(name) || sgsmClaims.containsKey(name)) return
+            token = -onDemandGen.incrementAndGet()
+            sgsmClaims[name] = token
         }
         onDemandExec.execute { safeTask(name) { taskOnDemandSgsm(name, token) } }
     }
 
     private fun taskOnDemandSgsm(name: String, token: Int) {
         val gen = stretchGeneration.get()
-        var completed = false
+        var dec: OpusDecoder? = null
         try {
             ensureSgsmStarted(name)
-            val dec = getOrCreateDecoder(name) ?: return
+            // Signalsmith 与 SBSMS 可能同时准备同一 variation，不能共享一个 MediaCodec 会话。
+            dec = createDecoder(name) ?: return
             while (token == -onDemandGen.get() && gen == stretchGeneration.get()) {
                 val chunk = dec.nextChunk(CHUNK_FRAMES) ?: break
                 if (nativeSgsmFeed(name, chunk, gen) < 0) return
             }
             if (token != -onDemandGen.get() || gen != stretchGeneration.get()) return
-            if (!nativeSgsmFinish(name, gen)) {
+            if (!drainSgsmToComplete(name, gen, token)) {
                 pushJs("onDrumLoopError('渲染失败: $name')")
                 return
             }
             synchronized(stateLock) { sgsmDone.add(name) }
-            completed = true
         } finally {
-            synchronized(stateLock) { if (claims[name] == token) claims.remove(name) }
-            if (completed) removeSession(name)
+            synchronized(stateLock) { if (sgsmClaims[name] == token) sgsmClaims.remove(name) }
+            dec?.release()
         }
     }
 
-    // ================= 播放 =================
+    // ================= 播放控制 (播放状态机) =================
 
-    fun play(variation: String) {
-        playingVariation = variation
-        val state = synchronized(stateLock) { states[variation] ?: STATE_NONE }
-        when (state) {
-            STATE_DONE -> {
-                // 状态2: 直接播放内存中的完整高质量音频
-                nativePlay(variation)
-            }
-            STATE_PRE_ROLLED -> {
-                // 状态1: 播放已渲染的 0.5s, 同时高质量续渲染
-                ensureRenderStarted(variation)
-                nativePlay(variation)
-                submitOnDemand(variation)
-            }
-            else -> {
-                // 状态0: Signalsmith 低质量引擎立即流式渲染播放 (低延迟)
-                ensureSgsmStarted(variation)
-                nativePlay(variation)
-                submitSgsmOnDemand(variation)
-            }
+    @Volatile private var pendingVariation: String? = null
+
+    /** 点击 variation 按钮: 设为待播放 (闪烁); 播放中则请求第一拍切换 */
+    fun setPending(variation: String) {
+        pendingVariation = variation
+        if (playingVariation != null) {
+            // 播放中: 预先准备目标渲染, 节拍器第一拍触发切换
+            prepareForPlayback(variation)
+            nativeRequestSwitch(variation)
         }
-        pushJs("onDrumLoopPlaying('$variation')")
+        pushJs("onDrumLoopPending('$variation')")
     }
 
-    fun stop() {
+    /** 播放按钮: 立即播放待播放的 variation, 并同步节拍器到第一拍 */
+    fun startPlayback() {
+        val p = pendingVariation
+        if (p == null || !folderLoaded || !synchronized(opusData) { opusData.containsKey(p) }) {
+            Log.w(TAG, "startPlayback ignored: no fully loaded pending variation")
+            pushJs("onDrumLoopPlaybackBlocked('请先选择并等待鼓循环加载完成')")
+            return
+        }
+        nativeRequestSwitch("")   // 清掉可能残留的切换请求
+        prepareForPlayback(p)
+        nativePlay(p)
+        nativeSyncBeat()
+        playingVariation = p
+        bpmSwitchPending = false
+        pushJs("onDrumLoopPlaying('$p')")
+    }
+
+    /** 停止按钮: 1 秒淡出停止 */
+    fun stopPlayback() {
         playingVariation = null
+        bpmSwitchPending = false
+        nativeRequestSwitch("")
+        nativeFadeOut(1000)
+        pushJs("onDrumLoopStopping()")
+    }
+
+    /** 立即停止 (切换模式/切换鼓循环集时) */
+    fun stopPlaybackImmediate() {
+        playingVariation = null
+        bpmSwitchPending = false
+        nativeRequestSwitch("")
         nativeStop()
     }
 
-    /** BPM 变化回调 (MainActivity 轮询调用) */
-    fun onBpmChanged(bpm: Double) {
+    /** beat-0 切换已触发 (MainActivity 轮询回调) */
+    fun onSwitchFired(name: String) {
+        playingVariation = name
+        bpmSwitchPending = false
+    }
+
+    /** 准备目标 variation 的渲染 (确保播放开始时有数据) */
+    private fun prepareForPlayback(variation: String) {
+        val state = synchronized(stateLock) { states[variation] ?: STATE_NONE }
+        when (state) {
+            STATE_DONE -> { /* 内存中已有完整高质量音频 */ }
+            STATE_PRE_ROLLED -> {
+                ensureRenderStarted(variation)
+                submitOnDemand(variation)
+            }
+            else -> {
+                // 状态0: Signalsmith 低延迟引擎立即流式渲染
+                val done = synchronized(stateLock) { sgsmDone.contains(variation) }
+                if (!done) {
+                    val inProgress = synchronized(stateLock) { sgsmClaims.containsKey(variation) }
+                    if (!inProgress) {
+                        // 首次或上次渲染被中断: 重置低延迟流后重启；解码器由该任务独占。
+                        synchronized(stateLock) {
+                            startedSgsm.remove(variation)
+                        }
+                        ensureSgsmStarted(variation)
+                        submitSgsmOnDemand(variation)
+                    }
+                }
+            }
+        }
+    }
+
+    /** 默认待播放 variation: VERSE→VERSE2→PRECHORUS→CHORUS 类别中第一个 (序号最小) */
+    fun pickDefaultPending(keys: List<String>): String? {
+        if (keys.isEmpty()) return null
+        val rank = listOf("verse", "verse2", "prechorus", "chorus")
+        for (cat in rank) {
+            val best = keys.filter { categoryOf(it) == cat }.minByOrNull { indexIntOf(it) }
+            if (best != null) return best
+        }
+        return keys.minByOrNull { indexIntOf(it) }
+    }
+
+    /**
+     * 预备变速回调: BPM 即将改变。+/- 由 MainActivity 直接派发；×2/÷2 与旋钮
+     * 仍由 native 状态事件派发。
+     * 节拍器尚未正式变速 —— 此时提前重置所有 variation 并准备目标渲染;
+     * 实际的 BPM 应用与切换发生在节拍器第一拍。
+     */
+    fun onBpmChangePreparing(targetBpm: Double) {
         if (!folderLoaded) return
-        if (Math.abs(bpm - currentBpm) < 0.05) return
-        currentBpm = bpm
-        startStretchPass(playingVariation)
+        Log.i(TAG, "BPM change preparing: target=$targetBpm (current=$currentBpm)")
+        val p = playingVariation
+        // 1. 以目标速度立即重置所有状态并清空已渲染缓存 (正式变速前的准备工作)
+        // 播放中的 variation 排到批量预热首位，避免先为无关片段消耗 CPU。
+        startStretchPass(p, targetBpm)
+        // 2. 正在播放: 以目标速度提前准备目标渲染, 并请求第一拍切换 (对齐新节拍器)
+        if (p != null) {
+            bpmSwitchPending = true
+            prepareForPlayback(p)
+            nativeRequestSwitch(p)
+        }
     }
 
     // ================= 启动辅助 =================
@@ -456,23 +610,34 @@ class DrumLoopPlayer(
 
     // ================= 解码会话 =================
 
+    private fun createDecoder(name: String): OpusDecoder? {
+        val bytes = synchronized(opusData) { opusData[name] } ?: return null
+        return try {
+            OpusDecoder(bytes)
+        } catch (e: Exception) {
+            Log.e(TAG, "create decoder failed: $name", e)
+            null
+        }
+    }
+
     private fun getOrCreateDecoder(name: String): OpusDecoder? {
         synchronized(stateLock) {
             decodeSessions[name]?.let { return it }
         }
-        val bytes = synchronized(opusData) { opusData[name] } ?: return null
-        val dec = try {
-            OpusDecoder(bytes)
-        } catch (e: Exception) {
-            Log.e(TAG, "create decoder failed: $name", e)
-            return null
+        val created = createDecoder(name) ?: return null
+        synchronized(stateLock) {
+            decodeSessions[name]?.let {
+                created.release()
+                return it
+            }
+            decodeSessions[name] = created
         }
-        synchronized(stateLock) { decodeSessions[name] = dec }
-        return dec
+        return created
     }
 
     private fun removeSession(name: String) {
-        synchronized(stateLock) { decodeSessions.remove(name) }
+        val decoder = synchronized(stateLock) { decodeSessions.remove(name) }
+        decoder?.release()
     }
 
     private fun releaseAllSessions() {
@@ -481,7 +646,11 @@ class DrumLoopPlayer(
             decodeSessions.clear()
             l
         }
-        list.forEach { runCatching { it.release() } }
+        if (list.isNotEmpty()) {
+            codecCleanupExec.execute {
+                list.forEach { runCatching { it.release() } }
+            }
+        }
     }
 
     private fun safeTask(name: String, body: () -> Unit) {
@@ -532,6 +701,7 @@ class DrumLoopPlayer(
             codec.start()
         }
 
+        @Synchronized
         fun nextChunk(maxFrames: Int): ShortArray? {
             if (released) return null
             if (outputDone) return null
@@ -581,6 +751,7 @@ class DrumLoopPlayer(
             return shorts
         }
 
+        @Synchronized
         fun release() {
             if (released) return
             released = true
