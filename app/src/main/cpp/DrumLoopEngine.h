@@ -7,23 +7,45 @@
 #include <mutex>
 #include <atomic>
 #include <cstdint>
+#include <cstddef>
 
 class TempoStream;
 class SignalsmithStream;
 
 /// 鼓循环播放引擎: 双引擎渲染 + 无缝循环混音
 ///
-/// 每个循环 (Loop):
-///  - buf: 播放缓冲 (渲染中不断增长; 完整后可循环)
-///  - stream: 高质量 sbsms 流式渲染 (预热/完整渲染线程驱动)
-///  - sgsm:   低质量低延迟 Signalsmith 流式渲染 (点击未渲染 variation 时立即启动)
-///  - pending*: 高质量重渲染缓冲 (播放中重新渲染, 完成后在循环边界切换)
-///
-/// 目标分离规则:
-///  - sbsms 渲染在 "播放中 或 sgsm 活跃" 时进入 pending (避免与当前播放缓冲冲突)
-///  - sgsm 启动时若 sbsms 渲染正在进行, 将其转入 pending, buf 让给 sgsm
+/// 每个循环 (Loop) 把三类对象分开保存：
+///  - buf / sgsmBuilds: Signalsmith 主缓冲及仍在增长的各 generation；
+///  - pending*: 当前 SBSMS 构建缓冲；
+///  - hq*: 已发布、可由播放槽安全引用的四级高质量快照。
+/// 新一阶段/新速度的构建不会覆盖正在播放的旧 shared_ptr 快照。
 class DrumLoopEngine {
 public:
+    using TempoCutCallback = void (*)(double bpm);
+
+    /// 渲染线程专用的固定容量缓冲区。
+    ///
+    /// samples 在构造后永不移动/扩容；渲染线程只写 publishedFrames 之后的区域，
+    /// 完成一段写入后以 release 语义发布新水位。音频线程以 acquire 语义读取水位，
+    /// 因而无需与渲染线程共同持有 mLock。
+    struct PcmBuffer {
+        explicit PcmBuffer(size_t requestedCapacityFrames);
+
+        std::unique_ptr<int16_t[]> samples;
+        size_t capacityFrames = 0;
+        std::atomic<size_t> publishedFrames{0};
+        std::atomic<bool> overflowLogged{false};
+
+        bool valid() const { return samples && capacityFrames > 0; }
+    };
+
+    struct SgsmBuild {
+        std::shared_ptr<SignalsmithStream> stream;
+        std::shared_ptr<PcmBuffer> buf;
+        bool drainStarted = false;
+        bool complete = false;
+    };
+
     struct Loop {
         std::string name;
         int sampleRate = 48000;
@@ -32,46 +54,78 @@ public:
         int sgsmGen = -1;                                 // sgsm 渲染批次
         int bufGen = -1;                                  // buf 所属渲染批次（区分旧速度播放快照）
         bool complete = false;                            // buf 完整可循环
+        double bufOriginFrame = 0.0;                      // buf 第 0 帧对应 variation 逻辑时间
+        double bufLogicalFrames = 0.0;                    // 当前速度下 variation 的逻辑总帧数
         bool sbsmDrainStarted = false;                    // sbsms 排空阶段已开始 (finishInput 已调用)
         bool sgsmDrainStarted = false;                    // sgsm 排空阶段已开始 (finishInput 已调用)
-        std::shared_ptr<std::vector<int16_t>> buf;        // 播放缓冲
+        std::shared_ptr<PcmBuffer> buf;                   // Signalsmith 固定容量播放缓冲
         std::shared_ptr<TempoStream> stream;              // sbsms 渲染 (非 null = 渲染中)
         std::shared_ptr<SignalsmithStream> sgsm;          // sgsm 渲染 (非 null = 渲染中)
-        std::shared_ptr<std::vector<int16_t>> pendingBuf;       // 高质量重渲染缓冲
+        std::map<int, std::shared_ptr<SgsmBuild>> sgsmBuilds; // 允许当前代与下一目标代并行流式生成
+        std::shared_ptr<PcmBuffer> pendingBuf;                  // 高质量固定容量构建缓冲
         std::shared_ptr<TempoStream> pendingStream;             // 高质量重渲染流
         bool pendingComplete = false;
         bool pendingPlayable = false;                          // 高质量 pending 已达到安全起播水位
+        double pendingOriginFrame = 0.0;
+        double pendingLogicalFrames = 0.0;
         bool promoteAtWrap = false;                            // 预热完成: 循环边界切换为高质量缓冲
+
+        // 已发布的 SBSMS 高质量快照。它与 pending 构建缓冲、Signalsmith 主缓冲彼此独立：
+        // 新一阶段的 SBSMS 重建不会覆盖仍可播放的上一阶段快照。
+        std::shared_ptr<PcmBuffer> hqBuf;
+        int hqGen = -1;
+        int hqState = 0;                                      // 0=无, 1=头0.5s, 2=头+末小节, 3=完整
+        bool hqComplete = false;
+        double hqOriginFrame = 0.0;                            // hqBuf 第0帧对应的逻辑时间
+        double hqLogicalFrames = 0.0;
     };
 
     DrumLoopEngine() = default;
     ~DrumLoopEngine() = default;
 
     // ===== 高质量 (sbsms) 渲染 =====
-    bool renderStart(const std::string& name, int sampleRate, float ratio, int gen);
+    bool renderStart(const std::string& name, int sampleRate, float ratio, int gen,
+                     double logicalOriginSec, double logicalDurationSec);
     int64_t renderFeed(const std::string& name, const int16_t* pcm, int32_t totalSamples, int gen);
     /// 排空一步 (协作式, 单次渲染至多 8192 帧); 返回本次渲染帧数, 0 = 排空完成, -1 = 批次过期
     int64_t renderFinishStep(const std::string& name, int gen);
 
-    /// 预热完成: 标记在当前循环边界把播放缓冲切换为高质量 pending 缓冲
-    /// (不打断当前播放; 正在播放低质量版本时使用)
+    /// 把当前 SBSMS 构建缓冲发布为指定高质量状态；构建可继续向同一缓冲追加。
+    bool renderCommit(const std::string& name, int gen, int state);
+
+    /// 兼容旧 JNI：把当前 pending 缓冲发布为状态1快照；不再安排循环边界自动升级。
     bool promotePending(const std::string& name);
 
     // ===== 低质量低延迟 (Signalsmith) 渲染 =====
-    bool sgsmStart(const std::string& name, int sampleRate, float ratio, int gen);
+    bool sgsmStart(const std::string& name, int sampleRate, float ratio, int gen,
+                   double logicalOriginSec, double logicalDurationSec);
     int64_t sgsmFeed(const std::string& name, const int16_t* pcm, int32_t totalSamples, int gen);
     /// 排空一步 (协作式); 返回本次渲染帧数, 0 = 排空完成, -1 = 批次过期
     int64_t sgsmFinishStep(const std::string& name, int gen);
 
-    /// 取消所有进行中的渲染 (保留已渲染缓冲用于播放)
+    /// 使全部 HQ 构建/快照失效；播放槽与仍被引用的 Signalsmith generation 可继续增长。
     void renderCancelAll();
 
     /// 清空所有循环并停止播放
     void clear();
 
     void play(const std::string& name);
+    /// 从 variation 逻辑时间轴的任意位置起播；高质量状态不足时回退到 Signalsmith 主缓冲。
+    void playAt(const std::string& name, double logicalStartSec);
     void stop();
     bool isPlaying() const;
+
+    /// 当前播放槽在 variation 逻辑时间轴上的位置（秒）；name 不匹配或未播放返回 -1。
+    double getPlaybackPositionSec(const std::string& name) const;
+
+    /// 在音频回调中按播放时间倒计时，并在 cut point 原子切换到同 variation 的新速度 buf。
+    bool armTempoCut(const std::string& name, int gen, double delaySec,
+                     const std::vector<double>& targetOffsetsSec,
+                     const std::vector<double>& nextDelaysSec,
+                     double targetBpm);
+    void cancelTempoCut();
+    double getAndClearTempoCutEvent();
+    void setTempoCutCallback(TempoCutCallback cb) { mTempoCutCallback = cb; }
 
     /// 淡出停止 (durationMs 内线性衰减到 0 并停止)
     void fadeOut(int durationMs);
@@ -107,8 +161,13 @@ private:
     // 双播放槽 (ping-pong): 切换时新槽立即播放新循环, 旧槽 30ms 淡出后清空
     struct Slot {
         std::shared_ptr<Loop> loop;
-        std::shared_ptr<std::vector<int16_t>> buf;  // 播放缓冲快照 (流式渲染持续增长, 快照不随 loop->buf 替换而变)
+        std::shared_ptr<PcmBuffer> buf;             // 固定容量播放快照；可读范围由 publishedFrames 发布
         int bufGen = -1;                           // 快照所属批次，防止新速度缓冲提前接管旧速度播放
+        int sampleRate = 48000;
+        double logicalOriginFrame = 0.0;
+        double logicalDurationFrames = 0.0;
+        bool complete = false;                         // 此播放缓冲快照是否已经完整，不能借用 Loop 的新批次状态
+        int hqState = 0;                               // 0=Signalsmith/普通缓冲, 1..3=高质量快照
         double pos = 0.0;
         float gain = 1.0f;
         bool fading = false;
@@ -121,9 +180,27 @@ private:
     static constexpr int64_t kSwitchFadeUs = 30000;   // 切换淡出 30ms
     static constexpr int64_t kSwitchFadeInUs = 10000; // 新槽淡入 10ms
 
+    // 任意 cut point 变速计划。remainingSec 由 Oboe 实际输出帧递减，不依赖 UI 轮询。
+    bool mTempoCutArmed = false;
+    std::string mTempoCutName;
+    int mTempoCutGen = -1;
+    double mTempoCutRemainingSec = 0.0;
+    double mTempoCutTargetBpm = -1.0;
+    struct TempoCutCandidate {
+        double targetOffsetSec = 0.0;  // 相对目标旋转缓冲区开头的物理播放位置
+        double nextDelaySec = 0.0;     // 本切分点失败后，到下一个切分点的旧速度时间
+    };
+    std::vector<TempoCutCandidate> mTempoCutCandidates;
+    size_t mTempoCutCandidateIndex = 0;
+    std::atomic<double> mTempoCutEvent{-1.0};
+    TempoCutCallback mTempoCutCallback = nullptr;
+
     /// 混音一个播放槽 (须在 mLock 持有下调用)
     void mixSlot(Slot& slot, bool isCurrent, float* outBuf, int32_t numFrames,
                  int32_t deviceSampleRate, float baseVol);
+
+    /// mLock 内调用；把当前槽切到已准备的新速度主缓冲，返回已应用 BPM，失败返回 -1。
+    double fireTempoCutLocked();
 
     /// 该循环是否在任一播放槽中 (须在 mLock 持有下调用)
     bool isLoopActive(const std::shared_ptr<Loop>& loop) const {

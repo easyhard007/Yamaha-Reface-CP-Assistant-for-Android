@@ -406,7 +406,15 @@
             var bpm = parseFloat((document.getElementById('bpm-display').innerText || '').replace('♪=', '')) || 75;
             var mult = bpm < 90 ? 2 : -2;
             _bpmPendingMult = mult;
-            if (typeof Android !== 'undefined' && Android.requestBpmMult) Android.requestBpmMult(mult);
+            if (typeof Android !== 'undefined' && Android.requestBpmMult) {
+                var target = Number(Android.requestBpmMult(mult));
+                if (isFinite(target) && target >= 0) {
+                    previewBpmTarget(target);
+                } else {
+                    _bpmPendingMult = 0;
+                    return;
+                }
+            }
             // 立即反馈: 按钮闪烁 + bpm 高亮黄
             document.getElementById('bpm-mult-btn').classList.add('flash');
             tempoHighlight();
@@ -464,7 +472,7 @@
                 _bpmHold.locked = true;
                 button.classList.add('pressing');
                 try { button.setPointerCapture(event.pointerId); } catch (e) {}
-                // 在第一次 ±1 之前先锁住拍头；若最终只是轻触，抬手会立即解锁。
+                // 先同步按住状态；非鼓循环路径保留拍头保护，鼓循环仍会立即启动 cut 流程。
                 setBpmHoldLock(true);
                 requestBpmStep(delta);
                 _bpmHold.timeout = setTimeout(function () {
@@ -586,7 +594,7 @@
         // ===== DRUM LOOPS =====
         window._drumMeta = null;
         window._drumCurrent = null;   // 正在播放的 variation (实心)
-        window._drumPending = null;   // 待播放的 variation (闪烁)
+        window._drumTarget = null;    // 播放目标 variation (快速闪烁白色外框)
         window._drumReady = false;    // 循环包元数据与 Opus 均已加载完成
         var DRUM_COLUMNS = [
             ['verse', 'VERSE'],
@@ -602,11 +610,12 @@
                 var key = b.getAttribute('data-key');
                 b.classList.remove('drum-active', 'drum-blink');
                 if (key === window._drumCurrent) b.classList.add('drum-active');
-                else if (key === window._drumPending) b.classList.add('drum-blink');
+                // 当前与目标可以是同一个：此时同时显示绿色填充和白色闪烁外框。
+                if (key === window._drumTarget) b.classList.add('drum-blink');
             });
             var pb = document.getElementById('drum-play-btn');
             if (pb) {
-                var canStart = window._drumReady && !!window._drumPending;
+                var canStart = window._drumReady && !!window._drumTarget;
                 var disabled = !window._drumCurrent && !canStart;
                 pb.classList.toggle('drum-play-stop', !!window._drumCurrent);
                 pb.classList.toggle('drum-play-disabled', disabled);
@@ -686,8 +695,7 @@
         }
         function onDrumLoopBtnClick(btn) {
             var key = btn.getAttribute('data-key');
-            if (key === window._drumCurrent) return;  // 点击正在播放的: 无操作
-            window._drumPending = key;
+            window._drumTarget = key;
             if (typeof Android !== 'undefined') Android.setDrumPending(key);
             updateDrumButtonStates();
         }
@@ -695,21 +703,21 @@
             if (window._drumCurrent) {
                 if (typeof Android !== 'undefined') Android.drumStopPlayback();
             } else {
-                if (!window._drumReady || !window._drumPending) return;
+                if (!window._drumReady || !window._drumTarget) return;
                 if (typeof Android !== 'undefined') Android.drumStartPlayback();
             }
         }
-        function onDrumLoopDefaultPending(key) { window._drumPending = key; updateDrumButtonStates(); }
-        function onDrumLoopPending(key) { window._drumPending = key; updateDrumButtonStates(); }
+        function onDrumLoopDefaultPending(key) { window._drumTarget = key; updateDrumButtonStates(); }
+        function onDrumLoopPending(key) { window._drumTarget = key; updateDrumButtonStates(); }
         function onDrumLoopPlaying(key) {
             window._drumCurrent = key;
-            window._drumPending = null;
+            window._drumTarget = key;
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '播放中: ' + key;
         }
         function onDrumLoopSwitchEvent(key) {
             window._drumCurrent = key;
-            window._drumPending = null;
+            // 目标可能已在这次 native 事件抵达 UI 前被用户改成另一个 variation，不能覆盖。
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '播放中: ' + key;
         }
@@ -728,7 +736,7 @@
         function resetDrumPlayback() {
             if (window._drumCurrent && typeof Android !== 'undefined') Android.drumStopImmediate();
             window._drumCurrent = null;
-            window._drumPending = null;
+            window._drumTarget = null;
             updateDrumButtonStates();
         }
         function onDrumLoopProgress(done, total) {
@@ -746,7 +754,7 @@
         function onDrumLoopStretchReset(total) {
             var grid = document.getElementById('drumloop-grid');
             grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
-                b.classList.remove('full');
+                b.classList.remove('ready', 'tail-ready', 'full');
             });
             document.getElementById('drumloop-status').innerText = '高质量渲染 0/' + total;
         }
@@ -756,10 +764,15 @@
             if (btn) btn.classList.add('ready');  // 状态1: 高质量已渲染 0.5s
             document.getElementById('drumloop-status').innerText = '预热 ' + ready + '/' + total;
         }
+        function onDrumLoopTailReady(key) {
+            var grid = document.getElementById('drumloop-grid');
+            var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
+            if (btn) btn.classList.add('tail-ready');  // 状态2: 头0.5s + 最后一小节
+        }
         function onDrumLoopStretched(key, done, total) {
             var grid = document.getElementById('drumloop-grid');
             var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
-            if (btn) btn.classList.add('full');  // 状态2: 高质量完整渲染
+            if (btn) btn.classList.add('full');  // 状态3: 高质量完整渲染
             document.getElementById('drumloop-status').innerText = '高质量渲染 ' + done + '/' + total;
         }
         function onDrumLoopStretchDone() {

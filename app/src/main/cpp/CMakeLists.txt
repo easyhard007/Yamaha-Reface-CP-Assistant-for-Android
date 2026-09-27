@@ -108,4 +108,13 @@ target_link_libraries(
         m
 )
 
+# Oboe 1.9.3 的 Prefab 模块在部分 AGP/CMake 组合下只参与链接，却不会自动进入
+# merged_native_libs。把实际共享库复制到本目标输出目录，确保 APK 同时包含
+# libcynarranger.so 与它运行时依赖的 liboboe.so。
+add_custom_command(TARGET cynarranger POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "$<TARGET_FILE:oboe::oboe>"
+        "$<TARGET_FILE_DIR:cynarranger>/liboboe.so"
+)
+
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ffast-math -mfpu=neon")

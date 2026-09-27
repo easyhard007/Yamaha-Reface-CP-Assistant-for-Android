@@ -30,7 +30,7 @@ public:
 
     /// 获取当前拍号 (0-based, 供 JS 轮询)
     int  getCurrentBeat() const { return currentBeat.load(); }
-    double getCurrentBpm() const { return bpm; }
+    double getCurrentBpm() const { return bpm.load(); }
 
     /// 是否正在运行
     bool isRunning() const { return running.load(); }
@@ -46,8 +46,8 @@ private:
     int stepCounter = 0;
 
     int    beatsPerBar = 4;
-    double bpm = 75.0;
-    double beatIntervalMs = 800.0; // 60000 / 75 = 800
+    std::atomic<double> bpm{75.0};
+    std::atomic<double> beatIntervalMs{800.0}; // 60000 / 75 = 800
     std::vector<double> mTapTempoStamps;
 
     std::mutex mtx;

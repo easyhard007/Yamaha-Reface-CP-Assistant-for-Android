@@ -552,6 +552,7 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
 }
 .drumloop-btn {
     display: flex;
+    position: relative;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -563,11 +564,20 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     cursor: pointer;
 }
 .drumloop-bars { font-size: 8px; font-weight: normal; color: #999; }
+.drumloop-btn.tail-ready { box-shadow: inset 0 -1px 0 rgba(255,255,255,0.28); } /* 头部+末小节 */
 .drumloop-btn.full { box-shadow: 0 0 4px rgba(255,255,255,0.35); }  /* 高质量完整渲染标记 */
 .drumloop-btn.drum-active { background: #2e7d32; }                   /* 实心: 正在播放 */
 .drumloop-btn.drum-active .drumloop-bars { color: #cfc; }
-.drumloop-btn.drum-blink { animation: drumblink 0.7s ease-in-out infinite alternate; }  /* 闪烁: 待播放 */
+.drumloop-btn.drum-blink::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px solid #fff;
+    border-radius: 7px;
+    pointer-events: none;
+    animation: drumblink 0.34s ease-in-out infinite alternate;
+}  /* 快速闪烁白框: 目标 variation；不覆盖当前 variation 的绿色填充 */
 @keyframes drumblink {
-    from { box-shadow: 0 0 2px rgba(255,255,255,0.2); background: rgba(255,255,255,0.10); }
-    to   { box-shadow: 0 0 8px rgba(255,255,255,0.8); background: rgba(255,255,255,0.35); }
+    from { opacity: 0.18; box-shadow: 0 0 2px rgba(255,255,255,0.2); }
+    to   { opacity: 1; box-shadow: 0 0 9px rgba(255,255,255,0.95); }
 }
