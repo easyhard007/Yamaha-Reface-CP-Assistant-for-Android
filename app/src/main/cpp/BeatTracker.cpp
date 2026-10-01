@@ -1,5 +1,6 @@
 #include "BeatTracker.h"
 #include "CajonAssistant.h"
+#include <algorithm>
 #include <chrono>
 #include <thread>
 #include <android/log.h>
@@ -45,9 +46,17 @@ void BeatTracker::sync() {
     cv.notify_one(); // 唤醒 beatLoop 立即跳到第 1 拍
 }
 
-void BeatTracker::tapTempo() {
+double BeatTracker::tapTempo(bool autoStartCajon) {
     using namespace std::chrono;
-    double nowMs = duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+    // 保留亚毫秒精度，避免四次 tap 的整数截断累积到启播相位。
+    double nowMs = duration<double, std::milli>(
+        steady_clock::now().time_since_epoch()).count();
+
+    // 两种模式的 tap 序列不混用，避免切换模式后一击就误触发。
+    if (mTapTempoCajonMode != autoStartCajon) {
+        mTapTempoStamps.clear();
+        mTapTempoCajonMode = autoStartCajon;
+    }
 
     // 最新时间戳超过 2 秒 → 清空重新计数
     if (!mTapTempoStamps.empty() && (nowMs - mTapTempoStamps.back()) > 2000.0) {
@@ -75,12 +84,12 @@ void BeatTracker::tapTempo() {
         // 推送 BPM 到 UI
         g_pendingBpmUpdate.store((double)roundedBpm);
 
-        // 如果当前节奏音量为 0 → 延迟 0.25*measure 后 sync + 启动节奏 + 设能量
-        extern RhythmAudioEngine* g_rhythmEngine;
-        float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
-        if (rg <= 0.0f) {
-            int64_t delayMs = (int64_t)(measureMs * 0.25) - 50;
-            if (delayMs < 0) delayMs = 0;
+        const double leadMs = autoStartCajon ? 50.0 : 100.0;
+        const double triggerDelayMs = std::max(0.0, measureMs * 0.25 - leadMs);
+
+        // 箱鼓模式保留原行为；鼓循环模式由 Kotlin 用返回的同一延时启播。
+        if (autoStartCajon) {
+            const int64_t delayMs = (int64_t)triggerDelayMs;
             BeatTracker* pSelf = this;
             std::thread([delayMs, pSelf]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(delayMs));
@@ -98,11 +107,13 @@ void BeatTracker::tapTempo() {
                 // 最后 sync, 此时音量+能量已就位
                 pSelf->sync();
             }).detach();
-
-            // 清空 tap 记录，准备下一轮
-            mTapTempoStamps.clear();
         }
+
+        // 每四击是一组完整测量，不把第五击累加到旧序列。
+        mTapTempoStamps.clear();
+        return triggerDelayMs;
     }
+    return -1.0;
 }
 
 void BeatTracker::beatLoop() {

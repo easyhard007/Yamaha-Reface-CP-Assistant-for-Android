@@ -100,6 +100,14 @@ add_library(
         ${FLUIDLITE_SOURCES}
 )
 
+# NDK 28 的 Windows clang++ 在本项目约 50 个 native 源文件同时冷编译时，偶发会在
+# libc++ <string> 内报并不存在的重载歧义（常见受害者是 chord_detect.cpp）；同一条
+# 编译命令单独重试又会成功。Gradle 的 --max-workers 不限制 Ninja 内部并发，因此用
+# CMake/Ninja job pool 把本目标的 C/C++ 编译并发固定为 2，避免 clean build 的前端
+# 资源竞争，同时仍保留少量并行度。
+set_property(GLOBAL PROPERTY JOB_POOLS cynarranger_compile_pool=2)
+set_property(TARGET cynarranger PROPERTY JOB_POOL_COMPILE cynarranger_compile_pool)
+
 target_link_libraries(
         cynarranger
         oboe::oboe

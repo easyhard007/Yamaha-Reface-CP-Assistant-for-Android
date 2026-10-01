@@ -95,14 +95,17 @@ void BassAssist::playBass(int pitch, int vel, double nowMs, AudioEngine& audio) 
 }
 
 void BassAssist::dampBass(double nowMs, double bpm, const std::vector<int>& chordNotes,
-                           float energy, AudioEngine& audio) {
+                           float energy, int triggerVelocity, AudioEngine& audio) {
     if (mBassNoteOn < 0) return;
     int dampPitch = mBassNoteOn;
     int gen = ++mDampGeneration;
     double measureMs = 240000.0 / bpm;
+    int dampVelocity = (int)std::lround((double)triggerVelocity * 0.70);
+    if (dampVelocity < 1) dampVelocity = 1;
+    if (dampVelocity > 127) dampVelocity = 127;
 
     audio.enqueueNoteOff(2, 0, dampPitch);
-    audio.enqueueNoteOn(2, 0, dampPitch, 126);
+    audio.enqueueNoteOn(2, 0, dampPitch, dampVelocity);
     mBassNoteOn = -1;
 
     AudioEngine* pAudio = &audio;
@@ -143,8 +146,8 @@ void BassAssist::processStep(int step, int bassVel, int toneVel, double nowMs, d
                               const std::vector<int>& chordNotes,
                               float energy,
                               AudioEngine& audio, RhythmAudioEngine* rhythmEng) {
-    // Cajon Tone 力度>64 → 制音
-    if (toneVel > 64) dampBass(nowMs, bpm, chordNotes, energy, audio);
+    // Cajon Tone（军鼓）力度>64 → 制音；短促制音音符使用原鼓力度的 70%。
+    if (toneVel > 64) dampBass(nowMs, bpm, chordNotes, energy, toneVel, audio);
 
     // 从和弦解析贝斯根音 (step 0 用)
     int bassPitch = getBassPitchFromChord(chordStr);

@@ -5,6 +5,8 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <condition_variable>
+#include <thread>
 #include <atomic>
 #include <cstdint>
 #include <cstddef>
@@ -22,6 +24,9 @@ class SignalsmithStream;
 class DrumLoopEngine {
 public:
     using TempoCutCallback = void (*)(double bpm);
+    using OneShotSwitchCallback = void (*)();
+    enum BassMidiAction { BassAllSoundsOff = 0, BassNoteOn = 1, BassNoteOff = 2 };
+    using BassMidiCallback = void (*)(int action, int pitch, int velocity);
 
     /// 渲染线程专用的固定容量缓冲区。
     ///
@@ -44,6 +49,15 @@ public:
         std::shared_ptr<PcmBuffer> buf;
         bool drainStarted = false;
         bool complete = false;
+    };
+
+    struct BassMidiEvent {
+        double phase = 0.0; // 0..1 on the variation's logical timeline
+        int velocity = 0;   // 原始 MIDI 力度；0=note-off，C5 输出时再缩放到 60%
+        bool downbeat = false; // true only for a note-on at the first beat of a measure
+        bool strongBeat = false; // note-on within a 32nd note of beat 1 or beat 3
+        int noteKind = 0;    // 0=C4, 1=isolated C5, 2=connected C5
+        int phraseGroup = -1; // connected-C5 component id; otherwise -1
     };
 
     struct Loop {
@@ -78,10 +92,11 @@ public:
         bool hqComplete = false;
         double hqOriginFrame = 0.0;                            // hqBuf 第0帧对应的逻辑时间
         double hqLogicalFrames = 0.0;
+        std::vector<BassMidiEvent> bassMidi;                    // 与 variation 同相位的贝斯乐句
     };
 
-    DrumLoopEngine() = default;
-    ~DrumLoopEngine() = default;
+    DrumLoopEngine();
+    ~DrumLoopEngine();
 
     // ===== 高质量 (sbsms) 渲染 =====
     bool renderStart(const std::string& name, int sampleRate, float ratio, int gen,
@@ -126,6 +141,43 @@ public:
     void cancelTempoCut();
     double getAndClearTempoCutEvent();
     void setTempoCutCallback(TempoCutCallback cb) { mTempoCutCallback = cb; }
+
+    /// 在音频回调的指定时刻，把当前 variation 以 30ms 等功率交叉淡化跳到
+    /// state2/3 高质量缓冲中的最后一小节位置。
+    bool armAutoFillJump(const std::string& name, int gen, double delaySec,
+                         double destinationLogicalSec);
+    void cancelAutoFillJump();
+
+    /// 以等功率交叉淡化进入一次性 variation；delaySec>0 时继续播放当前循环，
+    /// 由音频回调精确倒计时后才开始。播放到逻辑结尾后无缝切到 nextName 的
+    /// 0 秒，或在 stopAfter=true 时停止。
+    bool startOneShot(const std::string& name, double logicalStartSec, int fadeMs,
+                      const std::string& nextName, bool stopAfter, double delaySec,
+                      double endFadeSec);
+    /// INTRO/BREAK 播放期间允许前端更改播完后的目标 variation。
+    bool updateOneShotNext(const std::string& nextName);
+    void cancelOneShot();
+    std::string getAndClearOneShotStartedEvent();
+    std::string getAndClearOneShotSwitchEvent();
+    void setOneShotSwitchCallback(OneShotSwitchCallback cb) { mOneShotSwitchCallback = cb; }
+
+    /// 注册 variation 同名 MIDI 中的音符事件。phase 按原始 variation 总时长归一化；
+    /// velocity=0 表示 note-off，其余值保持 MIDI 原力度。
+    bool setBassMidiEvents(const std::string& name, const std::vector<double>& phases,
+                           const std::vector<int>& velocities,
+                           const std::vector<int>& downbeats,
+                           const std::vector<int>& strongBeats,
+                           const std::vector<int>& noteKinds,
+                           const std::vector<int>& phraseGroups);
+    void setBassMidiCallback(BassMidiCallback cb) { mBassMidiCallback = cb; }
+    /// 由原生 MIDI/和弦识别链即时推送全局和弦。有效和弦立即成为贝斯和弦；
+    /// 无和弦只启动 5 秒可取消计时，避免演奏换把间隙让贝斯过早静音。
+    /// fallbackPitch 是根音/转位低音；pitchClasses 包含 ChordDetector 给出的
+    /// 全部和弦内音（含七、九音）。tempoBpm 用于补弹力度的音乐时值衰减。
+    void setBassChordContext(int fallbackPitch, int rootPitch,
+                             const std::vector<int>& pitchClasses, double tempoBpm);
+    void setBassSelectionEnergy(float energy);
+    void setBassLoopEnabled(bool enabled);
 
     /// 淡出停止 (durationMs 内线性衰减到 0 并停止)
     void fadeOut(int durationMs);
@@ -174,11 +226,28 @@ private:
         int64_t fadeTotalUs = 0;
         int64_t fadeRemainingUs = 0;
         int64_t fadeInRemainingUs = 0;   // 新槽淡入 (10ms)
+        // Auto Fill 专用 constant-power 包络：-1=cos 淡出，+1=sin 淡入。
+        int constantPowerRole = 0;
+        int64_t constantPowerTotalFrames = 0;
+        int64_t constantPowerProgressFrames = 0;
     };
     Slot mSlots[2];
     int mCurSlot = 0;
     static constexpr int64_t kSwitchFadeUs = 30000;   // 切换淡出 30ms
     static constexpr int64_t kSwitchFadeInUs = 10000; // 新槽淡入 10ms
+
+    struct PlaybackSource {
+        std::shared_ptr<Loop> loop;
+        std::shared_ptr<PcmBuffer> buf;
+        int bufGen = -1;
+        int sampleRate = 48000;
+        double logicalOriginFrame = 0.0;
+        double logicalDurationFrames = 0.0;
+        double logicalStartFrame = 0.0;
+        double pos = 0.0;
+        bool complete = false;
+        int hqState = 0;
+    };
 
     // 任意 cut point 变速计划。remainingSec 由 Oboe 实际输出帧递减，不依赖 UI 轮询。
     bool mTempoCutArmed = false;
@@ -195,12 +264,111 @@ private:
     std::atomic<double> mTempoCutEvent{-1.0};
     TempoCutCallback mTempoCutCallback = nullptr;
 
+    // Auto Fill 的近即时切点跳转；与变速 cut 互斥，倒计时同样由实际输出帧推进。
+    bool mAutoFillJumpArmed = false;
+    std::string mAutoFillJumpName;
+    int mAutoFillJumpGen = -1;
+    double mAutoFillJumpRemainingSec = 0.0;
+    double mAutoFillJumpDestinationSec = 0.0;
+
+    // Smart Fill / BREAK / INTRO / ENDING 共用的一次性播放状态。延迟启动按设备输出帧，
+    // 播放结束按源音频帧倒计时，两端都不依赖 Kotlin 定时器。
+    bool mOneShotStartArmed = false;
+    double mOneShotStartRemainingSec = 0.0;
+    std::string mOneShotPendingName;
+    double mOneShotPendingLogicalStartSec = 0.0;
+    int mOneShotPendingFadeMs = 30;
+    std::string mOneShotPendingNextName;
+    bool mOneShotPendingStopAfter = false;
+    double mOneShotPendingEndFadeSec = 0.0;
+    PlaybackSource mOneShotPendingSource;
+    PlaybackSource mOneShotPendingNext;
+    bool mOneShotActive = false;
+    bool mOneShotStopAfter = false;
+    std::string mOneShotName;
+    double mOneShotRemainingSourceFrames = 0.0;
+    double mOneShotEndFadeSourceFrames = 0.0;
+    PlaybackSource mOneShotNext;
+    bool mOneShotNextReady = false;
+    std::atomic<int> mOneShotStartedEvent{0};
+    std::string mOneShotStartedEventName;
+    std::atomic<int> mOneShotSwitchEvent{0};
+    std::string mOneShotSwitchEventName;
+    OneShotSwitchCallback mOneShotSwitchCallback = nullptr;
+    std::atomic<int32_t> mLastDeviceSampleRate{48000};
+
+    // 贝斯循环与当前播放槽共用同一逻辑时间轴。这里只保存 transport 状态；
+    // 实际发声仍通过 AudioEngine 的 bass synth（target=2）。
+    BassMidiCallback mBassMidiCallback = nullptr;
+    std::atomic<int> mChordBassPitch{-1};
+    std::vector<int> mBassChordPitches;
+    std::vector<int> mBassChordTonePcs;
+    int mBassChordRootPc = -1;
+    int mBassChordThirdPc = -1;
+    int mBassChordFifthPc = -1;
+    double mBassTempoBpm = 75.0;
+    bool mGlobalBassChordPresent = false;
+    int64_t mBassNoChordDeadlineUs = -1;
+    bool mBassChordTimerStopping = false;
+    std::condition_variable mBassChordTimerCv;
+    std::thread mBassChordTimerThread;
+    std::atomic<float> mBassSelectionEnergy{0.0f};
+    uint32_t mBassRandomState = 0x6d2b79f5u;
+    std::atomic<bool> mBassLoopEnabled{false};
+    const Loop* mBassMidiLoop = nullptr;
+    int mBassMidiBufGen = -1;
+    double mBassMidiDurationFrames = 0.0;
+    double mBassMidiLastLogicalFrame = -1.0;
+    size_t mBassMidiNextEvent = 0;
+    bool mBassMidiNeedsSync = true;
+    bool mBassMidiInputOn = false;
+    int mBassMidiInputVelocity = 0;
+    bool mBassMidiInputDownbeat = false;
+    bool mBassMidiInputStrongBeat = false;
+    int mBassMidiInputKind = 0;
+    int mBassMidiInputGroup = -1;
+    int64_t mBassMidiGateStartUs = -1;
+    double mBassMidiGateEndLogicalFrame = -1.0;
+    int mBassMidiOutputPitch = -1;
+    int mBassConnectedGroup = -1;
+    int mBassConnectedPreviousPitch = -1;
+
     /// 混音一个播放槽 (须在 mLock 持有下调用)
     void mixSlot(Slot& slot, bool isCurrent, float* outBuf, int32_t numFrames,
                  int32_t deviceSampleRate, float baseVol);
 
     /// mLock 内调用；把当前槽切到已准备的新速度主缓冲，返回已应用 BPM，失败返回 -1。
     double fireTempoCutLocked();
+
+    /// mLock 内、音频回调中调用；建立同 variation A/B 双槽等功率淡化。
+    bool fireAutoFillJumpLocked(int32_t deviceSampleRate);
+
+    /// mLock 内调用：把逻辑时间映射到当前可播放的 SBSMS/Signalsmith 快照。
+    bool preparePlaybackSourceLocked(const std::string& name, double logicalStartSec,
+                                     PlaybackSource& out);
+    /// mLock 内、音频回调中调用；返回 1=切换到 next，2=停止，0=无动作。
+    int fireOneShotLocked();
+    /// mLock 内调用；把已准备的一次性源安装进双槽并启动其结尾倒计时。
+    bool beginOneShotLocked(PlaybackSource source, int fadeMs, PlaybackSource next,
+                            bool stopAfter, int32_t deviceSampleRate, double endFadeSec);
+    /// mLock 内、音频回调中调用；执行延迟的一次性段落启动。
+    bool fireOneShotStartLocked(int32_t deviceSampleRate);
+    void clearOneShotLocked();
+
+    void resetBassMidiLocked(bool emitAllSoundsOff);
+    void syncBassMidiLocked(const Slot& slot, double logicalFrame);
+    void processBassMidiLocked(const Slot& slot, double logicalFrame, double step);
+    void emitBassMidiEventLocked(const Loop& loop, size_t eventIndex);
+    int chooseBassPitchLocked(int noteKind, bool downbeat, int phraseGroup);
+    int chooseHighC5PitchLocked(int phraseGroup);
+    float nextBassRandomLocked();
+    int bassCatchUpVelocityLocked() const;
+    int bassOutputVelocityLocked(int noteKind, int sourceVelocity) const;
+    double findBassGateEndFrameLocked(const Loop& loop, size_t noteOnIndex) const;
+    double bassGateRemainingBeatsLocked() const;
+    bool bassPitchFitsCurrentTriadLocked(int pitch) const;
+    void clearRetainedBassChordLocked();
+    void bassChordTimerLoop();
 
     /// 该循环是否在任一播放槽中 (须在 mLock 持有下调用)
     bool isLoopActive(const std::shared_ptr<Loop>& loop) const {

@@ -1,12 +1,18 @@
 #include "AudioEngine.h"
 #include "RhythmAudioEngine.h"
 #include "DrumLoopEngine.h"
+#include <atomic>
 
 // Global rhythm engine for WAV playback
 RhythmAudioEngine* g_rhythmEngine = nullptr;
 // Global drum loop engine (opus → PCM 循环混音)
 DrumLoopEngine* g_drumLoopEngine = nullptr;
-extern float g_bassVolume;
+extern std::atomic<float> g_bassVolume;
+extern std::atomic<bool> g_bassLoopMode;
+
+// Shared by Cajon BassAssist and drum-loop bass. +3 dB is an amplitude ratio
+// of 10^(3/20), applied after the shared bass synth/reverb chain.
+static constexpr float kBassOutputBoost3Db = 1.4125375f;
 #include "fluid_sfont.h"
 #include <android/log.h>
 #include <cstring>
@@ -257,8 +263,14 @@ oboe::DataCallbackResult AudioEngine::onAudioReady(
             fluid_synth_write_float(mBassSynth, numFrames, bassBuf, 0, 2, bassBuf, 1, 2);
             g_rhythmEngine->processBassReverb(bassBuf, numFrames);
             float rg = g_rhythmEngine ? g_rhythmEngine->getMasterGain() : 0.0f;
+            // 箱鼓助手沿用箱鼓总音量作为组增益；鼓循环有独立的鼓/贝斯滑块，
+            // 因此贝斯循环不能被箱鼓音量（常为 0）再次衰减。
+            const float groupGain = g_bassLoopMode.load(std::memory_order_relaxed)
+                ? 1.0f : rg / 4.0f;
+            const float bassVolume = g_bassVolume.load(std::memory_order_relaxed);
             for (int i = 0; i < numFrames * 2; ++i)
-                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f * rg / 4.0f * g_bassVolume;
+                outBuffer[i] += bassBuf[i] * (float)mBassGain * 1.8f *
+                                kBassOutputBoost3Db * groupGain * bassVolume;
         }
     }
     // Mix rhythm WAV samples, then soft-clip to prevent hard clipping

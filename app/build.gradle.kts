@@ -10,7 +10,7 @@ android {
     }
 
     androidResources {
-        noCompress.addAll(listOf("wav", "mp3", "ogg", "sf2", "opus"))
+        noCompress.addAll(listOf("wav", "mp3", "ogg", "sf2", "opus", "mid"))
     }
 
     defaultConfig {

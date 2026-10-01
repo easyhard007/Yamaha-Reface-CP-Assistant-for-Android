@@ -1,0 +1,310 @@
+{
+  "source": "tools\\drum_midi\\DIVA_BALLAD_57_BPM_4#4.mid",
+  "output": "tools\\generated_bass_midi\\DIVA_BALLAD_57_BPM_4#4_bass_midigpt.mid",
+  "bars": 206,
+  "tempo_bpm": 56.99997720000912,
+  "time_signature": "4/4",
+  "drum_track_index": 1,
+  "drum_hits": 5311,
+  "bass_notes": 454,
+  "unique_pitches": [
+    24,
+    26,
+    28,
+    29,
+    31,
+    33,
+    35,
+    36,
+    38,
+    40,
+    41,
+    43,
+    45,
+    47,
+    48,
+    50,
+    52,
+    55
+  ],
+  "pitch_min": 24,
+  "pitch_max": 55,
+  "model": "Metacreation/MIDI-GPT yellow_small",
+  "harmony_condition": "C major",
+  "pitch_postprocessing": "none",
+  "overlap_bars": 2,
+  "windows": [
+    {
+      "window": 1,
+      "start_bar": 0,
+      "context_bars": 0,
+      "generated_bars": 8,
+      "seed": 662300773,
+      "notes": 20
+    },
+    {
+      "window": 2,
+      "start_bar": 6,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1727834297,
+      "notes": 11
+    },
+    {
+      "window": 3,
+      "start_bar": 12,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 382362264,
+      "notes": 11
+    },
+    {
+      "window": 4,
+      "start_bar": 18,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1464249090,
+      "notes": 12
+    },
+    {
+      "window": 5,
+      "start_bar": 24,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1283914469,
+      "notes": 14
+    },
+    {
+      "window": 6,
+      "start_bar": 30,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 640935844,
+      "notes": 8
+    },
+    {
+      "window": 7,
+      "start_bar": 36,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 498903571,
+      "notes": 14
+    },
+    {
+      "window": 8,
+      "start_bar": 42,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1769363202,
+      "notes": 18
+    },
+    {
+      "window": 9,
+      "start_bar": 48,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1668916456,
+      "notes": 10
+    },
+    {
+      "window": 10,
+      "start_bar": 54,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 850007736,
+      "notes": 18
+    },
+    {
+      "window": 11,
+      "start_bar": 60,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 196414027,
+      "notes": 15
+    },
+    {
+      "window": 12,
+      "start_bar": 66,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1285424865,
+      "notes": 21
+    },
+    {
+      "window": 13,
+      "start_bar": 72,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 893611587,
+      "notes": 21
+    },
+    {
+      "window": 14,
+      "start_bar": 78,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1237034592,
+      "notes": 21
+    },
+    {
+      "window": 15,
+      "start_bar": 84,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1221306592,
+      "notes": 16
+    },
+    {
+      "window": 16,
+      "start_bar": 90,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1967045239,
+      "notes": 15
+    },
+    {
+      "window": 17,
+      "start_bar": 96,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1295310016,
+      "notes": 17
+    },
+    {
+      "window": 18,
+      "start_bar": 102,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 361801225,
+      "notes": 14
+    },
+    {
+      "window": 19,
+      "start_bar": 108,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1787127080,
+      "notes": 12
+    },
+    {
+      "window": 20,
+      "start_bar": 114,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1993674298,
+      "notes": 12
+    },
+    {
+      "window": 21,
+      "start_bar": 120,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 686336781,
+      "notes": 12
+    },
+    {
+      "window": 22,
+      "start_bar": 126,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1277695729,
+      "notes": 13
+    },
+    {
+      "window": 23,
+      "start_bar": 132,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1160920694,
+      "notes": 10
+    },
+    {
+      "window": 24,
+      "start_bar": 138,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 2071405611,
+      "notes": 12
+    },
+    {
+      "window": 25,
+      "start_bar": 144,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 611345776,
+      "notes": 10
+    },
+    {
+      "window": 26,
+      "start_bar": 150,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1221739168,
+      "notes": 12
+    },
+    {
+      "window": 27,
+      "start_bar": 156,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1491084576,
+      "notes": 8
+    },
+    {
+      "window": 28,
+      "start_bar": 162,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1176397893,
+      "notes": 10
+    },
+    {
+      "window": 29,
+      "start_bar": 168,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1901111335,
+      "notes": 13
+    },
+    {
+      "window": 30,
+      "start_bar": 174,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 214472568,
+      "notes": 11
+    },
+    {
+      "window": 31,
+      "start_bar": 180,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1297915968,
+      "notes": 16
+    },
+    {
+      "window": 32,
+      "start_bar": 186,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 266289571,
+      "notes": 8
+    },
+    {
+      "window": 33,
+      "start_bar": 192,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 1214755442,
+      "notes": 13
+    },
+    {
+      "window": 34,
+      "start_bar": 198,
+      "context_bars": 2,
+      "generated_bars": 6,
+      "seed": 512530523,
+      "notes": 6
+    }
+  ]
+}

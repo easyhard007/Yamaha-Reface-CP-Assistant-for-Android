@@ -49,6 +49,7 @@ std::string ChordDetector::detect(const std::set<int>& allNotes) {
         mChord = "-";
         mRootPc = -1; mBassPc = -1;
         mChordType = "";
+        mChordNotes.clear();
         mChanged = (prev != mChord);
         return mChord;
     }
@@ -74,6 +75,7 @@ std::string ChordDetector::detect(const std::set<int>& allNotes) {
         mChord = std::string(NOTE_NAMES[bassPC]) + "5";
         mChordType = "5";
         mRootPc = bassPC;
+        computeChordNotes();
         mChanged = (prev != mChord);
         return mChord;
     }

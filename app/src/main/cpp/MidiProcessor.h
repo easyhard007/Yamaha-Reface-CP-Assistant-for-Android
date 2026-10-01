@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <set>
 #include <string>
 #include <mutex>
 #include <vector>
@@ -32,6 +33,11 @@ struct CCResult {
     int sustainCCToSend = -1;
 };
 
+struct MidiNoteSetSnapshot {
+    std::set<int> allNotes;  // Active ∪ PedalHeld
+    std::set<int> lowNotes;  // allNotes ∩ [0, splitPoint)
+};
+
 /// Central MIDI processing — owns all note/pedal/sustain state
 /// Independent of AudioEngine. Call from MyMidiReceiver.
 class MidiProcessor {
@@ -62,6 +68,9 @@ public:
     int  getSplitPoint() const { return mSplitPoint; }
     int  changeTranspose(int delta);  // returns new value
     int  getTranspose() const { return mTranspose; }
+    /// Atomically snapshots the two sets used by chord recognition and by the
+    /// bass-loop release filter. This is safe to call outside MidiProcessor.
+    MidiNoteSetSnapshot getNoteSetSnapshot() const;
 
 private:
     mutable std::mutex mLock;

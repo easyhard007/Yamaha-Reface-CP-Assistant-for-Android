@@ -550,6 +550,47 @@ select { padding: 12px; border-radius: 8px; width: 100%; max-width: 320px; margi
     opacity: 0.72;
     pointer-events: none;
 }
+.drum-special-btn {
+    flex: 1;
+    position: relative;
+    min-width: 0;
+    padding: 7px 2px !important;
+    text-align: center;
+    font-size: 10px;
+    cursor: pointer;
+}
+.drum-special-btn.drum-special-disabled {
+    color: #666;
+    border-color: #383838;
+    background: #252525;
+    opacity: 0.58;
+    pointer-events: none;
+}
+.drum-special-btn.drum-special-active { background: #2e7d32; color: #fff; }
+
+.drum-volume-row {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) 38px;
+    align-items: center;
+    gap: 7px;
+    margin: 9px 4px;
+    color: #aaa;
+    font-size: 10px;
+}
+.drum-volume-row .energy-range { width: 100%; }
+.drum-volume-row > span:last-child { text-align: right; }
+.drum-special-btn.drum-special-selected::after,
+.drum-special-btn.drum-special-preparing::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border: 2px solid #fff;
+    border-radius: 7px;
+    pointer-events: none;
+}
+.drum-special-btn.drum-special-preparing::after {
+    animation: drumblink 0.34s ease-in-out infinite alternate;
+}
 .drumloop-btn {
     display: flex;
     position: relative;

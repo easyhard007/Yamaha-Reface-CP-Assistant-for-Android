@@ -48,6 +48,20 @@ std::set<int> MidiProcessor::getAllNotes() const {
     return all;
 }
 
+MidiNoteSetSnapshot MidiProcessor::getNoteSetSnapshot() const {
+    std::lock_guard<std::mutex> lock(mLock);
+    MidiNoteSetSnapshot snapshot;
+    for (const auto& kv : mActiveNotes) {
+        snapshot.allNotes.insert(kv.first);
+        if (kv.first < mSplitPoint) snapshot.lowNotes.insert(kv.first);
+    }
+    for (const auto& kv : mPedalHeldNotes) {
+        snapshot.allNotes.insert(kv.first);
+        if (kv.first < mSplitPoint) snapshot.lowNotes.insert(kv.first);
+    }
+    return snapshot;
+}
+
 // ---- MIDI Event Processing ----
 
 NoteOnResult MidiProcessor::processNoteOn(int note, int velocity, double timestampMs) {

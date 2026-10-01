@@ -48,5 +48,5 @@ private:
 
     void playBass(int pitch, int vel, double nowMs, AudioEngine& audio);
     void dampBass(double nowMs, double bpm, const std::vector<int>& chordNotes,
-                  float energy, AudioEngine& audio);
+                  float energy, int triggerVelocity, AudioEngine& audio);
 };

@@ -71,7 +71,12 @@ class MidiJsBridge(
     private val onSetDrumPending: (String) -> Unit,
     private val onDrumStartPlayback: () -> Unit,
     private val onDrumStopPlayback: () -> Unit,
-    private val onDrumStopImmediate: () -> Unit
+    private val onDrumStopImmediate: () -> Unit,
+    private val onSetDrumIntroSelected: (Boolean) -> Unit,
+    private val onDrumSmartFill: () -> Unit,
+    private val onDrumBreak: () -> Unit,
+    private val onDrumEnding: () -> Unit,
+    private val onSetDrumLoopVolume: (Float) -> Unit
 ) {
     companion object { private const val TAG = "MidiJsBridge" }
 
@@ -151,4 +156,13 @@ class MidiJsBridge(
     @JavascriptInterface fun drumStartPlayback() { onDrumStartPlayback() }
     @JavascriptInterface fun drumStopPlayback() { onDrumStopPlayback() }
     @JavascriptInterface fun drumStopImmediate() { onDrumStopImmediate() }
+    @JavascriptInterface fun setDrumIntroSelected(selected: Boolean) {
+        onSetDrumIntroSelected(selected)
+    }
+    @JavascriptInterface fun drumSmartFill() { onDrumSmartFill() }
+    @JavascriptInterface fun drumBreak() { onDrumBreak() }
+    @JavascriptInterface fun drumEnding() { onDrumEnding() }
+    @JavascriptInterface fun setDrumLoopVolume(v: Float) {
+        onSetDrumLoopVolume(v.coerceIn(0f, 1f))
+    }
 }

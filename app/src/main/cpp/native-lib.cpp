@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <mutex>
 #include <condition_variable>
+#include <set>
 #include <thread>
 #include <vector>
 #include <android/log.h>
@@ -34,8 +35,9 @@ static TempoDetector tempoDetector;
 static BassAssist bassAssist;
 extern DrumLoopEngine* g_drumLoopEngine;
 static DrumLoopEngine drumLoopEngine;
-float g_bassVolume = 0.8f;  // AudioEngine 混音用
-static int assistType = 0;
+std::atomic<float> g_bassVolume{0.8f};  // AudioEngine 混音用
+std::atomic<bool> g_bassLoopMode{false};
+static std::atomic<int> assistType{0};
 float g_minCajonEnergy = 0.0f;
 std::atomic<double> g_pendingBpmUpdate{-1.0};
 std::atomic<double> g_pendingRhythmGainUpdate{-1.0};
@@ -65,6 +67,13 @@ static bool g_bpmAdjustHeld = false;              // +/- 指针按住期间禁�
 static bool g_bpmPrepDispatched = false;          // Kotlin 已为最新目标启动预备流程
 static constexpr double kBpmPrepTailFraction = 0.125;
 static std::string g_chordDisplayStr;
+// 和弦显示继续反映即时识别结果；贝斯和弦额外用低音区集合过滤松键过程中
+// 出现的 C -> Em -> G 一类短暂子集。这里必须和 ChordDetector 一起串行化，
+// 因为 NoteOn/NoteOff、CC64 与界面设置可能来自不同线程。
+static std::mutex g_bassChordPushMutex;
+static std::set<int> g_previousLowNotes;
+static bool g_previousLowNotesValid = false;
+static bool g_bassChordPushDeferred = false;
 static bool g_syncResetting = false;
 static std::vector<double> g_recentSyncErrs;
 
@@ -182,6 +191,67 @@ static void onDrumTempoCutApplied(double target) {
                         "BPM applied at audio cut point: %.1f", target);
 }
 
+// 一次性 INTRO/FILL/BREAK 播完切到目标，或延迟 ENDING 在小节边界启动时，
+// 把节拍器同步到新段落第一拍。这里只更新 BeatTracker 的无锁时间基准。
+static void onDrumOneShotSwitched() {
+    beatTracker.sync();
+}
+
+// DrumLoopEngine 只负责 MIDI transport；所有声音仍由与箱鼓贝斯助手相同的
+// AudioEngine bass synth、SoundFont、增益和混响链生成。
+static void onDrumBassMidiEvent(int action, int pitch, int velocity) {
+    if (action == DrumLoopEngine::BassNoteOn && pitch >= 0 && velocity > 0) {
+        audio.enqueueNoteOn(2, 0, pitch, velocity);
+    } else if (action == DrumLoopEngine::BassNoteOff && pitch >= 0) {
+        audio.enqueueNoteOff(2, 0, pitch);
+    } else if (action == DrumLoopEngine::BassAllSoundsOff) {
+        audio.enqueueAllSoundsOff(2);
+    }
+}
+
+// MIDI 输入线程在音符/踏板状态改变后直接调用：ChordDetector -> 贝斯循环，
+// 全程停留在原生 C++ 调用栈中，不等待 WebView 状态轮询。
+static bool detectAndPushChordToBassLoop() {
+    std::lock_guard<std::mutex> stateLock(g_bassChordPushMutex);
+    const MidiNoteSetSnapshot snapshot = midi.getNoteSetSnapshot();
+    // std::includes 也把“完全相等”算作子集：只有出现了至少一个新的低音区
+    // 音符才算真实切换；单纯减少（或低音区未变）不会推动贝斯和弦。
+    const bool lowNotesAreSubset = g_previousLowNotesValid &&
+        std::includes(g_previousLowNotes.begin(), g_previousLowNotes.end(),
+                      snapshot.lowNotes.begin(), snapshot.lowNotes.end());
+    const size_t previousLowCount = g_previousLowNotes.size();
+    g_previousLowNotes = snapshot.lowNotes;
+    g_previousLowNotesValid = true;
+
+    chordDetector.detect(snapshot.allNotes);
+    const bool chordChanged = chordDetector.changed();
+    if (chordChanged) {
+        g_chordDisplayStr = chordDetector.getChord();
+        g_pendingChordUpdate.store(1);
+    }
+
+    const int bassPitch = BassAssist::getBassPitchFromChord(chordDetector.getChord());
+    const bool validBassChord = bassPitch >= 0;
+    bool bassContextPushed = false;
+    if (chordChanged && lowNotesAreSubset && validBassChord) {
+        // 没有加入新低音区音符时，更新全局显示但保留贝斯和弦。后续一旦加入
+        // 新音，即使识别出的和弦名没有再次变化，也会补推这次真实切换。
+        g_bassChordPushDeferred = true;
+        __android_log_print(ANDROID_LOG_DEBUG, "DrumLoop",
+                            "defer subset bass chord %s low=%zu prev=%zu",
+                            chordDetector.getChord().c_str(), snapshot.lowNotes.size(),
+                            previousLowCount);
+    } else if ((chordChanged || g_bassChordPushDeferred) &&
+               (!lowNotesAreSubset || !validBassChord)) {
+        drumLoopEngine.setBassChordContext(
+            bassPitch, chordDetector.getRootMidi(), chordDetector.getChordNotes(),
+            beatTracker.getCurrentBpm());
+        g_bassChordPushDeferred = false;
+        bassContextPushed = true;
+    }
+    return chordChanged || bassContextPushed;
+}
+
 static void pushSustainToKotlin(int cc) {
     if (!g_jvm || !g_activityObj || cc < 0) return;
     JNIEnv* env;
@@ -293,11 +363,15 @@ static void onBeatStep(int step, double bpm, void*) {
     float autoEnergy = cajon.updateEnergy(ms, beatTracker.getCurrentBpm());
     float energy = std::max(autoEnergy, g_minCajonEnergy);
     cajon.setEnergy(energy);
+    drumLoopEngine.setBassSelectionEnergy(energy);
 
-    // 贝斯助手编排
-    bassAssist.processStep(step, bassVel, cajon.getLastToneVel(), ms, bpm,
-                            g_chordDisplayStr, chordDetector.getChordNotes(),
-                            energy, audio, g_rhythmEngine);
+    // 箱鼓模式使用动态触发的 BassAssist；鼓循环模式改由同名 MIDI 乐句驱动，
+    // 两者最终都进入 AudioEngine 的 bass synth，不能同时触发。
+    if (assistType.load(std::memory_order_relaxed) == 0) {
+        bassAssist.processStep(step, bassVel, cajon.getLastToneVel(), ms, bpm,
+                               g_chordDisplayStr, chordDetector.getChordNotes(),
+                               energy, audio, g_rhythmEngine);
+    }
     pushEnergyDisplayUpdate();
     // 每拍首子步推送白点更新
     if (step % 8 == 0) pushBeatDotUpdate();
@@ -336,6 +410,9 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeInit(
     cajon.init(&rhythmEngine);
     g_drumLoopEngine = &drumLoopEngine;
     drumLoopEngine.setTempoCutCallback(onDrumTempoCutApplied);
+    drumLoopEngine.setOneShotSwitchCallback(onDrumOneShotSwitched);
+    drumLoopEngine.setBassMidiCallback(onDrumBassMidiEvent);
+    drumLoopEngine.setBassChordContext(-1, -1, {}, beatTracker.getCurrentBpm());
     startDrumTempoCutDispatchThread();
     audio.start();
     // Beat tracker
@@ -389,7 +466,7 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSendCC(
     if (controller == 86) { audio.enqueueSetGain(0, value / 127.0 * 5.0); return; }
     // CC87 → 根据模式路由: type=0 控制 Cajon 音量, type=1 控制鼓循环/伴奏音量
     if (controller == 87) {
-        if (assistType == 0 && g_rhythmEngine) {
+        if (assistType.load(std::memory_order_relaxed) == 0 && g_rhythmEngine) {
             float gain = value / 127.0f * 4.0f;
             g_rhythmEngine->setMasterGain(gain);
             g_pendingRhythmGainUpdate.store(gain);
@@ -568,11 +645,8 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOn(
     }
 
     auto r = midi.processNoteOn(note, velocity, ms);
-    // 新和弦识别: 用 AllActiveNotes
-    chordDetector.detect(midi.getAllNotes());
-    if (chordDetector.changed()) {
-        g_chordDisplayStr = chordDetector.getChord();
-        g_pendingChordUpdate.store(1);
+    // 新和弦识别: 用 ActiveNotes ∪ PedalHeldNotes，并原生推送给贝斯循环。
+    if (detectAndPushChordToBassLoop()) {
         std::string chordName = chordDetector.getChord();
         if (chordName != "-" && chordName != "???") {
             int root = chordDetector.getRootMidi();
@@ -586,11 +660,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessNoteOff(
         JNIEnv*, jobject, jint note) {
     auto r = midi.processNoteOff(note);
-    chordDetector.detect(midi.getAllNotes());
-    if (chordDetector.changed()) {
-        g_chordDisplayStr = chordDetector.getChord();
-        g_pendingChordUpdate.store(1);
-    }
+    detectAndPushChordToBassLoop();
     return encodeResult(r.sustainCCToSend, r.bassNote, 0);
 }
 
@@ -598,9 +668,11 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeProcessCC(
         JNIEnv*, jobject, jint controller, jint value) {
     auto r = midi.processCC(controller, value);
+    // CC64 会改变 PedalHeldNotes；踏板松开导致的和弦变化也必须立即原生推送。
+    if (controller == 64) detectAndPushChordToBassLoop();
     float bv = midi.getAndClearBassVolumeFromCC();
     if (bv >= 0.0f) {
-        g_bassVolume = bv;
+        g_bassVolume.store(bv, std::memory_order_relaxed);
         bassAssist.setVolume(bv);
         g_pendingBassVolUpdate.store(bv);
     }
@@ -611,6 +683,7 @@ extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetAutoSustain(
         JNIEnv*, jobject, jboolean enabled) {
     int cc = midi.setAutoSustainEnabled(enabled);
+    detectAndPushChordToBassLoop();
     pushSustainToKotlin(cc);
     return cc;
 }
@@ -651,7 +724,15 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeTranspose(
 
 extern "C" JNIEXPORT jint JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeChangeSplitPoint(
-        JNIEnv*, jobject, jint delta) { return midi.changeSplitPoint(delta); }
+        JNIEnv*, jobject, jint delta) {
+    const int splitPoint = midi.changeSplitPoint(delta);
+    // 改分割点本身不应被下一次 MIDI 事件误判为“松键子集”。
+    std::lock_guard<std::mutex> stateLock(g_bassChordPushMutex);
+    g_previousLowNotes = midi.getNoteSetSnapshot().lowNotes;
+    g_previousLowNotesValid = true;
+    g_bassChordPushDeferred = false;
+    return splitPoint;
+}
 
 // ===== Style / Rhythm Playback =====
 extern "C" JNIEXPORT jstring JNICALL
@@ -759,7 +840,10 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeIsBassAssistEnabled(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetBassAssistVolume(
-        JNIEnv*, jobject, jfloat volume) { bassAssist.setVolume(volume); g_bassVolume = volume; }
+        JNIEnv*, jobject, jfloat volume) {
+    bassAssist.setVolume(volume);
+    g_bassVolume.store(volume, std::memory_order_relaxed);
+}
 extern "C" JNIEXPORT jfloat JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetBassAssistVolume(
         JNIEnv*, jobject) { return bassAssist.getVolume(); }
@@ -845,8 +929,14 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSyncBeat(
         beatTracker.sync();
         pushBeatDotUpdate();
     } else {
-        beatTracker.tapTempo();
+        beatTracker.tapTempo(true);
     }
+}
+
+extern "C" JNIEXPORT jdouble JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopTapTempo(
+        JNIEnv*, jobject) {
+    return beatTracker.tapTempo(false);
 }
 
 extern "C" JNIEXPORT jdouble JNICALL
@@ -1000,7 +1090,14 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetCajonWeights(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeSetAssistType(
-        JNIEnv*, jobject, jint v) { assistType = v; cajon.setEnabled(v == 0); }
+        JNIEnv*, jobject, jint v) {
+    const int mode = v == 1 ? 1 : 0;
+    assistType.store(mode, std::memory_order_relaxed);
+    const bool drumMode = mode == 1;
+    g_bassLoopMode.store(drumMode, std::memory_order_relaxed);
+    cajon.setEnabled(!drumMode);
+    drumLoopEngine.setBassLoopEnabled(drumMode);
+}
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetDebugInfo(
@@ -1011,7 +1108,15 @@ Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeGetDebugInfo(
 extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeResetChord(
         JNIEnv*, jobject) {
-    chordDetector.detect(std::set<int>());
+    {
+        std::lock_guard<std::mutex> stateLock(g_bassChordPushMutex);
+        chordDetector.detect(std::set<int>());
+        g_chordDisplayStr = "-";
+        g_previousLowNotes = midi.getNoteSetSnapshot().lowNotes;
+        g_previousLowNotesValid = true;
+        g_bassChordPushDeferred = false;
+        drumLoopEngine.setBassChordContext(-1, -1, {}, beatTracker.getCurrentBpm());
+    }
     stylePlayer.setChordRoot(60, "major");
 }
 
@@ -1331,6 +1436,121 @@ extern "C" JNIEXPORT void JNICALL
 Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopCancelTempoCut(
         JNIEnv*, jobject) {
     drumLoopEngine.cancelTempoCut();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopArmAutoFillJump(
+        JNIEnv* env, jobject, jstring name, jint gen, jdouble delaySec,
+        jdouble destinationLogicalSec) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    bool ok = drumLoopEngine.armAutoFillJump(
+        n, gen, delaySec, destinationLogicalSec);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopCancelAutoFillJump(
+        JNIEnv*, jobject) {
+    drumLoopEngine.cancelAutoFillJump();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopStartOneShot(
+        JNIEnv* env, jobject, jstring name, jdouble logicalStartSec, jint fadeMs,
+        jstring nextName, jboolean stopAfter, jdouble delaySec, jdouble endFadeSec) {
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    const char* next = env->GetStringUTFChars(nextName, nullptr);
+    const bool ok = drumLoopEngine.startOneShot(
+        n, logicalStartSec, fadeMs, next, stopAfter == JNI_TRUE, delaySec, endFadeSec);
+    env->ReleaseStringUTFChars(nextName, next);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearOneShotStartedEvent(
+        JNIEnv* env, jobject) {
+    const std::string name = drumLoopEngine.getAndClearOneShotStartedEvent();
+    return env->NewStringUTF(name.c_str());
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopUpdateOneShotNext(
+        JNIEnv* env, jobject, jstring nextName) {
+    const char* next = env->GetStringUTFChars(nextName, nullptr);
+    const bool ok = drumLoopEngine.updateOneShotNext(next);
+    env->ReleaseStringUTFChars(nextName, next);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopCancelOneShot(
+        JNIEnv*, jobject) {
+    drumLoopEngine.cancelOneShot();
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopSetBassMidi(
+        JNIEnv* env, jobject, jstring name, jdoubleArray phases,
+        jintArray velocities, jintArray downbeats, jintArray strongBeats,
+        jintArray noteKinds, jintArray phraseGroups) {
+    if (!name || !phases || !velocities || !downbeats || !strongBeats ||
+        !noteKinds || !phraseGroups) return JNI_FALSE;
+    const jsize phaseCount = env->GetArrayLength(phases);
+    const jsize velocityCount = env->GetArrayLength(velocities);
+    const jsize downbeatCount = env->GetArrayLength(downbeats);
+    const jsize strongBeatCount = env->GetArrayLength(strongBeats);
+    const jsize kindCount = env->GetArrayLength(noteKinds);
+    const jsize groupCount = env->GetArrayLength(phraseGroups);
+    if (phaseCount != velocityCount || phaseCount != downbeatCount ||
+        phaseCount != strongBeatCount || phaseCount != kindCount ||
+        phaseCount != groupCount) return JNI_FALSE;
+    std::vector<double> phaseValues((size_t)phaseCount);
+    std::vector<int> velocityValues((size_t)velocityCount);
+    std::vector<int> downbeatValues((size_t)downbeatCount);
+    std::vector<int> strongBeatValues((size_t)strongBeatCount);
+    std::vector<int> kindValues((size_t)kindCount);
+    std::vector<int> groupValues((size_t)groupCount);
+    if (phaseCount > 0) {
+        env->GetDoubleArrayRegion(phases, 0, phaseCount, phaseValues.data());
+        std::vector<jint> rawVelocities((size_t)velocityCount);
+        std::vector<jint> rawDownbeats((size_t)downbeatCount);
+        std::vector<jint> rawStrongBeats((size_t)strongBeatCount);
+        std::vector<jint> rawKinds((size_t)kindCount);
+        std::vector<jint> rawGroups((size_t)groupCount);
+        env->GetIntArrayRegion(velocities, 0, velocityCount, rawVelocities.data());
+        env->GetIntArrayRegion(downbeats, 0, downbeatCount, rawDownbeats.data());
+        env->GetIntArrayRegion(strongBeats, 0, strongBeatCount, rawStrongBeats.data());
+        env->GetIntArrayRegion(noteKinds, 0, kindCount, rawKinds.data());
+        env->GetIntArrayRegion(phraseGroups, 0, groupCount, rawGroups.data());
+        if (env->ExceptionCheck()) return JNI_FALSE;
+        std::transform(rawVelocities.begin(), rawVelocities.end(), velocityValues.begin(),
+                       [](jint value) { return (int)value; });
+        std::transform(rawDownbeats.begin(), rawDownbeats.end(), downbeatValues.begin(),
+                       [](jint value) { return (int)value; });
+        std::transform(rawStrongBeats.begin(), rawStrongBeats.end(),
+                       strongBeatValues.begin(),
+                       [](jint value) { return (int)value; });
+        std::transform(rawKinds.begin(), rawKinds.end(), kindValues.begin(),
+                       [](jint value) { return (int)value; });
+        std::transform(rawGroups.begin(), rawGroups.end(), groupValues.begin(),
+                       [](jint value) { return (int)value; });
+    }
+    const char* n = env->GetStringUTFChars(name, nullptr);
+    if (!n) return JNI_FALSE;
+    const bool ok = drumLoopEngine.setBassMidiEvents(
+        n, phaseValues, velocityValues, downbeatValues, strongBeatValues,
+        kindValues, groupValues);
+    env->ReleaseStringUTFChars(name, n);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_chenyinan_reface_1cp_1assist_MainActivity_nativeDrumLoopGetAndClearOneShotSwitchEvent(
+        JNIEnv* env, jobject) {
+    const std::string name = drumLoopEngine.getAndClearOneShotSwitchEvent();
+    return env->NewStringUTF(name.c_str());
 }
 
 extern "C" JNIEXPORT jdouble JNICALL

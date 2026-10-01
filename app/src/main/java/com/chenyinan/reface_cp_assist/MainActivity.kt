@@ -12,6 +12,7 @@ import android.media.midi.MidiReceiver
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.webkit.JavascriptInterface
@@ -23,6 +24,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.atomic.AtomicInteger
 
 class MainActivity : AppCompatActivity() {
 
@@ -59,6 +61,23 @@ class MainActivity : AppCompatActivity() {
                 nativeDrumLoopArmTempoCut(name, gen, delay, offsets, nextDelays, bpm)
             },
             { nativeDrumLoopCancelTempoCut() },
+            { name, gen, delay, destination ->
+                nativeDrumLoopArmAutoFillJump(name, gen, delay, destination)
+            },
+            { nativeDrumLoopCancelAutoFillJump() },
+            { name, start, fadeMs, next, stopAfter, delaySec, endFadeSec ->
+                nativeDrumLoopStartOneShot(
+                    name, start, fadeMs, next, stopAfter, delaySec, endFadeSec
+                )
+            },
+            { next -> nativeDrumLoopUpdateOneShotNext(next) },
+            { nativeDrumLoopCancelOneShot() },
+            { name, phases, velocities, downbeats, strongBeats, noteKinds, phraseGroups ->
+                nativeDrumLoopSetBassMidi(
+                    name, phases, velocities, downbeats, strongBeats,
+                    noteKinds, phraseGroups
+                )
+            },
             { nativeGetCurrentBpm() }
         )
     }
@@ -145,7 +164,7 @@ class MainActivity : AppCompatActivity() {
             { channel, bank, prog -> nativeSetStyleChannelInst(channel, bank, prog) },
             { dumpStyleDebug() },
             { nativeGetDebugInfo() },
-            { v -> nativeSetAssistType(v) },
+            { v -> setAssistType(v) },
             { nativeCajonTick() },
             { e -> nativeSetCajonEnergy(e) },
             { nativeGetCajonEnergy() },
@@ -177,7 +196,12 @@ class MainActivity : AppCompatActivity() {
             { v -> drumLoopPlayer.setPending(v) },
             { drumLoopPlayer.startPlayback() },
             { drumLoopPlayer.stopPlayback() },
-            { drumLoopPlayer.stopPlaybackImmediate() }
+            { drumLoopPlayer.stopPlaybackImmediate() },
+            { selected -> drumLoopPlayer.setIntroSelected(selected) },
+            { drumLoopPlayer.triggerSmartFill() },
+            { drumLoopPlayer.triggerBreak() },
+            { drumLoopPlayer.triggerEnding() },
+            { volume -> nativeDrumLoopSetVolume(volume) }
         ), "Android")
         webView.loadUrl("file:///android_asset/web/index.html")
 
@@ -373,6 +397,8 @@ class MainActivity : AppCompatActivity() {
     private val tempoRestoreRunnable = Runnable { js("tempoRestore()") }
     private val bpmPrepDispatchLock = Any()
     private var bpmPrepDispatchRevision = 0L
+    @Volatile private var assistType = 1
+    private val drumTapAutoStartRevision = AtomicInteger(0)
 
     private fun pushSf2List() {
         val arr = JSONArray()
@@ -418,7 +444,7 @@ class MainActivity : AppCompatActivity() {
                 val pbv = nativeGetAndClearPendingBassVolume()
                 if (pbv >= 0f) {
                     val pct = Math.round(pbv * 100)
-                    js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
+                    js("if(typeof updateBassVolumeSliders==='function')updateBassVolumeSliders($pct)")
                 }
                 // CC90 等 native 来源的预备变速事件仍通过状态轮询领取。
                 // WebView 的 +/- 与 ×2/÷2 都在同一次桥接调用中直接派发，不经过这里等待。
@@ -433,9 +459,20 @@ class MainActivity : AppCompatActivity() {
                     drumLoopPlayer.onSwitchFired(sw)
                     js("onDrumLoopSwitchEvent('$sw')")
                 }
+                val oneShotStarted = nativeDrumLoopGetAndClearOneShotStartedEvent()
+                if (oneShotStarted.isNotEmpty()) {
+                    drumLoopPlayer.onOneShotStartedFired(oneShotStarted)
+                }
+                val oneShotSwitch = nativeDrumLoopGetAndClearOneShotSwitchEvent()
+                if (oneShotSwitch.isNotEmpty()) {
+                    drumLoopPlayer.onOneShotSwitchFired(oneShotSwitch)
+                }
                 val lat = nativeDrumLoopGetAndClearLatencyMs()
                 if (lat >= 0) js("onDrumLoopLatency(${lat.toLong()})")
-                if (nativeDrumLoopGetAndClearStoppedEvent() != 0) js("onDrumLoopStopped()")
+                if (nativeDrumLoopGetAndClearStoppedEvent() != 0) {
+                    drumLoopPlayer.onPlaybackStopped()
+                    js("onDrumLoopStopped()")
+                }
                 chordHandler.postDelayed(this, 150)
             }
         }
@@ -524,7 +561,7 @@ class MainActivity : AppCompatActivity() {
                         val pbv = nativeGetAndClearPendingBassVolume()
                         if (pbv >= 0f) {
                             val pct = Math.round(pbv * 100)
-                            js("smoothSlide('bass-assist-vol',$pct,onBassAssistVol)")
+                            js("if(typeof updateBassVolumeSliders==='function')updateBassVolumeSliders($pct)")
                         }
                         val ccName = if (ctrl == 64) "Sustain" else "CC$ctrl"
                         // midiLogRx removed
@@ -612,7 +649,43 @@ class MainActivity : AppCompatActivity() {
     private fun startStyle() { nativeStyleStart() }
     private fun stopStyle() { nativeStopStyle() }
     private fun isStylePlaying(): Boolean = nativeIsStylePlaying()
-    private fun syncBeat() { nativeSyncBeat() }
+    private fun setAssistType(value: Int) {
+        assistType = if (value == 1) 1 else 0
+        // 切换模式会取消尚未到时的四击鼓循环启动。
+        drumTapAutoStartRevision.incrementAndGet()
+        nativeSetAssistType(assistType)
+    }
+
+    private fun syncBeat() {
+        if (assistType != 1) {
+            // 箱鼓助手保留原逻辑：第四击后锁定节拍并把伴奏设为 50%。
+            nativeSyncBeat()
+            return
+        }
+
+        // 在第四击进入 JNI 前就记住绝对时间。后续 BPM 渲染准备不能把
+        // 启播定时器整体往后推，否则准备耗时会直接变成节拍误差。
+        val fourthTapUptimeMs = SystemClock.uptimeMillis()
+        val delayMs = nativeDrumLoopTapTempo()
+        if (delayMs < 0.0) return
+        val bpm = nativeGetCurrentBpm()
+        val revision = drumTapAutoStartRevision.incrementAndGet()
+        val launchAtUptimeMs = fourthTapUptimeMs + delayMs.toLong().coerceAtLeast(0L)
+
+        // 鼓循环模式只计算 BPM，不打开/锁定箱鼓音量。渲染准备立即开始。
+        chordHandler.post {
+            if (assistType != 1 || drumTapAutoStartRevision.get() != revision) return@post
+            drumLoopPlayer.prepareTapTempoStart(bpm)
+        }
+        // 直接挂到“预计下一拍前 100ms”的绝对 uptime，不从上面的准备完成后才开始倒计。
+        chordHandler.postAtTime({
+            if (assistType == 1 && drumTapAutoStartRevision.get() == revision &&
+                !drumLoopPlayer.isPlaybackActive()
+            ) {
+                drumLoopPlayer.startPlayback()
+            }
+        }, launchAtUptimeMs)
+    }
 
     /**
      * 把已经确定的 BPM 目标放到主线程立即开始预备渲染。
@@ -734,6 +807,7 @@ class MainActivity : AppCompatActivity() {
     external fun nativeGetTimeSig(): Int
     external fun nativeGetCurrentBeat(): Int
     external fun nativeSyncBeat()
+    external fun nativeDrumLoopTapTempo(): Double
     external fun nativeRequestBpmMult(mult: Int): Double
     external fun nativeRequestBpmDelta(delta: Int): Double
     external fun nativeSetBpmHold(held: Boolean)
@@ -812,6 +886,35 @@ class MainActivity : AppCompatActivity() {
     ): Boolean
     external fun nativeDrumLoopCancelTempoCut()
     external fun nativeDrumLoopGetAndClearTempoCutEvent(): Double
+    external fun nativeDrumLoopArmAutoFillJump(
+        name: String,
+        gen: Int,
+        delaySec: Double,
+        destinationLogicalSec: Double
+    ): Boolean
+    external fun nativeDrumLoopCancelAutoFillJump()
+    external fun nativeDrumLoopStartOneShot(
+        name: String,
+        logicalStartSec: Double,
+        fadeMs: Int,
+        nextName: String,
+        stopAfter: Boolean,
+        delaySec: Double,
+        endFadeSec: Double
+    ): Boolean
+    external fun nativeDrumLoopUpdateOneShotNext(nextName: String): Boolean
+    external fun nativeDrumLoopCancelOneShot()
+    external fun nativeDrumLoopSetBassMidi(
+        name: String,
+        phases: DoubleArray,
+        velocities: IntArray,
+        downbeats: IntArray,
+        strongBeats: IntArray,
+        noteKinds: IntArray,
+        phraseGroups: IntArray
+    ): Boolean
+    external fun nativeDrumLoopGetAndClearOneShotStartedEvent(): String
+    external fun nativeDrumLoopGetAndClearOneShotSwitchEvent(): String
     external fun nativeDrumLoopPlay(name: String)
     external fun nativeDrumLoopPlayAt(name: String, logicalStartSec: Double)
     external fun nativeDrumLoopStop()

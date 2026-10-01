@@ -129,9 +129,20 @@
                 <div id="drum-play-btn" class="drum-play-disabled" role="button" aria-disabled="true" onclick="onDrumPlayBtn()" style="flex:0 0 auto; width:46px; height:36px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:16px; border-radius:6px;">▶</div>
             </div>
             <div style="display:flex; gap:6px; margin-bottom:8px;">
-                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">INTRO</div>
-                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">BREAK</div>
-                <div class="glass-btn btn-rect" style="flex:1; text-align:center; font-size:10px;">ENDING</div>
+                <div id="drum-intro-btn" class="glass-btn btn-rect drum-special-btn" onclick="onDrumIntroBtn()">INTRO</div>
+                <div id="drum-fill-btn" class="glass-btn btn-rect drum-special-btn" onclick="onDrumSmartFillBtn()">FILL</div>
+                <div id="drum-break-btn" class="glass-btn btn-rect drum-special-btn" onclick="onDrumBreakBtn()">BREAK</div>
+                <div id="drum-ending-btn" class="glass-btn btn-rect drum-special-btn" onclick="onDrumEndingBtn()">ENDING</div>
+            </div>
+            <div class="drum-volume-row">
+                <span>鼓</span>
+                <input type="range" id="drum-loop-vol" class="energy-range glow" min="0" max="100" value="90" oninput="onDrumLoopVol()">
+                <span id="drum-loop-vol-val">90%</span>
+            </div>
+            <div class="drum-volume-row">
+                <span>贝斯</span>
+                <input type="range" id="drum-bass-vol" class="energy-range glow" min="0" max="100" value="80" oninput="onDrumBassVol()">
+                <span id="drum-bass-vol-val">80%</span>
             </div>
             <div id="drumloop-status" style="color:#888; font-size:11px; text-align:center; margin-bottom:8px; min-height:14px;"></div>
             <div id="drumloop-grid" style="display:none;"></div>
@@ -149,7 +160,7 @@
             <div style="text-align:center; margin:8px 0;">
                 <span style="color:#aaa; font-size:10px;">贝斯</span>
                 <input type="range" id="bass-assist-vol" class="energy-range" min="0" max="100" value="80" oninput="onBassAssistVol()">
-                <span id="bass-assist-vol-val" style="color:#aaa; font-size:10px;">50%</span>
+                <span id="bass-assist-vol-val" style="color:#aaa; font-size:10px;">80%</span>
             </div>
             <div style="text-align:center; margin:8px 0;">
                 <span style="color:#aaa; font-size:10px;">能量</span>
@@ -551,13 +562,28 @@
         }
         // ===== Slider handlers =====
         function onRhythmVol() { var v = parseInt(document.getElementById('rhythm-vol').value); document.getElementById('rhythm-vol-val').innerText = v + '%'; if (typeof Android !== 'undefined') Android.setRhythmGain(v / 100 * 4.0); updateSliderGlow(); }
-        function onBassAssistVol() { var v = parseInt(document.getElementById('bass-assist-vol').value); syncBassVolSlider(); if (typeof Android !== 'undefined') { Android.setBassAssistVolume(v / 100); Android.setBassAssist(v > 0); } if (v > 0) { var eb = document.getElementById('enhance-btn'); if (eb && eb.classList.contains('btn-active')) toggleBassEnhance(); } }
-        function syncBassVolSlider() { var s = document.getElementById('bass-assist-vol'); var v = parseInt(s.value); document.getElementById('bass-assist-vol-val').innerText = v + '%'; updateSliderGlow(); }
+        function applyBassVolumeUi(v) {
+            v = Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
+            var assist = document.getElementById('bass-assist-vol');
+            var drum = document.getElementById('drum-bass-vol');
+            if (assist) assist.value = v;
+            if (drum) drum.value = v;
+            var assistVal = document.getElementById('bass-assist-vol-val');
+            var drumVal = document.getElementById('drum-bass-vol-val');
+            if (assistVal) assistVal.innerText = v + '%';
+            if (drumVal) drumVal.innerText = v + '%';
+            updateSliderGlow();
+        }
+        function onBassAssistVol() { var v = parseInt(document.getElementById('bass-assist-vol').value); applyBassVolumeUi(v); if (typeof Android !== 'undefined') { Android.setBassAssistVolume(v / 100); Android.setBassAssist(v > 0); } if (v > 0) { var eb = document.getElementById('enhance-btn'); if (eb && eb.classList.contains('btn-active')) toggleBassEnhance(); } }
+        function onDrumLoopVol() { var v = parseInt(document.getElementById('drum-loop-vol').value); document.getElementById('drum-loop-vol-val').innerText = v + '%'; document.getElementById('drum-loop-vol').classList.toggle('glow', v > 0); if (typeof Android !== 'undefined' && Android.setDrumLoopVolume) Android.setDrumLoopVolume(v / 100); }
+        function onDrumBassVol() { var v = parseInt(document.getElementById('drum-bass-vol').value); applyBassVolumeUi(v); if (typeof Android !== 'undefined') Android.setBassAssistVolume(v / 100); }
+        function syncBassVolSlider() { var s = document.getElementById('bass-assist-vol'); applyBassVolumeUi(parseInt(s.value)); }
+        function updateBassVolumeSliders(v) { applyBassVolumeUi(v); }
         function onCajonEnergy() { var v = parseInt(document.getElementById('cajon-energy').value) / 100; document.getElementById('cajon-energy-val').innerText = v.toFixed(2); if (typeof Android !== 'undefined') Android.setMinCajonEnergy(v); updateEnergyTrack(); }
         var _smoothEnergy = 0, _smoothFactor = 0.35;
         function updateEnergyTrack() { var slider = document.getElementById('cajon-energy'); if (!slider) return; var targetEnergy = (typeof Android !== 'undefined' && Android.getCajonEnergy) ? Android.getCajonEnergy() : 0; _smoothEnergy += (targetEnergy - _smoothEnergy) * _smoothFactor; var pct = Math.round(_smoothEnergy * 100); slider.style.background = 'linear-gradient(to right,rgba(59,173,227,1) 0%,rgba(87,111,230,1) 25%,rgba(152,68,183,1) 51%,rgba(255,53,127,1) 100%) 0 0 / ' + pct + '% 100% no-repeat, #444'; }
         function smoothSlide(sliderId, targetPct, onDone) { var s = document.getElementById(sliderId); if (!s) return; var cur = parseInt(s.value); if (cur === targetPct) { if (onDone) onDone(); return; } var step = cur < targetPct ? 1 : -1; var totalSteps = Math.abs(targetPct - cur); var interval = 5; var i = 0; var timer = setInterval(function() { cur += step; i++; s.value = cur; if (i >= totalSteps) { clearInterval(timer); s.value = targetPct; if (onDone) onDone(); } }, interval); }
-        function updateSliderGlow() { var rv = parseInt(document.getElementById('rhythm-vol').value); var bv = parseInt(document.getElementById('bass-assist-vol').value); document.getElementById('rhythm-vol').classList.toggle('glow', rv > 0); document.getElementById('bass-assist-vol').classList.toggle('glow', bv > 0); updateLockIcon(rv > 0 ? 1 : 0); }
+        function updateSliderGlow() { var rv = parseInt(document.getElementById('rhythm-vol').value); var bv = parseInt(document.getElementById('bass-assist-vol').value); document.getElementById('rhythm-vol').classList.toggle('glow', rv > 0); document.getElementById('bass-assist-vol').classList.toggle('glow', bv > 0); var db = document.getElementById('drum-bass-vol'); if (db) db.classList.toggle('glow', bv > 0); var dv = document.getElementById('drum-loop-vol'); if (dv) dv.classList.toggle('glow', parseInt(dv.value) > 0); updateLockIcon(rv > 0 ? 1 : 0); }
         function updateEnergyDisplay() {
             updateEnergyTrack();
             var energy = (typeof Android !== 'undefined' && Android.getCajonEnergy) ? Android.getCajonEnergy() : 0;
@@ -596,13 +622,38 @@
         window._drumCurrent = null;   // 正在播放的 variation (实心)
         window._drumTarget = null;    // 播放目标 variation (快速闪烁白色外框)
         window._drumReady = false;    // 循环包元数据与 Opus 均已加载完成
+        window._drumSpecial = null;   // fill / intro / break / ending
+        window._drumSpecialStarted = false;
+        window._drumIntroSelected = false;
+        window._drumStopping = false;
+        window._drumStopped = false;
+        window._drumRenderReady = 0;
+        window._drumRenderDone = 0;
+        window._drumRenderTotal = 0;
         var DRUM_COLUMNS = [
             ['verse', 'VERSE'],
             ['verse2', 'VERSE 2'],
             ['prechorus', 'PRE CHORUS'],
-            ['chorus', 'CHORUS'],
-            ['fill', 'FILL']
+            ['chorus', 'CHORUS']
         ];
+        function drumHasKey(key) {
+            return !!(window._drumMeta && window._drumMeta.variations &&
+                window._drumMeta.variations.some(function (v) { return v.key === key; }));
+        }
+        function drumHasCategory(category) {
+            return !!(window._drumMeta && window._drumMeta.variations &&
+                window._drumMeta.variations.some(function (v) { return v.category === category; }));
+        }
+        function setDrumSpecialButton(id, available, enabled, selected, active, preparing) {
+            var b = document.getElementById(id);
+            if (!b) return;
+            var disabled = !available || !enabled;
+            b.classList.toggle('drum-special-disabled', disabled);
+            b.classList.toggle('drum-special-selected', !!selected);
+            b.classList.toggle('drum-special-active', !!active);
+            b.classList.toggle('drum-special-preparing', !!preparing);
+            b.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+        }
         function updateDrumButtonStates() {
             var grid = document.getElementById('drumloop-grid');
             if (!grid) return;
@@ -613,14 +664,41 @@
                 // 当前与目标可以是同一个：此时同时显示绿色填充和白色闪烁外框。
                 if (key === window._drumTarget) b.classList.add('drum-blink');
             });
+            var busy = !!window._drumSpecial;
+            var playing = !!window._drumCurrent;
+            setDrumSpecialButton(
+                'drum-intro-btn', window._drumReady && drumHasKey('INTRO'),
+                !playing && !busy, window._drumIntroSelected,
+                window._drumSpecial === 'intro' && window._drumSpecialStarted,
+                window._drumSpecial === 'intro' && !window._drumSpecialStarted
+            );
+            setDrumSpecialButton(
+                'drum-fill-btn', window._drumReady && drumHasCategory('fill'),
+                playing && !busy, false,
+                window._drumSpecial === 'fill' && window._drumSpecialStarted,
+                window._drumSpecial === 'fill' && !window._drumSpecialStarted
+            );
+            setDrumSpecialButton(
+                'drum-break-btn', window._drumReady && drumHasKey('BREAK'),
+                playing && !busy, false,
+                window._drumSpecial === 'break' && window._drumSpecialStarted,
+                window._drumSpecial === 'break' && !window._drumSpecialStarted
+            );
+            setDrumSpecialButton(
+                'drum-ending-btn', window._drumReady && drumHasCategory('ending'),
+                playing && !busy, false,
+                window._drumSpecial === 'ending' && window._drumSpecialStarted,
+                window._drumSpecial === 'ending' && !window._drumSpecialStarted
+            );
             var pb = document.getElementById('drum-play-btn');
             if (pb) {
                 var canStart = window._drumReady && !!window._drumTarget;
-                var disabled = !window._drumCurrent && !canStart;
-                pb.classList.toggle('drum-play-stop', !!window._drumCurrent);
+                var engaged = !!window._drumCurrent || !!window._drumSpecial;
+                var disabled = !engaged && !canStart;
+                pb.classList.toggle('drum-play-stop', engaged);
                 pb.classList.toggle('drum-play-disabled', disabled);
                 pb.setAttribute('aria-disabled', disabled ? 'true' : 'false');
-                if (window._drumCurrent) {
+                if (engaged) {
                     pb.innerText = '■';
                 } else {
                     pb.innerText = '▶';
@@ -658,6 +736,11 @@
             try {
                 var meta = JSON.parse(json);
                 window._drumMeta = meta;
+                window._drumStopping = false;
+                window._drumStopped = false;
+                window._drumRenderReady = 0;
+                window._drumRenderDone = 0;
+                window._drumRenderTotal = meta.variations.length;
                 var groups = {};
                 DRUM_COLUMNS.forEach(function (c) {
                     groups[c[0]] = meta.variations
@@ -666,7 +749,7 @@
                 });
                 var m = 0;
                 DRUM_COLUMNS.forEach(function (c) { m = Math.max(m, groups[c[0]].length); });
-                var html = '<div style="display:grid; grid-template-columns:repeat(5,1fr); gap:4px;">';
+                var html = '<div style="display:grid; grid-template-columns:repeat(' + DRUM_COLUMNS.length + ',1fr); gap:4px;">';
                 DRUM_COLUMNS.forEach(function (c) {
                     html += '<div style="text-align:center; color:#aaa; font-size:9px; padding:2px 0;">' + c[1] + '</div>';
                 });
@@ -699,8 +782,28 @@
             if (typeof Android !== 'undefined') Android.setDrumPending(key);
             updateDrumButtonStates();
         }
+        function onDrumIntroBtn() {
+            if (!window._drumReady || window._drumCurrent || window._drumSpecial || !drumHasKey('INTRO')) return;
+            window._drumIntroSelected = !window._drumIntroSelected;
+            if (typeof Android !== 'undefined' && Android.setDrumIntroSelected) {
+                Android.setDrumIntroSelected(window._drumIntroSelected);
+            }
+            updateDrumButtonStates();
+        }
+        function onDrumSmartFillBtn() {
+            if (!window._drumCurrent || window._drumSpecial || !drumHasCategory('fill')) return;
+            if (typeof Android !== 'undefined' && Android.drumSmartFill) Android.drumSmartFill();
+        }
+        function onDrumBreakBtn() {
+            if (!window._drumCurrent || window._drumSpecial || !drumHasKey('BREAK')) return;
+            if (typeof Android !== 'undefined' && Android.drumBreak) Android.drumBreak();
+        }
+        function onDrumEndingBtn() {
+            if (!window._drumCurrent || window._drumSpecial || !drumHasCategory('ending')) return;
+            if (typeof Android !== 'undefined' && Android.drumEnding) Android.drumEnding();
+        }
         function onDrumPlayBtn() {
-            if (window._drumCurrent) {
+            if (window._drumCurrent || window._drumSpecial) {
                 if (typeof Android !== 'undefined') Android.drumStopPlayback();
             } else {
                 if (!window._drumReady || !window._drumTarget) return;
@@ -709,34 +812,106 @@
         }
         function onDrumLoopDefaultPending(key) { window._drumTarget = key; updateDrumButtonStates(); }
         function onDrumLoopPending(key) { window._drumTarget = key; updateDrumButtonStates(); }
+        function onDrumIntroSelection(selected) {
+            window._drumIntroSelected = !!selected;
+            updateDrumButtonStates();
+        }
+        function onDrumOneShotPreparing(kind, key) {
+            window._drumSpecial = kind;
+            window._drumSpecialStarted = false;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '准备中: ' + key;
+        }
+        function onDrumOneShotStarted(kind, key) {
+            window._drumStopping = false;
+            window._drumStopped = false;
+            window._drumSpecial = kind;
+            window._drumSpecialStarted = true;
+            window._drumCurrent = key;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
+        }
+        function onDrumOneShotFinished(key, kind) {
+            window._drumStopping = false;
+            window._drumStopped = false;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            window._drumIntroSelected = false;
+            window._drumCurrent = key;
+            updateDrumButtonStates();
+            document.getElementById('drumloop-status').innerText = '播放中: ' + key;
+        }
+        function onDrumOneShotCancelled() {
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            updateDrumButtonStates();
+        }
         function onDrumLoopPlaying(key) {
+            window._drumStopping = false;
+            window._drumStopped = false;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            window._drumIntroSelected = false;
             window._drumCurrent = key;
             window._drumTarget = key;
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '播放中: ' + key;
         }
         function onDrumLoopSwitchEvent(key) {
+            window._drumStopping = false;
+            window._drumStopped = false;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
             window._drumCurrent = key;
             // 目标可能已在这次 native 事件抵达 UI 前被用户改成另一个 variation，不能覆盖。
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '播放中: ' + key;
         }
         function onDrumLoopStopping() {
+            window._drumStopping = true;
+            window._drumStopped = false;
             window._drumCurrent = null;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            window._drumIntroSelected = false;
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '停止中...';
         }
         function onDrumLoopStopped() {
+            window._drumStopping = false;
+            window._drumStopped = true;
             window._drumCurrent = null;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            window._drumIntroSelected = false;
             updateDrumButtonStates();
+            var status = document.getElementById('drumloop-status');
+            if (window._drumRenderTotal > 0 &&
+                window._drumRenderDone >= window._drumRenderTotal) {
+                status.innerText = '已停止 · 全部渲染完成';
+            } else if (window._drumRenderTotal > 0) {
+                status.innerText = '已停止 · 高质量渲染 ' +
+                    window._drumRenderDone + '/' + window._drumRenderTotal;
+            } else {
+                status.innerText = '已停止';
+            }
         }
         function onDrumLoopLatency(ms) {
+            if (window._drumStopping || window._drumStopped) return;
             document.getElementById('drumloop-status').innerText = '切换延迟: ' + ms + ' ms';
         }
         function resetDrumPlayback() {
-            if (window._drumCurrent && typeof Android !== 'undefined') Android.drumStopImmediate();
+            if ((window._drumCurrent || window._drumSpecial) && typeof Android !== 'undefined') Android.drumStopImmediate();
             window._drumCurrent = null;
             window._drumTarget = null;
+            window._drumSpecial = null;
+            window._drumSpecialStarted = false;
+            window._drumIntroSelected = false;
+            window._drumStopping = false;
+            window._drumStopped = false;
+            window._drumRenderReady = 0;
+            window._drumRenderDone = 0;
+            window._drumRenderTotal = 0;
             updateDrumButtonStates();
         }
         function onDrumLoopProgress(done, total) {
@@ -747,6 +922,12 @@
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = '就绪（点击 ▶ 开始播放）';
         }
+        function showDrumRenderStatus(message) {
+            // 1 秒停止淡出期间保留“停止中”；淡出完成后渲染进度继续更新。
+            if (window._drumStopping) return;
+            document.getElementById('drumloop-status').innerText =
+                (window._drumStopped ? '已停止 · ' : '') + message;
+        }
         function onDrumLoopPlaybackBlocked(msg) {
             updateDrumButtonStates();
             document.getElementById('drumloop-status').innerText = msg || '请先选择并等待鼓循环加载完成';
@@ -756,13 +937,18 @@
             grid.querySelectorAll('.drumloop-btn').forEach(function (b) {
                 b.classList.remove('ready', 'tail-ready', 'full');
             });
-            document.getElementById('drumloop-status').innerText = '高质量渲染 0/' + total;
+            window._drumRenderReady = 0;
+            window._drumRenderDone = 0;
+            window._drumRenderTotal = total;
+            showDrumRenderStatus('高质量渲染 0/' + total);
         }
         function onDrumLoopPreRoll(key, ready, total) {
             var grid = document.getElementById('drumloop-grid');
             var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
             if (btn) btn.classList.add('ready');  // 状态1: 高质量已渲染 0.5s
-            document.getElementById('drumloop-status').innerText = '预热 ' + ready + '/' + total;
+            window._drumRenderReady = ready;
+            window._drumRenderTotal = total;
+            showDrumRenderStatus('预热 ' + ready + '/' + total);
         }
         function onDrumLoopTailReady(key) {
             var grid = document.getElementById('drumloop-grid');
@@ -773,10 +959,15 @@
             var grid = document.getElementById('drumloop-grid');
             var btn = grid.querySelector('.drumloop-btn[data-key="' + key + '"]');
             if (btn) btn.classList.add('full');  // 状态3: 高质量完整渲染
-            document.getElementById('drumloop-status').innerText = '高质量渲染 ' + done + '/' + total;
+            window._drumRenderDone = done;
+            window._drumRenderTotal = total;
+            showDrumRenderStatus('高质量渲染 ' + done + '/' + total);
         }
         function onDrumLoopStretchDone() {
-            document.getElementById('drumloop-status').innerText = '全部渲染完成，点击按钮循环播放';
+            window._drumRenderDone = window._drumRenderTotal;
+            showDrumRenderStatus(window._drumStopped
+                ? '全部渲染完成'
+                : '全部渲染完成，点击按钮循环播放');
         }
         function onDrumLoopError(msg) {
             document.getElementById('drumloop-status').innerText = '错误: ' + msg;
